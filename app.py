@@ -49,3 +49,30 @@ if cod_input in mapping_specialisti:
     col_a, col_b = st.columns(2)
     with col_a:
         categorie = st.selectbox("1. Alege Categoria:", ["Contracte & Proiecte", "Proprietate Intelectuală", "Evenimente științifice"])
+    
+    with col_b:
+        optiuni_tabel = []
+        if categorie == "Contracte & Proiecte":
+            optiuni_tabel = [
+                "base_proiecte_fdi", "base_proiecte_internationale", 
+                "base_proiecte_pnrr", "base_contracte_terti", 
+                "base_proiecte_pncdi", "base_proiecte_interreg", 
+                "base_proiecte_noneu", "base_contracte_cep"
+            ]
+        
+        tabel_selectat = st.selectbox("2. Selectează Tabelul:", optiuni_tabel if optiuni_tabel else ["Fără tabele disponibile"])
+
+    # Mesaj pregătire cu nickname
+    if optiuni_tabel:
+        st.info(f"Sistemul este pregătit să încarce datele din **{tabel_selectat}** pentru **{nume_fain}**.")
+        
+        # Buton activare
+        if st.button("🔄 Activează încărcarea datelor"):
+            st.success(f"Se interoghează baza de date PostgreSQL pentru tabelul {tabel_selectat}...")
+            # Mesajul actualizat conform cerinței tale:
+            st.warning("Urmează afișarea tabelului cu funcțiile de Editare / Citire / Actualizare si Ștergere.")
+    else:
+        st.warning(f"Momentan nu există tabele configurate pentru categoria '{categorie}'.")
+
+elif cod_input != "":
+    st.sidebar.error("Cod neautorizat!")
