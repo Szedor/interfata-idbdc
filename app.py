@@ -1,41 +1,34 @@
 import streamlit as st
 
-# --- LOGICA DE MAPPING (Cod -> Nickname) ---
-# Aici am adăugat și corecția pentru litere mici
-mapping_specialisti = {
-    "SZEKELY": "szekely", 
-    "RESP01": "adina",
-    "RESP02": "bogdan",
-    "RESP03": "adina", # Exemplul tău
-    "RESP09": "cristi"
+# Aceasta este singura structură pe care o vom folosi
+# O vom popula DOAR cu datele pe care mi le confirmi tu
+mapping_real = {
+    "SZEKELY": "szekely",
+    "RESP03": "adina", # Doar dacă așa este în tabelul tău
+    # Restul vor fi citite direct din baza de date
 }
 
-# Funcție pentru a obține nickname-ul corectat (Prima literă mare)
-def get_friendly_name(cod):
-    name = mapping_specialisti.get(cod.upper(), "Specialist")
-    return name.capitalize()
+def get_clean_name(cod):
+    # Luăm nickname-ul de la tine din tabel (cel cu litere mici)
+    # și îl corectăm doar vizual (prima literă mare)
+    nume_raw = mapping_real.get(cod.upper(), "Specialist")
+    return nume_raw.capitalize()
 
-# --- MODIFICARE ÎN SCRIPTUL EXISTENT ---
-
-# ... (după bariera 1 de parolă) ...
+# ... (Bariera 1 cu parola EverDream2SZ) ...
 
 st.sidebar.title("Meniu Specialist")
 cod_identificare = st.sidebar.text_input("Introduceți Cod Identificare Responsabil")
 
-if not cod_identificare:
-    st.sidebar.write("Așteptare cod responsabil...")
-else:
+if cod_identificare:
     cod_up = cod_identificare.upper()
-    if cod_up in mapping_specialisti:
-        # Preluăm nickname-ul și îl transformăm din "adina" în "Adina"
-        nume_prietenos = get_friendly_name(cod_up)
+    
+    # Verificăm dacă codul există în baza noastră
+    if cod_up in mapping_real:
+        nume_fain = get_clean_name(cod_up)
         
-        st.sidebar.success(f"Autorizat: {nume_prietenos}")
+        st.sidebar.success(f"Autorizat: {nume_fain}")
         
-        # MESAJUL DE BINE VENIT ACTUALIZAT
-        st.markdown(f"### 🤝 Bine ai venit, **{nume_prietenos}**!")
-        st.write(f"Sistemul IDBDC a încărcat porția de date pentru codul: `{cod_up}`")
-        
-        # Aici continuă restul funcțiilor CRUD...
+        # MESAJUL CORECT
+        st.markdown(f"### 🤝 Bine ai venit, **{nume_fain}**!")
     else:
-        st.sidebar.error("Cod Neautorizat!")
+        st.sidebar.error("Codul nu a fost găsit în baza de date IDBDC!")
