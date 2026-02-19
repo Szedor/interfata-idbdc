@@ -1,23 +1,25 @@
 import streamlit as st
-import psycopg2
 import pandas as pd
+from sqlalchemy import create_engine
 
-st.set_page_config(page_title="IDBDC UPT", layout="wide")
+st.set_page_config(page_title="Consola IDBDC", layout="wide")
 st.title("🛡️ Consola Operatori IDBDC")
 
-# Mesaj de verificare
-st.info("Dacă vezi acest mesaj, interfața funcționează. Urmează conectarea la date.")
+# Preluăm conexiunea din Secrets
+if "postgres_url" in st.secrets:
+    try:
+        engine = create_engine(st.secrets["postgres_url"])
+        
+        # Interogarea SQL pentru tabelul tău
+        query = "SELECT * FROM base_proiecte_fdi" 
+        df = pd.read_sql(query, engine)
 
-# Încercăm să citim datele din Supabase
-try:
-    conn = psycopg2.connect(st.secrets["postgres_url"])
-    st.success("✅ Conexiune reușită la baza de date!")
-    
-    query = "SELECT id_tehnic, titlul, validat_idbdc FROM base_proiecte_fdi LIMIT 10"
-    df = pd.read_sql(query, conn)
-    st.write("### Ultimele 10 proiecte FDI:")
-    st.table(df)
-    
-    conn.close()
-except Exception as e:
-    st.error(f"❌ Încă nu am configurat conexiunea. Eroare: {e}")
+        st.success("✅ Datele au fost încărcate cu succes!")
+        
+        # Afișăm tabelul interactiv
+        st.dataframe(df, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"❌ Eroare la citirea datelor: {e}")
+else:
+    st.warning("⚠️ Conexiunea nu este configurată în Secrets.")
