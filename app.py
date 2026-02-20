@@ -1,27 +1,42 @@
 import streamlit as st
 import psycopg2
+import pandas as pd
 
-# 1. ZONA DE DEFINIȚII (Aici "învățăm" programul ce să facă)
 def connect_db():
-    return psycopg2.connect(
-        host="host_ul_tau",
-        database="nume_db",
-        user="utilizator",
-        password="parola"
-    )
+    try:
+        return psycopg2.connect(
+            host="ADRESA_HOST",
+            database="NUME_BAZA_DATE",
+            user="UTILIZATOR",
+            password="PAROLA"
+        )
+    except Exception as e:
+        st.error(f"Eroare de conexiune: {e}")
+        return None
 
-# 2. ZONA DE EXECUȚIE (Aici îi spunem să afișeze efectiv pe ecran)
-# Aceasta este partea care trebuie să fie "la final", sub funcție
-st.title("Sistem IDBDC")
-st.subheader("Gestionare Proiecte FDI")
-
-# Apelăm funcția definită mai sus
-try:
+def main():
+    st.set_page_config(page_title="Interfață IDBDC", layout="wide")
+    
+    # Titlul și antetul conform Protocolului de Lucru IDBDC
+    st.title("Interfață IDBDC")
+    st.markdown("---")
+    
     conn = connect_db()
-    st.success("Conexiunea la baza de date este activă!")
     
-    # Aici vom adăuga ulterior logica pentru cod_identificare
-    # și legătura cu cod_inregistrare din base_proiecte_fdi
-    
-except Exception as e:
-    st.error(f"Nu am putut conecta baza de date: {e}")
+    if conn:
+        st.success("Conexiune stabilă cu baza de date.")
+        
+        # Aici se va implementa logica pentru cod_identificare 
+        # și legătura cu cod_inregistrare din base_proiecte_fdi
+        
+        # Exemplu de placeholder pentru interogare:
+        # query = "SELECT * FROM base_proiecte_fdi"
+        # df = pd.read_sql(query, conn)
+        # st.dataframe(df)
+        
+        conn.close()
+    else:
+        st.warning("Așteptare configurare corectă parametri conexiune.")
+
+if __name__ == "__main__":
+    main()
