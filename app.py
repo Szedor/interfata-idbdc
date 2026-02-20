@@ -2,51 +2,37 @@ import streamlit as st
 import psycopg2
 import pandas as pd
 
-# CONFIGURARE PARAMETRI CONEXIUNE (Introdu datele tale aici)
-DB_CONFIG = {
-    "host": "localhost",          # Sau IP-ul serverului tău
-    "database": "nume_baza_ta",   # Numele bazei de date
-    "user": "postgres",           # Utilizatorul tău
-    "password": "parola_ta"       # Parola ta
+# CONFIGURARE ACCES IDBDC
+# Înlocuiește valorile de mai jos cu datele tale reale de acces
+DB_PARAMS = {
+    "host": "localhost",
+    "database": "nume_baza_date",
+    "user": "utilizator",
+    "password": "parola"
 }
 
 def connect_db():
     try:
-        return psycopg2.connect(
-            host=DB_CONFIG["host"],
-            database=DB_CONFIG["database"],
-            user=DB_CONFIG["user"],
-            password=DB_CONFIG["password"]
-        )
+        return psycopg2.connect(**DB_PARAMS)
     except Exception as e:
-        # Mesaj tehnic pentru depanare, afișat doar dacă conexiunea eșuează
         st.error(f"Eroare de conexiune la baza de date: {e}")
         return None
 
 def main():
-    # Setări de pagină pentru un aspect curat, conform IDBDC
-    st.set_page_config(page_title="IDBDC - Gestiune Cercetare", layout="wide")
+    # Aspectul IDBDC stabilit anterior
+    st.title("Interfață IDBDC")
     
-    st.title("Sistem IDBDC")
-    st.subheader("Interogare și Dezvoltare Baze Date Cercetare")
-    st.markdown("---")
-    
-    # Tentativă de conectare
     conn = connect_db()
     
     if conn:
-        st.success("✅ Conexiune stabilită cu succes.")
+        st.success("Conexiune stabilită.")
         
-        # ZONA DE OPERARE IDBDC
-        # Aici vom integra logica pentru cod_identificare 
-        # și legătura cu cod_inregistrare din base_proiecte_fdi
+        # Logica de corelare cod_identificare (IDBDC) -> cod_inregistrare (base_proiecte_fdi)
+        # Se va adăuga aici interogarea specifică
         
-        st.info("Sistemul este gata pentru prelucrarea datelor din base_proiecte_fdi.")
-        
-        # Închidem conexiunea la finalul execuției
         conn.close()
     else:
-        st.warning("⚠️ Atenție: Verificați parametrii de conectare în cod (Host, Database, User, Password).")
+        st.warning("⚠️ Serverul PostgreSQL nu a fost găsit. Verifică dacă serviciul este pornit și parametrii de host/port sunt corecți.")
 
 if __name__ == "__main__":
     main()
