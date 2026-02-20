@@ -1,23 +1,32 @@
-import streamlit as st
-import psycopg2
-
-# Funcție care verifică în SQL cine este operatorul
-def verifica_operator(cod_introdus):
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT nume_prenume FROM com_operatori WHERE cod_acces = %s", (cod_introdus,))
-        result = cur.fetchone()
-        return result[0] if result else None
-    except:
-        return None
-
-# Bariera 2 (Sidebar)
-cod_input = st.sidebar.text_input("Cod Identificare", type="password").upper()
-nume_operator = verifica_operator(cod_input)
-
 if nume_operator:
-    st.sidebar.success(f"Salut, {nume_operator}!")
-    # Aici începe CRUD
-else:
-    if cod_input:
-        st.sidebar.error("Cod incorect!")
+    st.title("🛠️ Editare și Validare Proiecte")
+    
+    # Selectăm un proiect din baza de date
+    cur.execute("SELECT cod_inregistrare, titlu_proiect FROM base_proiecte_fdi")
+    proiecte = cur.fetchall()
+    optiuni = {f"{p[0]} - {p[1][:50]}...": p[0] for p in proiecte}
+    
+    selectie = st.selectbox("Selectează proiectul pentru validare:", list(optiuni.keys()))
+    cod_proiect = optiuni[selectie]
+
+    # Formularul de "Luptă"
+    with st.form("form_editare"):
+        st.info(f"Editezi proiectul: {cod_proiect}")
+        
+        # Aici adăugăm câmpurile CRUD
+        validat = st.checkbox("Confirm validare IDBDC")
+        observatii = st.text_area("Observații")
+        
+        buton_salvare = st.form_submit_button("💾 Salvează în Baza de Date")
+        
+        if buton_salvare:
+            # Executăm UPDATE-ul care "ștampilează" rândul cu numele operatorului
+            query_update = """
+                UPDATE base_proiecte_fdi 
+                SET responsabil_idbdc = %s, 
+                    data_ultimei_actualizari = CURRENT_TIMESTAMP
+                WHERE cod_inregistrare = %s
+            """
+            cur.execute(query_update, (nume_operator, cod_proiect))
+            conn.commit()
+            st.success(f"Proiect validat cu succes de către {nume_operator}!")
