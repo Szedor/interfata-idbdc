@@ -1,38 +1,34 @@
 import streamlit as st
 import psycopg2
-import pandas as pd
-
-# CONFIGURARE ACCES IDBDC
-# Înlocuiește valorile de mai jos cu datele tale reale de acces
-DB_PARAMS = {
-    "host": "localhost",
-    "database": "nume_baza_date",
-    "user": "utilizator",
-    "password": "parola"
-}
 
 def connect_db():
     try:
-        return psycopg2.connect(**DB_PARAMS)
+        # Aici trebuie să introduci datele tale reale de acces
+        return psycopg2.connect(
+            host="localhost", 
+            database="nume_baza_date", 
+            user="postgres", 
+            password="parola"
+        )
     except Exception as e:
         st.error(f"Eroare de conexiune la baza de date: {e}")
         return None
 
 def main():
-    # Aspectul IDBDC stabilit anterior
+    # Revenire la aspectul minim stabilit: titlul simplu
     st.title("Interfață IDBDC")
-    
+
     conn = connect_db()
-    
+
     if conn:
         st.success("Conexiune stabilită.")
         
-        # Logica de corelare cod_identificare (IDBDC) -> cod_inregistrare (base_proiecte_fdi)
-        # Se va adăuga aici interogarea specifică
+        # Aici se va face interogarea folosind cod_identificare 
+        # legat de cod_inregistrare din base_proiecte_fdi
         
         conn.close()
     else:
-        st.warning("⚠️ Serverul PostgreSQL nu a fost găsit. Verifică dacă serviciul este pornit și parametrii de host/port sunt corecți.")
+        st.warning("⚠️ Serverul PostgreSQL nu a fost găsit. Verifică dacă serviciul este pornit.")
 
 if __name__ == "__main__":
     main()
