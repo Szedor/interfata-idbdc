@@ -29,8 +29,3 @@ def check_idbdc_status(conn):
             st.warning("⚠️ 'cod_inregistrare' nu a fost găsită în tabelă.")
     except:
         pass
-
-# Notă: Acest script presupune că ai configurat deja st.connection("postgresql")
-    if st.sidebar.button("Ieșire (Logout)"):
-        st.session_state["autentificat"] = False
-        st.rerun()
