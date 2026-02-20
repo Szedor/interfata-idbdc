@@ -2,41 +2,51 @@ import streamlit as st
 import psycopg2
 import pandas as pd
 
+# CONFIGURARE PARAMETRI CONEXIUNE (Introdu datele tale aici)
+DB_CONFIG = {
+    "host": "localhost",          # Sau IP-ul serverului tău
+    "database": "nume_baza_ta",   # Numele bazei de date
+    "user": "postgres",           # Utilizatorul tău
+    "password": "parola_ta"       # Parola ta
+}
+
 def connect_db():
     try:
         return psycopg2.connect(
-            host="ADRESA_HOST",
-            database="NUME_BAZA_DATE",
-            user="UTILIZATOR",
-            password="PAROLA"
+            host=DB_CONFIG["host"],
+            database=DB_CONFIG["database"],
+            user=DB_CONFIG["user"],
+            password=DB_CONFIG["password"]
         )
     except Exception as e:
-        st.error(f"Eroare de conexiune: {e}")
+        # Mesaj tehnic pentru depanare, afișat doar dacă conexiunea eșuează
+        st.error(f"Eroare de conexiune la baza de date: {e}")
         return None
 
 def main():
-    st.set_page_config(page_title="Interfață IDBDC", layout="wide")
+    # Setări de pagină pentru un aspect curat, conform IDBDC
+    st.set_page_config(page_title="IDBDC - Gestiune Cercetare", layout="wide")
     
-    # Titlul și antetul conform Protocolului de Lucru IDBDC
-    st.title("Interfață IDBDC")
+    st.title("Sistem IDBDC")
+    st.subheader("Interogare și Dezvoltare Baze Date Cercetare")
     st.markdown("---")
     
+    # Tentativă de conectare
     conn = connect_db()
     
     if conn:
-        st.success("Conexiune stabilă cu baza de date.")
+        st.success("✅ Conexiune stabilită cu succes.")
         
-        # Aici se va implementa logica pentru cod_identificare 
+        # ZONA DE OPERARE IDBDC
+        # Aici vom integra logica pentru cod_identificare 
         # și legătura cu cod_inregistrare din base_proiecte_fdi
         
-        # Exemplu de placeholder pentru interogare:
-        # query = "SELECT * FROM base_proiecte_fdi"
-        # df = pd.read_sql(query, conn)
-        # st.dataframe(df)
+        st.info("Sistemul este gata pentru prelucrarea datelor din base_proiecte_fdi.")
         
+        # Închidem conexiunea la finalul execuției
         conn.close()
     else:
-        st.warning("Așteptare configurare corectă parametri conexiune.")
+        st.warning("⚠️ Atenție: Verificați parametrii de conectare în cod (Host, Database, User, Password).")
 
 if __name__ == "__main__":
     main()
