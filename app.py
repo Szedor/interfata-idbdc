@@ -10,7 +10,7 @@ DB_CONFIG = {
     "host": "db.zkkkirpggtczbdzqqlyc.supabase.co",
     "database": "postgres",
     "user": "postgres",
-    "password": "AICI_SCRII_PAROLA_NOUA", # <--- PUNE PAROLA TA AICI
+    "password": "23elf18SKY05!", # <--- PUNE PAROLA TA AICI
     "port": "5432"
 }
 
@@ -25,7 +25,7 @@ if not st.session_state["autentificat"]:
     st.subheader("Bariera 1: Acces General")
     parola_gen = st.text_input("Parola secretă IDBDC:", type="password")
     if st.button("Verifică"):
-        if parola_gen == "idbdc2026": # Poți schimba această parolă oricând
+        if parola_gen == "EverDream2SZ": # Poți schimba această parolă oricând
             st.session_state["autentificat"] = True
             st.rerun()
         else:
