@@ -5,8 +5,9 @@ import psycopg2
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- DATE INTEGRATE (SOLUȚIA DEFINITIVĂ PENTRU TENANT) ---
-# Am modificat User-ul: am adăugat ID-ul proiectului tău după punct (metoda recomandată de Supabase pentru Pooler)
+# --- DATE INTEGRATE (SOLUȚIA PENTRU TENANT ID) ---
+# Am unit USERNAME-ul cu PROJECT ID (metoda standard: user.project_id)
+# Aceasta elimină eroarea "Tenant not found"
 DB_URI = "postgresql://postgres.zkkkirpggtczbdzqqlyc:23elf18SKY05!@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
 # Gestionare Sesiune
@@ -33,10 +34,11 @@ elif st.session_state["operator_valid"] is None:
     
     if st.button("Validare Operator"):
         try:
-            # Conectare folosind URI-ul cu Tenant ID inclus în User
+            # Conectare folosind URI-ul care conține Tenant ID-ul în user
             conn = psycopg2.connect(DB_URI)
             cur = conn.cursor()
             
+            # Verificăm codul în tabela creată vineri
             cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
             res = cur.fetchone()
             
@@ -46,7 +48,7 @@ elif st.session_state["operator_valid"] is None:
                     "cat": res[1], 
                     "prj": res[2]
                 }
-                st.success("Conexiune stabilită cu succes!")
+                st.success("Sistemul este LIVE!")
                 st.rerun()
             else:
                 st.error("❌ Codul nu a fost găsit în baza de date!")
@@ -63,8 +65,8 @@ else:
     st.sidebar.info(f"Proiect: {op['prj']}\nCategorie: {op['cat']}")
     
     st.header(f"Salut, {op['nume']}!")
-    st.write(f"Sunteți conectat la Consola de Gestionare Cercetare.")
-    st.info(f"Filtru activat pe categoria: **{op['cat']}**.")
+    st.write(f"Conexiunea cu baza de date IDBDC a fost stabilită prin tunel IPv4 securizat.")
+    st.info(f"Filtru activ: {op['prj']}")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
