@@ -1,14 +1,13 @@
 import streamlit as st
 import psycopg2
-import os
 
 # Configurare vizuală IDBDC
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- DATE INTEGRATE (METODA PENTRU FORȚARE IPv4) ---
-# Am adăugat parametrul sslmode și am păstrat portul 6543 (Pooler) care este mai prietenos cu IPv4
-DB_URI = "postgresql://postgres:23elf18SKY05!@db.zkkkirpggtczbdzqqlyc.supabase.co:6543/postgres?sslmode=require"
+# --- DATE INTEGRATE (SOLUȚIA PENTRU FORȚARE IPv4) ---
+# Schimbăm host-ul cu versiunea "ipv4.pooler..." care forțează adresa pe formatul vechi, compatibil
+DB_URI = "postgresql://postgres:23elf18SKY05!@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
 # Gestionare Sesiune
 if "autentificat" not in st.session_state:
@@ -34,11 +33,11 @@ elif st.session_state["operator_valid"] is None:
     
     if st.button("Validare Operator"):
         try:
-            # Conectare folosind URI-ul care forțează parametrii de rețea corecți
+            # Conectare folosind URI-ul adaptat pentru IPv4
             conn = psycopg2.connect(DB_URI)
             cur = conn.cursor()
             
-            # Interogare tabelă com_operatori
+            # Verificăm codul în tabela com_operatori
             cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
             res = cur.fetchone()
             
@@ -48,7 +47,7 @@ elif st.session_state["operator_valid"] is None:
                     "cat": res[1], 
                     "prj": res[2]
                 }
-                st.success("Conexiune reușită!")
+                st.success("Conexiune stabilită prin IPv4!")
                 st.rerun()
             else:
                 st.error("❌ Codul nu a fost găsit în baza de date!")
@@ -56,7 +55,7 @@ elif st.session_state["operator_valid"] is None:
             cur.close()
             conn.close()
         except Exception as e:
-            st.error(f"Eroare tehnică (Posibilă problemă IPv4/IPv6): {e}")
+            st.error(f"Eroare de rețea (IPv4/IPv6): {e}")
 
 # INTERFAȚA DE LUCRU
 else:
@@ -65,7 +64,7 @@ else:
     st.sidebar.info(f"Proiect: {op['prj']}\nCategorie: {op['cat']}")
     
     st.header(f"Salut, {op['nume']}!")
-    st.write(f"Acces activat pentru: **{op['prj']}**.")
+    st.write(f"Conexiunea cu baza de date IDBDC este acum activă prin tunel IPv4.")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
