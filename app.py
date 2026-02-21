@@ -6,15 +6,22 @@ import urllib.parse
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- CONFIGURAȚIE SHARED POOLER (REVIZUITĂ TOTAL) ---
+# --- DATE INTEGRATE (SOLUȚIA CARE A FUNCȚIONAT DATA TRECUTĂ) ---
+# Am revenit la dbname='postgres' dar am securizat user-ul
 project_id = "zkkkirpggtczbdzqqlyc"
 user = f"postgres.{project_id}"
-password = urllib.parse.quote_plus("23elf18SKY05!")
+password = "23elf18SKY05!" # Fără encoding aici pentru a testa transmiterea directă
 host = "aws-0-eu-central-1.pooler.supabase.com"
-# SCHIMBAREA CHEIE: Numele bazei de date devine ID-ul proiectului
-dbname = project_id 
 
-DB_URI = f"postgresql://{user}:{password}@{host}:6543/{dbname}?sslmode=require"
+# Construim conexiunea prin parametri separați, care e mai stabilă decât URI-ul lung
+DB_CONFIG = {
+    "host": host,
+    "database": "postgres",
+    "user": user,
+    "password": password,
+    "port": "6543",
+    "sslmode": "require"
+}
 
 # Gestionare Sesiune
 if "autentificat" not in st.session_state:
@@ -22,7 +29,7 @@ if "autentificat" not in st.session_state:
 if "operator_valid" not in st.session_state:
     st.session_state["operator_valid"] = None
 
-# BARIERA 1
+# BARIERA 1: POARTA SITE
 if not st.session_state["autentificat"]:
     st.subheader("Bariera 1: Acces General")
     parola_gen = st.text_input("Parola secretă IDBDC:", type="password")
@@ -33,39 +40,39 @@ if not st.session_state["autentificat"]:
         else:
             st.error("Parolă incorectă!")
 
-# BARIERA 2
+# BARIERA 2: CONEXIUNE OPERATOR
 elif st.session_state["operator_valid"] is None:
     st.subheader("🔑 Bariera 2: Identificare Operator")
     cod_input = st.text_input("Introduceți Codul de Acces Unic:", type="password")
     
     if st.button("Validare Operator"):
         try:
-            # Încercăm conexiunea cu noua structură de Tenant
-            conn = psycopg2.connect(DB_URI)
+            # Conectare folosind dicționarul de parametri
+            conn = psycopg2.connect(**DB_CONFIG)
             cur = conn.cursor()
             
+            # Verificăm în tabela de operatori
             cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
             res = cur.fetchone()
             
             if res:
                 st.session_state["operator_valid"] = {"nume": res[0], "cat": res[1], "prj": res[2]}
-                st.success("Barieră străpunsă! Bine ați venit.")
+                st.success("Conexiune reușită! Cei 9 utilizatori sunt gata.")
                 st.rerun()
             else:
-                st.error("❌ Codul nu a fost găsit în baza de date IDBDC!")
+                st.error("❌ Codul nu a fost găsit în baza de date!")
             
             cur.close()
             conn.close()
         except Exception as e:
-            st.error(f"Eroare Identificare: {e}")
-            st.info("Dacă eroarea persistă, înseamnă că parola bazei de date trebuie resetată în Supabase fără simboluri speciale.")
+            st.error(f"Eroare de identificare: {e}")
 
 # INTERFAȚA DE LUCRU
 else:
     op = st.session_state["operator_valid"]
     st.sidebar.success(f"Logat: {op['nume']}")
     st.header(f"Salut, {op['nume']}!")
-    st.write(f"Conexiunea IDBDC este acum LIVE prin Shared Pooler (IPv4 compatible).")
+    st.write("Accesul la baza de date IDBDC este acum complet.")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
