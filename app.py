@@ -1,31 +1,27 @@
 import streamlit as st
 import psycopg2
+import os
 
 # Configurare vizuală IDBDC
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- DATELE TALE REALE DIN SUPABASE (INTEGRATE DE GEMINI) ---
-DB_CONFIG = {
-    "host": "db.zkkkirpggtczbdzqqlyc.supabase.co",
-    "database": "postgres",
-    "user": "postgres",
-    "password": "23elf18SKY05!", # Parola bazei de date integrată conform cerinței
-    "port": "6543" # Portul corectat pentru a evita eroarea TCP/IP
-}
+# --- DATE INTEGRATE (METODA PENTRU FORȚARE IPv4) ---
+# Am adăugat parametrul sslmode și am păstrat portul 6543 (Pooler) care este mai prietenos cu IPv4
+DB_URI = "postgresql://postgres:23elf18SKY05!@db.zkkkirpggtczbdzqqlyc.supabase.co:6543/postgres?sslmode=require"
 
-# Gestionare Sesiune (Bariere)
+# Gestionare Sesiune
 if "autentificat" not in st.session_state:
     st.session_state["autentificat"] = False
 if "operator_valid" not in st.session_state:
     st.session_state["operator_valid"] = None
 
-# BARIERA 1: ACCES GENERAL (PAROLA SITE)
+# BARIERA 1: ACCES GENERAL
 if not st.session_state["autentificat"]:
     st.subheader("Bariera 1: Acces General")
     parola_gen = st.text_input("Parola secretă IDBDC:", type="password")
     if st.button("Verifică"):
-        if parola_gen == "EverDream2SZ": # Parola de poartă integrată conform cerinței
+        if parola_gen == "EverDream2SZ":
             st.session_state["autentificat"] = True
             st.rerun()
         else:
@@ -38,11 +34,11 @@ elif st.session_state["operator_valid"] is None:
     
     if st.button("Validare Operator"):
         try:
-            # Conectare la baza de date centrală
-            conn = psycopg2.connect(**DB_CONFIG)
+            # Conectare folosind URI-ul care forțează parametrii de rețea corecți
+            conn = psycopg2.connect(DB_URI)
             cur = conn.cursor()
             
-            # Verificăm dacă codul există în tabela com_operatori
+            # Interogare tabelă com_operatori
             cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
             res = cur.fetchone()
             
@@ -52,25 +48,24 @@ elif st.session_state["operator_valid"] is None:
                     "cat": res[1], 
                     "prj": res[2]
                 }
-                st.success("Acces Validat!")
+                st.success("Conexiune reușită!")
                 st.rerun()
             else:
-                st.error("❌ Codul nu a fost găsit în baza de date IDBDC!")
+                st.error("❌ Codul nu a fost găsit în baza de date!")
             
             cur.close()
             conn.close()
         except Exception as e:
-            st.error(f"Eroare tehnică de conectare: {e}")
+            st.error(f"Eroare tehnică (Posibilă problemă IPv4/IPv6): {e}")
 
-# INTERFAȚA DE LUCRU (DUPĂ VALIDARE)
+# INTERFAȚA DE LUCRU
 else:
     op = st.session_state["operator_valid"]
     st.sidebar.success(f"Logat: {op['nume']}")
     st.sidebar.info(f"Proiect: {op['prj']}\nCategorie: {op['cat']}")
     
     st.header(f"Salut, {op['nume']}!")
-    st.write("Sunteți conectat la Consola de Gestionare Cercetare.")
-    st.write(f"Conform bazei de date, aveți acces la datele: **{op['prj']}**.")
+    st.write(f"Acces activat pentru: **{op['prj']}**.")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
