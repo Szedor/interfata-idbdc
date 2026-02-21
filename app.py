@@ -6,15 +6,15 @@ import urllib.parse
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- CONFIGURAȚIE SHARED POOLER (VERIFICATĂ) ---
-# Parametrii care forțează identificarea corectă a Tenant-ului
+# --- CONFIGURAȚIE SHARED POOLER (REVIZUITĂ TOTAL) ---
 project_id = "zkkkirpggtczbdzqqlyc"
 user = f"postgres.{project_id}"
 password = urllib.parse.quote_plus("23elf18SKY05!")
 host = "aws-0-eu-central-1.pooler.supabase.com"
+# SCHIMBAREA CHEIE: Numele bazei de date devine ID-ul proiectului
+dbname = project_id 
 
-# Încercăm varianta în care și baza de date și user-ul poartă ID-ul proiectului
-DB_URI = f"postgresql://{user}:{password}@{host}:6543/postgres?sslmode=require"
+DB_URI = f"postgresql://{user}:{password}@{host}:6543/{dbname}?sslmode=require"
 
 # Gestionare Sesiune
 if "autentificat" not in st.session_state:
@@ -40,7 +40,7 @@ elif st.session_state["operator_valid"] is None:
     
     if st.button("Validare Operator"):
         try:
-            # Conexiune optimizată pentru Pooler
+            # Încercăm conexiunea cu noua structură de Tenant
             conn = psycopg2.connect(DB_URI)
             cur = conn.cursor()
             
@@ -49,23 +49,23 @@ elif st.session_state["operator_valid"] is None:
             
             if res:
                 st.session_state["operator_valid"] = {"nume": res[0], "cat": res[1], "prj": res[2]}
-                st.success("Sistemul IDBDC este ONLINE!")
+                st.success("Barieră străpunsă! Bine ați venit.")
                 st.rerun()
             else:
-                st.error("❌ Codul nu a fost găsit!")
+                st.error("❌ Codul nu a fost găsit în baza de date IDBDC!")
             
             cur.close()
             conn.close()
         except Exception as e:
             st.error(f"Eroare Identificare: {e}")
-            st.info("Dacă eroarea 'Tenant not found' persistă, vom încerca să schimbăm baza de date din 'postgres' în ID-ul proiectului.")
+            st.info("Dacă eroarea persistă, înseamnă că parola bazei de date trebuie resetată în Supabase fără simboluri speciale.")
 
 # INTERFAȚA DE LUCRU
 else:
     op = st.session_state["operator_valid"]
     st.sidebar.success(f"Logat: {op['nume']}")
     st.header(f"Salut, {op['nume']}!")
-    st.write(f"Conexiune activă pe proiectul: **{op['prj']}**")
+    st.write(f"Conexiunea IDBDC este acum LIVE prin Shared Pooler (IPv4 compatible).")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
