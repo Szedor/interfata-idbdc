@@ -5,13 +5,13 @@ import psycopg2
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- DATELE TALE REALE DIN SUPABASE (CONFIGURATE) ---
+# --- DATELE TALE REALE DIN SUPABASE (INTEGRATE DE GEMINI) ---
 DB_CONFIG = {
     "host": "db.zkkkirpggtczbdzqqlyc.supabase.co",
     "database": "postgres",
     "user": "postgres",
-    "password": "23elf18SKY05!", # <--- PUNE PAROLA TA AICI
-    "port": "5432"
+    "password": "23elf18SKY05!", # Parola bazei de date integrată conform cerinței
+    "port": "6543" # Portul corectat pentru a evita eroarea TCP/IP
 }
 
 # Gestionare Sesiune (Bariere)
@@ -25,7 +25,7 @@ if not st.session_state["autentificat"]:
     st.subheader("Bariera 1: Acces General")
     parola_gen = st.text_input("Parola secretă IDBDC:", type="password")
     if st.button("Verifică"):
-        if parola_gen == "EverDream2SZ": # Poți schimba această parolă oricând
+        if parola_gen == "EverDream2SZ": # Parola de poartă integrată conform cerinței
             st.session_state["autentificat"] = True
             st.rerun()
         else:
@@ -42,7 +42,7 @@ elif st.session_state["operator_valid"] is None:
             conn = psycopg2.connect(**DB_CONFIG)
             cur = conn.cursor()
             
-            # Verificăm dacă codul există în tabela com_operatori stabilită vineri
+            # Verificăm dacă codul există în tabela com_operatori
             cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
             res = cur.fetchone()
             
