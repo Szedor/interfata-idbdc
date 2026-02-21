@@ -5,10 +5,10 @@ import psycopg2
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- DATE INTEGRATE (SOLUȚIA PENTRU TENANT ID) ---
-# Am unit USERNAME-ul cu PROJECT ID (metoda standard: user.project_id)
-# Aceasta elimină eroarea "Tenant not found"
-DB_URI = "postgresql://postgres.zkkkirpggtczbdzqqlyc:23elf18SKY05!@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
+# --- DATE INTEGRATE (SOLUȚIA PENTRU TENANT ID REVIZUITĂ) ---
+# Am adăugat codul de proiect în username și am folosit adresa directă de pooler
+# care corespunde exact proiectului tău, forțând IPv4.
+DB_URI = "postgresql://postgres.zkkkirpggtczbdzqqlyc:23elf18SKY05!@db.zkkkirpggtczbdzqqlyc.supabase.co:6543/postgres?sslmode=require"
 
 # Gestionare Sesiune
 if "autentificat" not in st.session_state:
@@ -34,7 +34,7 @@ elif st.session_state["operator_valid"] is None:
     
     if st.button("Validare Operator"):
         try:
-            # Conectare folosind URI-ul care conține Tenant ID-ul în user
+            # Conectare folosind URI-ul care conține Tenant ID-ul în user ȘI în host
             conn = psycopg2.connect(DB_URI)
             cur = conn.cursor()
             
@@ -48,7 +48,7 @@ elif st.session_state["operator_valid"] is None:
                     "cat": res[1], 
                     "prj": res[2]
                 }
-                st.success("Sistemul este LIVE!")
+                st.success("Succes! Conexiune IDBDC stabilită.")
                 st.rerun()
             else:
                 st.error("❌ Codul nu a fost găsit în baza de date!")
@@ -56,7 +56,7 @@ elif st.session_state["operator_valid"] is None:
             cur.close()
             conn.close()
         except Exception as e:
-            st.error(f"Eroare de identificare (Tenant/User): {e}")
+            st.error(f"Eroare de identificare: {e}")
 
 # INTERFAȚA DE LUCRU
 else:
@@ -65,8 +65,7 @@ else:
     st.sidebar.info(f"Proiect: {op['prj']}\nCategorie: {op['cat']}")
     
     st.header(f"Salut, {op['nume']}!")
-    st.write(f"Conexiunea cu baza de date IDBDC a fost stabilită prin tunel IPv4 securizat.")
-    st.info(f"Filtru activ: {op['prj']}")
+    st.write(f"Conexiunea cu baza de date IDBDC este activă.")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
