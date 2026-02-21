@@ -5,9 +5,9 @@ import psycopg2
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- DATE INTEGRATE (SOLUȚIA PENTRU FORȚARE IPv4) ---
-# Schimbăm host-ul cu versiunea "ipv4.pooler..." care forțează adresa pe formatul vechi, compatibil
-DB_URI = "postgresql://postgres:23elf18SKY05!@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
+# --- DATE INTEGRATE (SOLUȚIA DEFINITIVĂ PENTRU TENANT) ---
+# Am modificat User-ul: am adăugat ID-ul proiectului tău după punct (metoda recomandată de Supabase pentru Pooler)
+DB_URI = "postgresql://postgres.zkkkirpggtczbdzqqlyc:23elf18SKY05!@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
 # Gestionare Sesiune
 if "autentificat" not in st.session_state:
@@ -33,11 +33,10 @@ elif st.session_state["operator_valid"] is None:
     
     if st.button("Validare Operator"):
         try:
-            # Conectare folosind URI-ul adaptat pentru IPv4
+            # Conectare folosind URI-ul cu Tenant ID inclus în User
             conn = psycopg2.connect(DB_URI)
             cur = conn.cursor()
             
-            # Verificăm codul în tabela com_operatori
             cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
             res = cur.fetchone()
             
@@ -47,7 +46,7 @@ elif st.session_state["operator_valid"] is None:
                     "cat": res[1], 
                     "prj": res[2]
                 }
-                st.success("Conexiune stabilită prin IPv4!")
+                st.success("Conexiune stabilită cu succes!")
                 st.rerun()
             else:
                 st.error("❌ Codul nu a fost găsit în baza de date!")
@@ -55,7 +54,7 @@ elif st.session_state["operator_valid"] is None:
             cur.close()
             conn.close()
         except Exception as e:
-            st.error(f"Eroare de rețea (IPv4/IPv6): {e}")
+            st.error(f"Eroare de identificare (Tenant/User): {e}")
 
 # INTERFAȚA DE LUCRU
 else:
@@ -64,7 +63,8 @@ else:
     st.sidebar.info(f"Proiect: {op['prj']}\nCategorie: {op['cat']}")
     
     st.header(f"Salut, {op['nume']}!")
-    st.write(f"Conexiunea cu baza de date IDBDC este acum activă prin tunel IPv4.")
+    st.write(f"Sunteți conectat la Consola de Gestionare Cercetare.")
+    st.info(f"Filtru activat pe categoria: **{op['cat']}**.")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
