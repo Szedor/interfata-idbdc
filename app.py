@@ -5,10 +5,17 @@ import psycopg2
 st.set_page_config(page_title="Consola Responsabili IDBDC", layout="wide")
 st.title("🛡️ Consola Responsabili IDBDC")
 
-# --- DATE INTEGRATE (SOLUȚIA PENTRU TENANT ID REVIZUITĂ) ---
-# Am adăugat codul de proiect în username și am folosit adresa directă de pooler
-# care corespunde exact proiectului tău, forțând IPv4.
-DB_URI = "postgresql://postgres.zkkkirpggtczbdzqqlyc:23elf18SKY05!@db.zkkkirpggtczbdzqqlyc.supabase.co:6543/postgres?sslmode=require"
+# --- DATE INTEGRATE (SOLUȚIA PENTRU SHARED POOLER - FREE PLAN) ---
+# 1. Host: Folosim adresa de pooler (nu cea directă)
+# 2. User: Adăugăm .zkkkirpggtczbdzqqlyc (Tenant ID) la finalul numelui de utilizator
+DB_CONFIG = {
+    "host": "aws-0-eu-central-1.pooler.supabase.com",
+    "database": "postgres",
+    "user": "postgres.zkkkirpggtczbdzqqlyc", 
+    "password": "23elf18SKY05!",
+    "port": "6543",
+    "sslmode": "require"
+}
 
 # Gestionare Sesiune
 if "autentificat" not in st.session_state:
@@ -27,28 +34,23 @@ if not st.session_state["autentificat"]:
         else:
             st.error("Parolă incorectă!")
 
-# BARIERA 2: IDENTIFICARE OPERATOR (CONEXIUNE SQL)
+# BARIERA 2: IDENTIFICARE OPERATOR
 elif st.session_state["operator_valid"] is None:
     st.subheader("🔑 Bariera 2: Identificare Operator")
     cod_input = st.text_input("Introduceți Codul de Acces Unic:", type="password")
     
     if st.button("Validare Operator"):
         try:
-            # Conectare folosind URI-ul care conține Tenant ID-ul în user ȘI în host
-            conn = psycopg2.connect(DB_URI)
+            # Conectare prin Shared Pooler (Compatibil IPv4)
+            conn = psycopg2.connect(**DB_CONFIG)
             cur = conn.cursor()
             
-            # Verificăm codul în tabela creată vineri
             cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
             res = cur.fetchone()
             
             if res:
-                st.session_state["operator_valid"] = {
-                    "nume": res[0], 
-                    "cat": res[1], 
-                    "prj": res[2]
-                }
-                st.success("Succes! Conexiune IDBDC stabilită.")
+                st.session_state["operator_valid"] = {"nume": res[0], "cat": res[1], "prj": res[2]}
+                st.success("Conexiune Shared Pooler activată!")
                 st.rerun()
             else:
                 st.error("❌ Codul nu a fost găsit în baza de date!")
@@ -56,16 +58,15 @@ elif st.session_state["operator_valid"] is None:
             cur.close()
             conn.close()
         except Exception as e:
-            st.error(f"Eroare de identificare: {e}")
+            st.error(f"Eroare Pooler: {e}")
+            st.info("Asigură-te că parola bazei de date este 23elf18SKY05!")
 
 # INTERFAȚA DE LUCRU
 else:
     op = st.session_state["operator_valid"]
     st.sidebar.success(f"Logat: {op['nume']}")
-    st.sidebar.info(f"Proiect: {op['prj']}\nCategorie: {op['cat']}")
-    
     st.header(f"Salut, {op['nume']}!")
-    st.write(f"Conexiunea cu baza de date IDBDC este activă.")
+    st.write(f"Sistemul IDBDC rulează prin Shared Pooler (Plan Free).")
 
     if st.sidebar.button("Log Out"):
         st.session_state["autentificat"] = False
