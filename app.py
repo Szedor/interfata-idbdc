@@ -7,7 +7,6 @@ from supabase import create_client, Client
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
-# Inițializăm stările de sesiune
 if 'autorizat_p1' not in st.session_state:
     st.session_state.autorizat_p1 = False
 if 'operator_identificat' not in st.session_state:
@@ -17,7 +16,6 @@ if 'operator_identificat' not in st.session_state:
 st.markdown("""
 <style>
     .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
-    .stSidebar { background-color: #f8f9fa; border-right: 1px solid #ddd; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -35,14 +33,10 @@ if not st.session_state.autorizat_p1:
     st.markdown("<h3 style='text-align: center; color: #555;'>Universitatea Politehnica Timișoara</h3>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align: center; color: #CC0000;'>Acces restricționat</h4>", unsafe_allow_html=True)
     
-    st.write("") 
-
-    col_stanga, col_centru, col_dreapta = st.columns([1.3, 0.5, 1.3])
-    
-    with col_centru:
+    col_st, col_ce, col_dr = st.columns([1.3, 0.5, 1.3])
+    with col_ce:
         st.write("Parola de acces:")
         parola_introdusa = st.text_input("Parola", type="password", label_visibility="collapsed", key="p1_pass")
-        
         if st.button("Autorizare acces", use_container_width=True):
             if parola_introdusa == "EverDream2SZ":
                 st.session_state.autorizat_p1 = True
@@ -54,7 +48,7 @@ if not st.session_state.autorizat_p1:
 # ==========================================
 # 3. POARTA 2: IDENTIFICARE (SIDEBAR 1/8)
 # ==========================================
-# Am unit simbolurile într-un singur element vizual conform cerinței
+# SIMBOL CONCATENAT: 🛡️👤
 st.sidebar.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️👤</h1>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold; margin-top: 0;'>Identificare Operator</p>", unsafe_allow_html=True)
 
@@ -85,27 +79,37 @@ if st.session_state.operator_identificat:
     
     col_a, col_b = st.columns([1, 1])
     cat_selectata = "---"
+    opt_selectata = "---"
 
+    # CASETA 1: Selectați Categoria (nom_categorie)
     with col_a:
         try:
             res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
             if res_cat.data:
                 liste_categorii = [item["denumire_categorie"] for item in res_cat.data]
                 cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
-        except:
-            st.error("Eroare la nom_categorie.")
+            else:
+                st.warning("Tabela 'nom_categorie' nu are date.")
+        except Exception as e:
+            st.error(f"Eroare la nom_categorie: {e}")
 
+    # CASETA 2: Selectati tipul de contract sau proiect (nom_contracte_proiecte)
     with col_b:
         if cat_selectata == "Contracte & Proiecte":
             try:
                 res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
                 if res_sub.data:
                     liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data]
-                    st.selectbox("Selectati tipul de contract sau proiect", ["---"] + liste_sub)
-            except:
-                st.error("Eroare la nom_contracte_proiecte.")
+                    opt_selectata = st.selectbox("Selectati tipul de contract sau proiect", ["---"] + liste_sub)
+                else:
+                    st.warning("Tabela 'nom_contracte_proiecte' este goală.")
+            except Exception as e:
+                st.error(f"Eroare la nom_contracte_proiecte: {e}")
         else:
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
+    # Confirmare selecție context
     if cat_selectata != "---":
         st.info(f"Context activ: **{cat_selectata}**")
+        if cat_selectata == "Contracte & Proiecte" and opt_selectata != "---":
+            st.success(f"Opțiune curentă: **{opt_selectata}**")
