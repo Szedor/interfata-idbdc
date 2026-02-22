@@ -70,22 +70,24 @@ if st.session_state.operator_identificat:
     cat_selectata = "---"
     opt_selectata = "---"
 
-    # CASETA 1: Categoria
+    # CASETA 1: Categoria (nom_categorie)
     with col_a:
         try:
-            res_cat = supabase.table("nom_categorie").select("denumire categorie").execute()
+            # CORECTAT: denumire_categorie (cu underscore)
+            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
             if res_cat.data:
-                liste_categorii = [item["denumire categorie"] for item in res_cat.data]
+                liste_categorii = [item["denumire_categorie"] for item in res_cat.data]
                 cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
             else:
                 st.warning("Tabela 'nom_categorie' nu are date.")
         except Exception as e:
-            st.error(f"Eroare la accesarea tabelului 'nom_categorie'.")
+            st.error(f"Eroare la accesarea tabelului 'nom_categorie' (coloana denumire_categorie).")
 
-    # CASETA 2: Tipul (Condiționată)
+    # CASETA 2: Tipul (nom_contracte_proiecte)
     with col_b:
         if cat_selectata == "Contracte & Proiecte":
             try:
+                # Coloana: acronim_contracte_proiecte
                 res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
                 if res_sub.data:
                     liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data]
@@ -95,14 +97,11 @@ if st.session_state.operator_identificat:
             except Exception as e:
                 st.error(f"Eroare la coloana acronim_contracte_proiecte.")
         else:
-            # Aici am corectat indentarea: am pus instrucțiunea direct sub else
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
-    # Confirmare selecție
+    # Confirmare vizuală
     if cat_selectata != "---":
-        st.write(f"Sunteți în secțiunea: **{cat_selectata}**")
-        if cat_selectata == "Contracte & Proiecte" and opt_selectata != "---":
-            st.success(f"Configurare completă pentru: **{opt_selectata}**")
+        st.info(f"Sunteți în secțiunea: **{cat_selectata}**")
 
 else:
-    st.info("Vă rugăm să introduceți codul de identificare în sidebar (stânga).")
+    st.info("Vă rugăm să introduceți codul de identificare în sidebar.")
