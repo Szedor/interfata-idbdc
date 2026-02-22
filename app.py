@@ -5,8 +5,8 @@ import psycopg2
 st.set_page_config(page_title="IDBDC Consola", layout="centered")
 
 # --- DATE CONEXIUNE ---
-# Atenție: Șterge doar cuvântul PASTE_AICI și pune ce ai copiat (păstrează ghilimelele)
-DB_URI = "PASTE_AICI"
+# Aici pui codul lung copiat manual între ghilimele
+DB_URI = "ostgresql://neondb_owner:npg_oRwnHk82CFUj@ep-silent-hill-ag8n1884-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 if "autentificat" not in st.session_state:
     st.session_state["autentificat"] = False
