@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
@@ -26,6 +25,7 @@ if not st.session_state.autorizat_p1:
     st.markdown("<h3 style='text-align: center; color: #555;'>Universitatea Politehnica Timișoara</h3>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align: center; color: #CC0000;'>Acces restricționat</h4>", unsafe_allow_html=True)
     
+    st.write("") 
     col_st, col_ce, col_dr = st.columns([1.3, 0.5, 1.3])
     with col_ce:
         st.write("Parola de acces:")
@@ -41,7 +41,7 @@ if not st.session_state.autorizat_p1:
 # ==========================================
 # 3. POARTA 2: IDENTIFICARE (SIDEBAR 1/8)
 # ==========================================
-# SIMBOL CONCATENAT CERUT
+# AICI ESTE SIMBOLUL CONCATENAT CERUT: 🛡️👤
 st.sidebar.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️👤</h1>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold; margin-top: 0;'>Identificare Operator</p>", unsafe_allow_html=True)
 
@@ -64,7 +64,7 @@ else:
         st.rerun()
 
 # ==========================================
-# 4. ZONA CENTRALĂ: LOGICĂ SELECTII (7/8)
+# 4. ZONA CENTRALĂ: PANOU DE LUCRU (7/8)
 # ==========================================
 if st.session_state.operator_identificat:
     st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}")
@@ -72,27 +72,27 @@ if st.session_state.operator_identificat:
     
     col_a, col_b = st.columns([1, 1])
     
-    # 1. Obținem datele pentru Categorie
-    try:
-        res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
-        optiuni_cat = ["---"] + [r["denumire_categorie"] for r in res_cat.data]
-    except:
-        optiuni_cat = ["---", "Eroare încărcare"]
-
+    # 1. SELECTIE CATEGORIE (nom_categorie -> denumire_categorie)
     with col_a:
-        cat_aleasa = st.selectbox("Selectați Categoria:", optiuni_cat)
+        try:
+            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+            liste_categorii = ["---"] + [item["denumire_categorie"] for item in res_cat.data]
+            cat_selectata = st.selectbox("Selectați Categoria:", liste_categorii)
+        except Exception as e:
+            st.error(f"Eroare nom_categorie: {e}")
+            cat_selectata = "---"
 
-    # 2. Obținem datele pentru Sub-categorie (Contracte & Proiecte)
+    # 2. SELECTIE TIP (nom_contracte_proiecte -> acronim_contracte_proiecte)
     with col_b:
-        if cat_aleasa == "Contracte & Proiecte":
+        if cat_selectata == "Contracte & Proiecte":
             try:
                 res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
-                optiuni_sub = ["---"] + [r["acronim_contracte_proiecte"] for r in res_sub.data]
-                st.selectbox("Selectati tipul de contract sau proiect", optiuni_sub)
-            except:
-                st.error("Eroare la acronime")
+                liste_sub = ["---"] + [item["acronim_contracte_proiecte"] for item in res_sub.data]
+                st.selectbox("Selectati tipul de contract sau proiect", liste_sub)
+            except Exception as e:
+                st.error(f"Eroare nom_contracte_proiecte: {e}")
         else:
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
-    if cat_aleasa != "---":
-        st.info(f"Sunteți în secțiunea: **{cat_aleasa}**")
+    if cat_selectata != "---":
+        st.info(f"Sunteți în secțiunea: **{cat_selectata}**")
