@@ -71,10 +71,10 @@ if st.session_state.operator_identificat:
 
     with col_a:
         try:
-            # TABELA: nom_categorie | COLOANA: denumire_categorie
-            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+            # TABELA: nom_categorie | COLOANA: denumire categorie
+            res_cat = supabase.table("nom_categorie").select("denumire categorie").execute()
             if res_cat.data:
-                liste_categorii = [item["denumire_categorie"] for item in res_cat.data]
+                liste_categorii = [item["denumire categorie"] for item in res_cat.data]
                 cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
             else:
                 st.warning("Tabela 'nom_categorie' nu are date.")
@@ -82,23 +82,26 @@ if st.session_state.operator_identificat:
             st.error(f"Eroare la accesarea tabelului 'nom_categorie'.")
 
     with col_b:
-        # Verificăm dacă alegerea este exact "Contracte & Proiecte"
+        # Logica pentru a doua selecție
         if cat_selectata == "Contracte & Proiecte":
             try:
-                # Aici folosim tabela nom_contracte_proiecte
-                res_sub = supabase.table("nom_contracte_proiecte").select("*").execute()
+                # TABELA: nom_contracte_proiecte | COLOANA: acronim_contracte_proiecte
+                res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
                 if res_sub.data:
-                    # Detectăm coloana automat pentru siguranță
-                    cols_s = list(res_sub.data[0].keys())
-                    nume_col_sub = "nume_optiune" if "nume_optiune" in cols_s else cols_s[0]
-                    liste_sub = [item[nume_col_sub] for item in res_sub.data]
-                    opt_selectata = st.selectbox("Selectați Tipul:", ["---"] + liste_sub)
-            except:
-                st.error("Eroare la accesarea tabelului 'nom_contracte_proiecte'.")
+                    liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data]
+                    opt_selectata = st.selectbox("Selectati tipul de contract sau proiect", ["---"] + liste_sub)
+                else:
+                    st.warning("Tabela 'nom_contracte_proiecte' este goală.")
+            except Exception as e:
+                st.error(f"Eroare la accesarea coloanei acronim_contracte_proiecte.")
         else:
-            st.selectbox("Selectați Tipul:", ["---"], disabled=True)
+            # Rămâne inactivă pentru alte categorii
+            st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
+    # Confirmare vizuală a selecției
     if cat_selectata != "---":
-        st.info(f"Secțiunea activă: {cat_selectata}")
+        st.markdown(f"**Categorie:** {cat_selectata}")
+        if cat_selectata == "Contracte & Proiecte" and 'opt_selectata' in locals() and opt_selectata != "---":
+            st.info(f"Ați selectat tipul: **{opt_selectata}**. Sistemul este pregătit pentru gestionarea datelor.")
+
 else:
-    st.info("Vă rugăm să introduceți codul de identificare în sidebar.")
