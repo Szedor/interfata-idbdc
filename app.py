@@ -2,26 +2,35 @@ import streamlit as st
 import psycopg2
 import urllib.parse
 
-# 1. DESIGN & CONFIGURARE ASPECT
+# 1. DESIGN & CONFIGURARE ASPECT (Interfață Profesională)
 st.set_page_config(page_title="IDBDC | Consola Cercetare", layout="centered")
 
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; background-color: #1a73e8; color: white; border: none; font-weight: bold; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; background-color: #004a99; color: white; border: none; font-weight: bold; }
+    .stButton>button:hover { background-color: #003366; }
     .auth-card { padding: 30px; border-radius: 15px; border: 1px solid #dee2e6; background-color: white; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-    .header-text { color: #1a73e8; text-align: center; font-family: 'Segoe UI', sans-serif; }
+    .header-text { color: #004a99; text-align: center; font-family: 'Segoe UI', sans-serif; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONFIGURAȚIE SUPABASE (METODA OPTIONS PENTRU TENANT) ---
+# --- CONFIGURAȚIE SHARED POOLER (CU NOUA PAROLĂ) ---
 project_id = "zkkkirpggtczbdzqqlyc"
-user = "postgres" # Revenim la user simplu, dar trimitem proiectul prin options
-password = urllib.parse.quote_plus("23elf18SKY05!")
+user = f"postgres.{project_id}"
+# Folosim noua parolă fără caractere speciale
+password = "EverDream2026IDBDC" 
 host = "aws-0-eu-central-1.pooler.supabase.com"
 
-# Adăugăm ?options=-c%20project%3D[PROJECT_ID] - aceasta e "cheia magică"
-DB_URI = f"postgresql://{user}:{password}@{host}:6543/postgres?sslmode=require&options=-c%20project%3D{project_id}"
+# Construim configurația tip dicționar (cea mai stabilă formă)
+DB_CONFIG = {
+    "host": host,
+    "database": "postgres",
+    "user": user,
+    "password": password,
+    "port": "6543",
+    "sslmode": "require"
+}
 
 if "autentificat" not in st.session_state:
     st.session_state["autentificat"] = False
@@ -34,9 +43,9 @@ if not st.session_state["autentificat"]:
     col1, col2, col3 = st.columns([1,4,1])
     with col2:
         st.markdown('<div class="auth-card">', unsafe_allow_html=True)
-        st.markdown('<h2 class="header-text">Consola IDBDC</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="header-text">🛡️ Consola IDBDC</h2>', unsafe_allow_html=True)
         st.write("---")
-        parola_gen = st.text_input("Cheie Acces Sistem:", type="password", placeholder="Introdu parola generală")
+        parola_gen = st.text_input("Cheie Acces Sistem:", type="password", placeholder="Introduceți parola generală")
         if st.button("AUTENTIFICARE"):
             if parola_gen == "EverDream2SZ":
                 st.session_state["autentificat"] = True
@@ -51,14 +60,16 @@ elif st.session_state["operator_valid"] is None:
     col1, col2, col3 = st.columns([1,4,1])
     with col2:
         st.markdown('<div class="auth-card">', unsafe_allow_html=True)
-        st.markdown('<h2 class="header-text">Validare Operator</h2>', unsafe_allow_html=True)
-        cod_input = st.text_input("Cod de Identificare Responsabil:", type="password", placeholder="Cod IDBDC-XXXX")
+        st.markdown('<h2 class="header-text">🔑 Validare Operator</h2>', unsafe_allow_html=True)
+        cod_input = st.text_input("Cod de Identificare Responsabil:", type="password", placeholder="Introduceți codul unic")
         
         if st.button("VERIFICĂ ACCESUL"):
             try:
-                # Conexiune folosind URI-ul cu parametrul OPTIONS
-                conn = psycopg2.connect(DB_URI)
+                # Conectare prin Shared Pooler cu noua parolă
+                conn = psycopg2.connect(**DB_CONFIG)
                 cur = conn.cursor()
+                
+                # Interogăm tabela creată conform Protocolului Working IDBDC
                 cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
                 res = cur.fetchone()
                 
@@ -66,25 +77,29 @@ elif st.session_state["operator_valid"] is None:
                     st.session_state["operator_valid"] = {"nume": res[0], "cat": res[1], "prj": res[2]}
                     st.rerun()
                 else:
-                    st.error("❌ Cod invalid în baza centrală.")
+                    st.error("❌ Codul de operator nu a fost găsit.")
+                
                 cur.close()
                 conn.close()
             except Exception as e:
-                st.error(f"⚠️ Eroare Server: {e}")
-                st.info("Sfat: Dacă eroarea 'Tenant not found' persistă, trebuie să resetăm parola bazei de date în Supabase fără simbolul '!'")
+                st.error(f"⚠️ Eroare de conexiune: {e}")
+                st.info("Verifică dacă ai salvat noua parolă în Supabase înainte de a rula.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- CONSOLA OPERATOR ---
+# --- CONSOLA OPERATOR (LIVE) ---
 else:
     op = st.session_state["operator_valid"]
-    st.sidebar.title("🛡️ IDBDC Navigare")
+    st.sidebar.title("📑 Navigare IDBDC")
     st.sidebar.info(f"Operator: {op['nume']}\nProiect: {op['prj']}")
     
-    st.title(f"Panou Control: {op['nume']}")
+    st.title(f"Panou de Control: {op['nume']}")
     st.markdown("---")
-    st.success("✅ Conexiune activă. Baza de date este pregătită pentru interogare.")
+    st.success(f"✅ Sistem conectat. Aveți acces la categoria: **{op['cat']}**")
+    
+    # Aici vom afișa datele din baza de date
+    st.write("Sesiunea de lucru este activă.")
 
-    if st.sidebar.button("Log Out"):
+    if st.sidebar.button("Ieșire Securizată"):
         st.session_state["autentificat"] = False
         st.session_state["operator_valid"] = None
         st.rerun()
