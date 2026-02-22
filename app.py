@@ -1,46 +1,86 @@
+Înțeles perfect. Refacem „fațada” aplicației conform Cartei Proiectului IDBDC, păstrând în același timp noul „motor” prin API care funcționează.
+
+Iată codul actualizat pentru app.py. Acesta va restabili aspectul profesional (culorile, fundalul și stilizarea) pe care l-am stabilit în Protocolul de Lucru.
+
+Python
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 
-# Configurare pagină
-st.set_page_config(page_title="IDBDC - Baze de Date Cercetare", layout="wide")
+# 1. CONFIGURARE PAGINĂ & DESIGN (CARTA PROIECTULUI IDBDC)
+st.set_page_config(page_title="Sistem IDBDC", layout="wide")
 
-# Verificare parolă acces aplicație
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f0f2f6;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 5px;
+        height: 3em;
+        background-color: #004a99;
+        color: white;
+    }
+    .auth-container {
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 2rem;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .header-style {
+        color: #004a99;
+        text-align: center;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 2. LOGICA DE ACCES (ECRANUL DE START)
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    parola_introdusa = st.text_input("Introduceți parola de acces:", type="password")
-    if st.button("Acces"):
+    st.markdown("<div class='auth-container'>", unsafe_allow_html=True)
+    st.markdown("<h1 class='header-style'>Sistem IDBDC</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Interogare și Dezvoltare Baze Date Cercetare</p>", unsafe_allow_html=True)
+    
+    parola_introdusa = st.text_input("Cheie de Acces Sistem:", type="password")
+    
+    if st.button("AUTENTIFICARE"):
         if parola_introdusa == "EverDream2SZ":
             st.session_state.authenticated = True
             st.rerun()
         else:
-            st.error("Parolă incorectă!")
+            st.error("Cheie de acces invalidă. Vă rugăm să reîncercați.")
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-st.success("✅ Acces Autorizat. Bun venit în sistemul IDBDC.")
+# 3. INTERFAȚA DUPĂ AUTENTIFICARE
+st.markdown(f"<h2 style='color: #004a99;'>Protocol de Lucru IDBDC: Panou Control</h2>", unsafe_allow_html=True)
+st.sidebar.success("Conexiune API Activă (Port 443)")
 
-# Conectare la Supabase prin API (Metoda HTTP - Port 443)
+# Conectare la Supabase prin API
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 
 try:
     supabase: Client = create_client(url, key)
     
-    # Interogare tabel folosind API-ul
-    # Tabelul stabilit în Protocolul de Lucru: base_proiecte_fdi
+    # Afișare tabel FDI (Conform cerinței curente)
     response = supabase.table("base_proiecte_fdi").select("*").execute()
     
     if response.data:
         df = pd.DataFrame(response.data)
-        st.write("### Date Proiecte FDI")
+        st.write("### 📂 Vizualizare Date: base_proiecte_fdi")
         st.dataframe(df, use_container_width=True)
     else:
-        st.info("Conexiunea a reușit, dar tabelul nu conține date sau nu a fost găsit.")
+        st.info("Sistemul este conectat, dar tabelul solicitat este gol.")
 
 except Exception as e:
-    st.error(f"Eroare tehnică la conexiunea API: {e}")
+    st.error(f"Eroare de comunicare cu serverul: {e}")
 
 st.divider()
-st.info("Sistemul folosește acum conexiunea securizată prin API (Port 443) pentru a evita restricțiile de rețea.")
+st.caption("IDBDC v1.0 | Securizat prin Protocolul de Lucru stabilit.")
