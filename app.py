@@ -1,73 +1,29 @@
 import streamlit as st
-import psycopg2
-from psycopg2.extras import RealDictCursor
 
-# 1. CONFIGURARE PAGINĂ
-st.set_page_config(page_title="Consola Centrală IDBDC", layout="centered")
+# Configurare pagină
+st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
-# --- DATE CONEXIUNE ---
-# Aici pui adresa ta lungă de la Neon între ghilimele
-DB_URI = "postgresql://neondb_owner:npg_oRwnHk82CFUj@ep-silent-hill-ag8n1884-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+# Afișare Titlu ales
+st.markdown(f"<h1 style='text-align: center;'>Sistemul de Gestiune IDBDC | Universitatea Politehnica Timișoara</h1>", unsafe_allow_html=True)
+st.write("---")
 
-def get_db_connection():
-    return psycopg2.connect(DB_URI, cursor_factory=RealDictCursor)
+# Centrarea casetei de parolă (folosim 5 coloane, punem caseta în cea din mijloc pentru a fi scurtă)
+st.write("") 
+c1, c2, c3, c4, c5 = st.columns([2, 1, 2, 1, 2])
 
-# Inițializare variabile de sesiune
-if "etapa" not in st.session_state:
-    st.session_state.etapa = "bariera_1"
-if "date_operator" not in st.session_state:
-    st.session_state.date_operator = None
-
-# --- BARIERA 1: ACCES SISTEM ---
-if st.session_state.etapa == "bariera_1":
-    st.title("🛡️ Sistem IDBDC")
-    parola_sistem = st.text_input("Introdu Cheia de Acces Sistem:", type="password")
-    if st.button("VERIFICĂ SISTEM"):
-        if parola_sistem == "EverDream2SZ":
-            st.session_state.etapa = "bariera_2"
-            st.rerun()
+with c3:
+    parola_introdusa = st.text_input(
+        label="Introdu Parola de Acces:", 
+        type="password", 
+        help=None, # iii) Nu apare nimic la mouse-over
+        label_visibility="visible"
+    )
+    
+    # Buton de verificare
+    if st.button("Accesează Poarta 1", use_container_width=True):
+        if parola_introdusa == "EverDream2SZ":
+            st.success("✅ Acces permis în sistem.")
+            # Aici ne oprim. Nu am adăugat logica pentru Poarta 2 încă.
         else:
-            st.error("Cheie incorectă.")
-
-# --- BARIERA 2: LOGIN OPERATOR ---
-elif st.session_state.etapa == "bariera_2":
-    st.title("🔑 Identificare Responsabil")
-    cod_acces = st.text_input("Introdu Codul tău de Operator (ex: IDBDC-001):", type="password")
-    
-    if st.button("AUTENTIFICARE"):
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_acces,))
-            user = cur.fetchone()
-            
-            if user:
-                st.session_state.date_operator = user
-                st.session_state.etapa = "consola_activa"
-                st.rerun()
-            else:
-                st.error("Cod de operator invalid.")
-            
-            cur.close()
-            conn.close()
-        except Exception as e:
-            st.error(f"Eroare tehnică: {e}")
-
-# --- CONSOLA ACTIVĂ ---
-elif st.session_state.etapa == "consola_activa":
-    op = st.session_state.date_operator
-    st.balloons()
-    st.success(f"Acces Confirmat: {op['nume_operator']}")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.info(f"**Categorie:** {op['filtru_categorie']}")
-    with col2:
-        st.info(f"**Proiect:** {op['filtru_proiect']}")
-    
-    st.write("---")
-    st.write("Sistemul este acum conectat la Neon.tech și gata de procesare.")
-    
-    if st.button("Ieșire Securizată"):
-        st.session_state.clear()
-        st.rerun()
+            # iv) Mesajul tău personalizat
+            st.warning("⚠️ Acces Neautorizat: Parola nu corespunde sistemului IDBDC.")
