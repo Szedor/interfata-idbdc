@@ -46,8 +46,9 @@ if not st.session_state.autorizat_p1:
             key="p1_pass",
             help=None
         )
+        # NOUA PAROLĂ FIXATĂ: EverDream2SZ
         if st.button("Autorizare acces", use_container_width=True):
-            if parola_p1 == "UPT_IDBDC_2026":
+            if parola_p1 == "EverDream2SZ":
                 st.session_state.autorizat_p1 = True
                 st.rerun()
             else:
