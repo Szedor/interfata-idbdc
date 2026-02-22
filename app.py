@@ -13,14 +13,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONFIGURAȚIE PENTRU FORȚARE IPv4 (SHARED POOLER) ---
-# Folosim host-ul de pooler pentru că acesta are adrese IPv4 pe care Streamlit le poate accesa
+# --- CONFIGURAȚIE DE FORȚĂ (TENANT AS DATABASE NAME) ---
+project_id = "zkkkirpggtczbdzqqlyc"
+
 DB_CONFIG = {
     "host": "aws-0-eu-central-1.pooler.supabase.com",
-    "database": "postgres",
-    "user": "postgres.zkkkirpggtczbdzqqlyc", # Formatul specific pentru Pooler
-    "password": "EverDream2026IDBDC",        # Noua ta parolă curată
-    "port": "6543",                          # Portul obligatoriu pentru Pooler
+    "database": project_id,           # SCHIMBARE: Folosim ID-ul proiectului ca nume de DB
+    "user": f"postgres.{project_id}", # Păstrăm și aici pentru siguranță
+    "password": "EverDream2026IDBDC",
+    "port": "6543",
     "sslmode": "require"
 }
 
@@ -57,7 +58,7 @@ elif st.session_state["operator_valid"] is None:
         
         if st.button("VERIFICĂ ACCESUL"):
             try:
-                # Conectare prin tunelul IPv4 (Pooler)
+                # Încercăm conexiunea cu noua structură de Tenant
                 conn = psycopg2.connect(**DB_CONFIG)
                 cur = conn.cursor()
                 
@@ -68,21 +69,21 @@ elif st.session_state["operator_valid"] is None:
                     st.session_state["operator_valid"] = {"nume": res[0], "cat": res[1], "prj": res[2]}
                     st.rerun()
                 else:
-                    st.error("❌ Codul nu a fost găsit în baza IDBDC.")
+                    st.error("❌ Codul nu a fost găsit în baza centrală.")
                 
                 cur.close()
                 conn.close()
             except Exception as e:
                 st.error(f"⚠️ Eroare de rețea: {e}")
-                st.info("Această conexiune folosește Tunelul IPv4 pentru a evita blocajul Streamlit.")
+                st.info("Dacă eroarea persistă, înseamnă că sistemul refuză identificarea prin Pooler și va trebui să folosim un proxy IPv4 extern.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- INTERFAȚĂ LIVE ---
 else:
     op = st.session_state["operator_valid"]
     st.title(f"Salut, {op['nume']}!")
-    st.success("✅ Conexiune stabilită prin tunel securizat.")
-    st.write(f"Proiect: **{op['prj']}** | Acces: **{op['cat']}**")
+    st.success("✅ Protocol IDBDC activat!")
+    st.write(f"Sunteți logat pe proiectul: **{op['prj']}**")
     
     if st.sidebar.button("Ieșire Securizată"):
         st.session_state.clear()
