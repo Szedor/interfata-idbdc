@@ -3,7 +3,7 @@ import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
-# 1. CONFIGURARE & STIL (PĂSTRĂM ASPECTUL IDBDC)
+# 1. CONFIGURARE & STIL (IDBDC UPT)
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
@@ -14,7 +14,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Inițializare stări sesiune
+# Gestiune sesiune
 if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
 if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
@@ -24,7 +24,7 @@ key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
 # ==========================================
-# POARTA 1: ACCES SISTEM (ECRAN CENTRAL)
+# POARTA 1: ACCES SISTEM
 # ==========================================
 if not st.session_state.autorizat_p1:
     st.markdown("<h1 style='text-align: center;'>🛡️</h1>", unsafe_allow_html=True)
@@ -47,19 +47,19 @@ if not st.session_state.autorizat_p1:
 st.sidebar.markdown("<h1 style='text-align: center;'>🛡️👤</h1>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold;'>Identificare Operator</p>", unsafe_allow_html=True)
 
-# Caseta pentru cod_acces
+# Căutăm după cod_operator (rebranding-ul tău)
 cod_introdus = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod")
 
 if cod_introdus:
     try:
-        # Verificare în tabela com_operatori pe coloana cod_acces
-        res_op = supabase.table("com_operatori").select("nume_operator").eq("cod_acces", cod_introdus).execute()
+        # Verificare în tabela com_operatori folosind coloanele noi: cod_operator și nume_prenume
+        res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operator", cod_introdus).execute()
         
         if res_op.data:
-            st.session_state.operator_identificat = res_op.data[0]['nume_operator']
+            st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
             st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
         else:
-            st.sidebar.error("Cod acces invalid!")
+            st.sidebar.error("Cod operator invalid!")
             st.session_state.operator_identificat = None
     except Exception as e:
         st.sidebar.error(f"Eroare DB: {e}")
@@ -77,27 +77,6 @@ if st.session_state.operator_identificat:
         # Preluare categorii din nom_categorii
         res_cat = supabase.table("nom_categorii").select("nume_categorie").execute()
         liste_categorii = [item['nume_categorie'] for item in res_cat.data] if res_cat.data else []
-        categorie_selectata = st.selectbox("Alegeți Categoria:", ["---"] + liste_categorii)
+        categorie_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
 
-    with col_b:
-        # Logica condiționată pentru Contracte & Proiecte
-        if categorie_selectata == "Contracte & Proiecte":
-            res_sub = supabase.table("nom_contracte_proiecte").select("nume_optiune").execute()
-            liste_sub = [item['nume_optiune'] for item in res_sub.data] if res_sub.data else []
-            optiune_selectata = st.selectbox("Alegeți Tipul:", ["---"] + liste_sub)
-        else:
-            # Rămâne albă/inaccesibilă pentru celelalte categorii
-            st.selectbox("Alegeți Tipul:", ["Nespecificat"], disabled=True)
-
-    if categorie_selectata != "---":
-        st.write(f"Sunteți în secțiunea: **{categorie_selectata}**")
-        if categorie_selectata == "Contracte & Proiecte" and 'optiune_selectata' in locals() and optiune_selectata != "---":
-             st.info(f"Identificat ca {st.session_state.operator_identificat}. Acces CRUD activ pentru {optiune_selectata}.")
-
-else:
-    st.info("Sistemul așteaptă identificarea operatorului în partea stângă.")
-
-# Buton Resetare/Ieșire
-if st.sidebar.button("Ieșire Sistem"):
-    st.session_state.clear()
-    st.rerun()
+    with
