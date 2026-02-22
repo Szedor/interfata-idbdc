@@ -68,10 +68,11 @@ if st.session_state.operator_identificat:
     
     col_a, col_b = st.columns([1, 1])
     cat_selectata = "---"
+    opt_selectata = "---"
 
+    # CASETA 1: Categoria
     with col_a:
         try:
-            # TABELA: nom_categorie | COLOANA: denumire categorie
             res_cat = supabase.table("nom_categorie").select("denumire categorie").execute()
             if res_cat.data:
                 liste_categorii = [item["denumire categorie"] for item in res_cat.data]
@@ -81,11 +82,10 @@ if st.session_state.operator_identificat:
         except Exception as e:
             st.error(f"Eroare la accesarea tabelului 'nom_categorie'.")
 
+    # CASETA 2: Tipul (Condiționată)
     with col_b:
-        # Logica pentru a doua selecție
         if cat_selectata == "Contracte & Proiecte":
             try:
-                # TABELA: nom_contracte_proiecte | COLOANA: acronim_contracte_proiecte
                 res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
                 if res_sub.data:
                     liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data]
@@ -93,15 +93,16 @@ if st.session_state.operator_identificat:
                 else:
                     st.warning("Tabela 'nom_contracte_proiecte' este goală.")
             except Exception as e:
-                st.error(f"Eroare la accesarea coloanei acronim_contracte_proiecte.")
+                st.error(f"Eroare la coloana acronim_contracte_proiecte.")
         else:
-            # Rămâne inactivă pentru alte categorii
+            # Aici am corectat indentarea: am pus instrucțiunea direct sub else
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
-    # Confirmare vizuală a selecției
+    # Confirmare selecție
     if cat_selectata != "---":
-        st.markdown(f"**Categorie:** {cat_selectata}")
-        if cat_selectata == "Contracte & Proiecte" and 'opt_selectata' in locals() and opt_selectata != "---":
-            st.info(f"Ați selectat tipul: **{opt_selectata}**. Sistemul este pregătit pentru gestionarea datelor.")
+        st.write(f"Sunteți în secțiunea: **{cat_selectata}**")
+        if cat_selectata == "Contracte & Proiecte" and opt_selectata != "---":
+            st.success(f"Configurare completă pentru: **{opt_selectata}**")
 
 else:
+    st.info("Vă rugăm să introduceți codul de identificare în sidebar (stânga).")
