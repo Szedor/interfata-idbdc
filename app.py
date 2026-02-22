@@ -1,8 +1,3 @@
-Iată scriptul final, „înghețat” conform tuturor specificațiilor tale. Am eliminat orice comentariu inutil și am păstrat structura vizuală exact așa cum am convenit pentru sistemul IDBDC.
-
-Poți copia și rula acest cod; este configurat să respecte titlul instituției, mesajul de eroare roșu pe un singur rând și noua parolă de acces.
-
-Python
 import streamlit as st
 
 # ==========================================
