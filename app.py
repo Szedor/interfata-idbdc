@@ -30,14 +30,14 @@ st.markdown("<h3 style='text-align: center; margin-top: 0; font-weight: normal;'
 st.write("---")
 
 # ==========================================
-# 3. LOGICA PORȚILOR (MODULARĂ)
+# 3. LOGICA DE ACCES (AUTORIZARE ȘI IDENTIFICARE)
 # ==========================================
 
-# --- POARTA 1: AUTORIZARE (ÎNGHEȚATĂ) ---
+# --- ETAPA 1: AUTORIZARE ACCES ---
 if not st.session_state.autorizat_p1:
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        st.write("**Poarta 1: Autorizare Acces**")
+        st.write("Parola pentru autorizare acces")
         parola_p1 = st.text_input(
             "Parola", 
             type="password", 
@@ -46,43 +46,48 @@ if not st.session_state.autorizat_p1:
             key="p1_pass",
             help=None
         )
-        if st.button("Verifică Poarta 1", use_container_width=True):
+        if st.button("Autorizare acces", use_container_width=True):
             if parola_p1 == "UPT_IDBDC_2026":
                 st.session_state.autorizat_p1 = True
                 st.rerun()
             else:
-                st.markdown("<div class='eroare-idbdc'>ACCES NEAUTORIZAT! Verificați parola.</div>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div class='eroare-idbdc'>"
+                    "⚠️ Acces Neautorizat: Parola nu corespunde sistemului IDBDC."
+                    "</div>", 
+                    unsafe_allow_html=True
+                )
 
-# --- POARTA 2: IDENTIFICARE (ZIDUL NOU) ---
+# --- ETAPA 2: IDENTIFICARE INDIVIDUALĂ ---
 elif st.session_state.autorizat_p1 and not st.session_state.identificat_p2:
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        st.success("✅ Poarta 1: Autorizat")
-        st.write("**Poarta 2: Identificare (cod_identificare)**")
+        st.success("✅ Autorizare reușită.")
+        st.write("Introduceți cod_identificare pentru acces date")
         
         cod_id = st.text_input(
             "Identitate", 
             label_visibility="collapsed",
-            placeholder="Introduceți cod_identificare...",
+            placeholder="cod_identificare...",
             key="p2_cod",
             autocomplete="off"
         )
         
-        if st.button("Confirmă Identificarea", use_container_width=True):
+        if st.button("Confirmă Identitatea", use_container_width=True):
             if cod_id:
                 st.session_state.identificat_p2 = True
                 st.session_state.user_cod = cod_id
                 st.rerun()
             else:
-                st.warning("Introduceți un cod pentru a continua.")
+                st.warning("Vă rugăm să introduceți codul de identificare.")
 
-# --- INTERFAȚA DE LUCRU (CE URMEAZĂ) ---
+# --- INTERFAȚA DE LUCRU IDBDC ---
 else:
-    st.success(f"Sistem IDBDC activ | Utilizator: **{st.session_state.user_cod}**")
+    st.success(f"Utilizator identificat: **{st.session_state.user_cod}**")
     
-    if st.sidebar.button("Reset / Ieșire"):
+    if st.sidebar.button("Ieșire / Reset"):
         st.session_state.autorizat_p1 = False
         st.session_state.identificat_p2 = False
         st.rerun()
     
-    st.write("Aici vom implementa legătura cu `base_proiecte_fdi` prin `cod_inregistrare`.")
+    st.info("Sistemul este pregătit pentru prelucrarea datelor din 'base_proiecte_fdi'.")
