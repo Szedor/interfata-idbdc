@@ -6,7 +6,7 @@ st.set_page_config(page_title="IDBDC Consola", layout="centered")
 
 # --- DATE CONEXIUNE ---
 # Aici pui codul lung copiat manual între ghilimele
-DB_URI = "ostgresql://neondb_owner:npg_oRwnHk82CFUj@ep-silent-hill-ag8n1884-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+DB_URI = "postgresql://neondb_owner:npg_oRwnHk82CFUj@ep-silent-hill-ag8n1884-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 if "autentificat" not in st.session_state:
     st.session_state["autentificat"] = False
