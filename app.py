@@ -24,7 +24,7 @@ key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
 # ==========================================
-# POARTA 1: ACCES SISTEM
+# POARTA 1: ACCES SISTEM (ECRAN CENTRAL)
 # ==========================================
 if not st.session_state.autorizat_p1:
     st.markdown("<h1 style='text-align: center;'>🛡️</h1>", unsafe_allow_html=True)
@@ -47,12 +47,11 @@ if not st.session_state.autorizat_p1:
 st.sidebar.markdown("<h1 style='text-align: center;'>🛡️👤</h1>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold;'>Identificare Operator</p>", unsafe_allow_html=True)
 
-# Căutăm după cod_operator (rebranding-ul tău)
 cod_introdus = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod")
 
 if cod_introdus:
     try:
-        # Verificare în tabela com_operatori folosind coloanele noi: cod_operator și nume_prenume
+        # Verificare folosind coloanele: cod_operator și nume_prenume
         res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operator", cod_introdus).execute()
         
         if res_op.data:
@@ -73,10 +72,39 @@ if st.session_state.operator_identificat:
     
     col_a, col_b = st.columns([1, 1])
     
-    with col_a:
-        # Preluare categorii din nom_categorii
-        res_cat = supabase.table("nom_categorii").select("nume_categorie").execute()
-        liste_categorii = [item['nume_categorie'] for item in res_cat.data] if res_cat.data else []
-        categorie_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
+    # Inițializăm variabilele de selecție pentru a evita NameError mai jos
+    categorie_selectata = "---"
+    optiune_selectata = "---"
 
-    with
+    with col_a:
+        try:
+            res_cat = supabase.table("nom_categorii").select("nume_categorie").execute()
+            liste_categorii = [item['nume_categorie'] for item in res_cat.data] if res_cat.data else []
+            categorie_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
+        except Exception:
+            st.error("Eroare la încărcarea categoriilor.")
+
+    with col_b:
+        if categorie_selectata == "Contracte & Proiecte":
+            try:
+                res_sub = supabase.table("nom_contracte_proiecte").select("nume_optiune").execute()
+                liste_sub = [item['nume_optiune'] for item in res_sub.data] if res_sub.data else []
+                optiune_selectata = st.selectbox("Selectați Tipul:", ["---"] + liste_sub)
+            except Exception:
+                st.error("Eroare la încărcarea tipurilor de contracte.")
+        else:
+            st.selectbox("Selectați Tipul:", ["---"], disabled=True)
+
+    # Afișare stare și confirmare selecție
+    if categorie_selectata != "---":
+        st.write(f"Secțiunea curentă: **{categorie_selectata}**")
+        if categorie_selectata == "Contracte & Proiecte" and optiune_selectata != "---":
+            st.info(f"Sunteți gata să lucrați pe: {optiune_selectata}")
+
+else:
+    st.info("Vă rugăm să introduceți codul de identificare în sidebar (stânga).")
+
+# Ieșire
+if st.sidebar.button("Ieșire Sistem"):
+    st.session_state.clear()
+    st.rerun()
