@@ -12,13 +12,6 @@ if 'autorizat_p1' not in st.session_state:
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Stil Vizual
-st.markdown("""
-<style>
-    .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
-</style>
-""", unsafe_allow_html=True)
-
 # Conectare API Supabase
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
@@ -42,13 +35,13 @@ if not st.session_state.autorizat_p1:
                 st.session_state.autorizat_p1 = True
                 st.rerun()
             else:
-                st.markdown("<div class='eroare-idbdc'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
+                st.error("⚠️ Parolă incorectă.")
     st.stop() 
 
 # ==========================================
 # 3. POARTA 2: IDENTIFICARE (SIDEBAR 1/8)
 # ==========================================
-# SIMBOL CONCATENAT: 🛡️👤
+# SIMBOL CONCATENAT CERUT
 st.sidebar.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️👤</h1>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold; margin-top: 0;'>Identificare Operator</p>", unsafe_allow_html=True)
 
@@ -63,7 +56,7 @@ if not st.session_state.operator_identificat:
             else:
                 st.sidebar.error("Cod operator invalid!")
         except Exception as e:
-            st.sidebar.error(f"Eroare DB Operator: {e}")
+            st.sidebar.error(f"Eroare DB: {e}")
 else:
     st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
     if st.sidebar.button("Ieșire/Resetare"):
@@ -71,7 +64,7 @@ else:
         st.rerun()
 
 # ==========================================
-# 4. ZONA CENTRALĂ: LOGICĂ CATEGORII (7/8)
+# 4. ZONA CENTRALĂ: LOGICĂ SELECTII (7/8)
 # ==========================================
 if st.session_state.operator_identificat:
     st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}")
@@ -79,29 +72,27 @@ if st.session_state.operator_identificat:
     
     col_a, col_b = st.columns([1, 1])
     
-    # CASETA 1: Selectați Categoria
-    with col_a:
-        try:
-            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
-            liste_categorii = [item["denumire_categorie"] for item in res_cat.data] if res_cat.data else []
-            cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
-        except Exception as e:
-            st.error("Eroare la nom_categorie")
-            cat_selectata = "---"
+    # 1. Obținem datele pentru Categorie
+    try:
+        res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+        optiuni_cat = ["---"] + [r["denumire_categorie"] for r in res_cat.data]
+    except:
+        optiuni_cat = ["---", "Eroare încărcare"]
 
-    # CASETA 2: Selectati tipul de contract sau proiect
+    with col_a:
+        cat_aleasa = st.selectbox("Selectați Categoria:", optiuni_cat)
+
+    # 2. Obținem datele pentru Sub-categorie (Contracte & Proiecte)
     with col_b:
-        if cat_selectata == "Contracte & Proiecte":
+        if cat_aleasa == "Contracte & Proiecte":
             try:
                 res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
-                liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data] if res_sub.data else []
-                opt_selectata = st.selectbox("Selectati tipul de contract sau proiect", ["---"] + liste_sub)
-            except Exception as e:
-                st.error("Eroare la nom_contracte_proiecte")
-                opt_selectata = "---"
+                optiuni_sub = ["---"] + [r["acronim_contracte_proiecte"] for r in res_sub.data]
+                st.selectbox("Selectati tipul de contract sau proiect", optiuni_sub)
+            except:
+                st.error("Eroare la acronime")
         else:
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
-    # Info bar final
-    if cat_selectata != "---":
-        st.info(f"Context activ: **{cat_selectata}**")
+    if cat_aleasa != "---":
+        st.info(f"Sunteți în secțiunea: **{cat_aleasa}**")
