@@ -3,20 +3,21 @@ import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
-# 1. CONFIGURARE & INIȚIALIZARE (FUNDAȚIA)
+# 1. CONFIGURARE & INIȚIALIZARE
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
-# Inițializăm stările de sesiune înainte de orice logică de afișare
+# Inițializăm stările de sesiune
 if 'autorizat_p1' not in st.session_state:
     st.session_state.autorizat_p1 = False
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Stil Vizual pentru erori
+# Stil Vizual
 st.markdown("""
 <style>
     .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
+    .stSidebar { background-color: #f8f9fa; border-right: 1px solid #ddd; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -36,7 +37,6 @@ if not st.session_state.autorizat_p1:
     
     st.write("") 
 
-    # Coloane pentru îngustarea casetei centrală (scurtăm lungimea vizuală)
     col_stanga, col_centru, col_dreapta = st.columns([1.3, 0.5, 1.3])
     
     with col_centru:
@@ -54,8 +54,9 @@ if not st.session_state.autorizat_p1:
 # ==========================================
 # 3. POARTA 2: IDENTIFICARE (SIDEBAR 1/8)
 # ==========================================
-st.sidebar.markdown("<h1 style='text-align: center;'>🛡️👤</h1>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='text-align: center; font-weight: bold;'>Identificare Operator</p>", unsafe_allow_html=True)
+# Am unit simbolurile într-un singur element vizual conform cerinței
+st.sidebar.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️👤</h1>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='text-align: center; font-weight: bold; margin-top: 0;'>Identificare Operator</p>", unsafe_allow_html=True)
 
 if not st.session_state.operator_identificat:
     cod_introdus = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod")
@@ -105,3 +106,6 @@ if st.session_state.operator_identificat:
                 st.error("Eroare la nom_contracte_proiecte.")
         else:
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
+
+    if cat_selectata != "---":
+        st.info(f"Context activ: **{cat_selectata}**")
