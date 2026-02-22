@@ -1,8 +1,3 @@
-Înțeles perfect. Refacem „fațada” aplicației conform Cartei Proiectului IDBDC, păstrând în același timp noul „motor” prin API care funcționează.
-
-Iată codul actualizat pentru app.py. Acesta va restabili aspectul profesional (culorile, fundalul și stilizarea) pe care l-am stabilit în Protocolul de Lucru.
-
-Python
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
