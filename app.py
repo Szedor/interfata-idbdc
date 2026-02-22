@@ -1,9 +1,3 @@
-Ai perfectă dreptate. Îmi cer scuze, am încercat să simplific codul și am pierdut stilul și identitatea vizuală pe care am muncit atât să le construim conform Protocolului IDBDC [cite: 2026-02-16].
-
-Vom păstra exact structura ta cu bannerul roșu, centrarea coloanelor și logica de autorizare, dar vom injecta sub ea conexiunea la Supabase, astfel încât după ce treci de barieră să apară datele automat.
-
-Iată scriptul tău original, dar "conectat" la date:
-Python
 import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
@@ -11,15 +5,13 @@ from sqlalchemy import create_engine
 # ==========================================
 # 1. CONFIGURARE & STIL (ÎNGHEȚAT)
 # ==========================================
-st.set_page_config(page_title="IDBDC UPT", layout="centered")
+st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
-# Stil special pentru bannerul de eroare roșu
 st.markdown(""" <style> .eroare-idbdc {
 color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px;
 text-align: center; font-weight: bold; width: 100%; display: block; margin-top:
 10px; } </style> """, unsafe_allow_html=True)
 
-# Gestionarea stării sesiunii
 if 'autorizat_p1' not in st.session_state:
     st.session_state.autorizat_p1 = False
 
@@ -47,7 +39,6 @@ if not st.session_state.autorizat_p1:
         )
         
         if st.button("Autorizare acces", use_container_width=True):
-            # Verificarea parolei stabilite anterior
             if parola_introdusa == "EverDream2SZ":
                 st.session_state.autorizat_p1 = True
                 st.rerun()
@@ -65,7 +56,6 @@ else:
     st.success("✅ Acces Autorizat. Bun venit în sistemul IDBDC.")
     
     try:
-        # Folosim URL-ul salvat în Secrets (Supabase)
         engine = create_engine(st.secrets["DB_URL"])
         query = "SELECT * FROM base_proiecte_internationale"
         df = pd.read_sql(query, engine)
