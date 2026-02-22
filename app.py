@@ -6,12 +6,20 @@ from supabase import create_client, Client
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
+# Inițializare stări sesiune
 if 'autorizat_p1' not in st.session_state:
     st.session_state.autorizat_p1 = False
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Conectare API Supabase
+# Stil Vizual pentru erori și sidebar
+st.markdown("""
+<style>
+    .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
+</style>
+""", unsafe_allow_html=True)
+
+# Conectare Supabase
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
@@ -35,13 +43,13 @@ if not st.session_state.autorizat_p1:
                 st.session_state.autorizat_p1 = True
                 st.rerun()
             else:
-                st.error("⚠️ Parolă incorectă.")
+                st.markdown("<div class='eroare-idbdc'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
     st.stop() 
 
 # ==========================================
 # 3. POARTA 2: IDENTIFICARE (SIDEBAR 1/8)
 # ==========================================
-# AICI ESTE SIMBOLUL CONCATENAT CERUT: 🛡️👤
+# SIMBOLUL CONCATENAT CERUT
 st.sidebar.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️👤</h1>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold; margin-top: 0;'>Identificare Operator</p>", unsafe_allow_html=True)
 
@@ -72,17 +80,17 @@ if st.session_state.operator_identificat:
     
     col_a, col_b = st.columns([1, 1])
     
-    # 1. SELECTIE CATEGORIE (nom_categorie -> denumire_categorie)
+    # 1. SELECTIE CATEGORIE (nom_categorie)
     with col_a:
         try:
             res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
-            liste_categorii = ["---"] + [item["denumire_categorie"] for item in res_cat.data]
-            cat_selectata = st.selectbox("Selectați Categoria:", liste_categorii)
+            liste_cat = ["---"] + [item["denumire_categorie"] for item in res_cat.data]
+            cat_selectata = st.selectbox("Selectați Categoria:", liste_cat)
         except Exception as e:
-            st.error(f"Eroare nom_categorie: {e}")
+            st.error("Eroare la nom_categorie")
             cat_selectata = "---"
 
-    # 2. SELECTIE TIP (nom_contracte_proiecte -> acronim_contracte_proiecte)
+    # 2. SELECTIE TIP (nom_contracte_proiecte)
     with col_b:
         if cat_selectata == "Contracte & Proiecte":
             try:
@@ -90,9 +98,9 @@ if st.session_state.operator_identificat:
                 liste_sub = ["---"] + [item["acronim_contracte_proiecte"] for item in res_sub.data]
                 st.selectbox("Selectati tipul de contract sau proiect", liste_sub)
             except Exception as e:
-                st.error(f"Eroare nom_contracte_proiecte: {e}")
+                st.error("Eroare la nom_contracte_proiecte")
         else:
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
     if cat_selectata != "---":
-        st.info(f"Sunteți în secțiunea: **{cat_selectata}**")
+        st.info(f"Secțiunea curentă: **{cat_selectata}**")
