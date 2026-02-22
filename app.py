@@ -1,7 +1,7 @@
 import streamlit as st
 import psycopg2
 
-# 1. CONFIGURARE VIZUALĂ IDBDC
+# 1. DESIGN & CONFIGURARE VIZUALĂ
 st.set_page_config(page_title="IDBDC | Consola Centrală", layout="centered")
 
 st.markdown("""
@@ -13,13 +13,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONFIGURAȚIE CONEXIUNE (DATELE TALE ACTUALE) ---
+# --- CONFIGURAȚIE PENTRU FORȚARE IPv4 (SHARED POOLER) ---
+# Folosim host-ul de pooler pentru că acesta are adrese IPv4 pe care Streamlit le poate accesa
 DB_CONFIG = {
-    "host": "db.zkkkirpggtczbdzqqlyc.supabase.co",
+    "host": "aws-0-eu-central-1.pooler.supabase.com",
     "database": "postgres",
-    "user": "postgres",
-    "password": "EverDream2026IDBDC",
-    "port": "5432",
+    "user": "postgres.zkkkirpggtczbdzqqlyc", # Formatul specific pentru Pooler
+    "password": "EverDream2026IDBDC",        # Noua ta parolă curată
+    "port": "6543",                          # Portul obligatoriu pentru Pooler
     "sslmode": "require"
 }
 
@@ -56,9 +57,10 @@ elif st.session_state["operator_valid"] is None:
         
         if st.button("VERIFICĂ ACCESUL"):
             try:
+                # Conectare prin tunelul IPv4 (Pooler)
                 conn = psycopg2.connect(**DB_CONFIG)
                 cur = conn.cursor()
-                # Interogăm tabela de operatori
+                
                 cur.execute("SELECT nume_operator, filtru_categorie, filtru_proiect FROM com_operatori WHERE cod_acces = %s", (cod_input,))
                 res = cur.fetchone()
                 
@@ -66,20 +68,21 @@ elif st.session_state["operator_valid"] is None:
                     st.session_state["operator_valid"] = {"nume": res[0], "cat": res[1], "prj": res[2]}
                     st.rerun()
                 else:
-                    st.error("❌ Codul nu a fost găsit.")
+                    st.error("❌ Codul nu a fost găsit în baza IDBDC.")
                 
                 cur.close()
                 conn.close()
             except Exception as e:
-                st.error(f"⚠️ Eroare de conexiune: {e}")
+                st.error(f"⚠️ Eroare de rețea: {e}")
+                st.info("Această conexiune folosește Tunelul IPv4 pentru a evita blocajul Streamlit.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- INTERFAȚĂ LIVE ---
 else:
     op = st.session_state["operator_valid"]
     st.title(f"Salut, {op['nume']}!")
-    st.success("✅ Conexiune IDBDC stabilită.")
-    st.write(f"Proiect: **{op['prj']}** | Categorie: **{op['cat']}**")
+    st.success("✅ Conexiune stabilită prin tunel securizat.")
+    st.write(f"Proiect: **{op['prj']}** | Acces: **{op['cat']}**")
     
     if st.sidebar.button("Ieșire Securizată"):
         st.session_state.clear()
