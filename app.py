@@ -12,27 +12,23 @@ if 'autorizat_p1' not in st.session_state:
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Stil Vizual Corectat pentru Contrast (Zona Centrală vs Sidebar)
+# Stil Vizual Corectat: Contrast optim între Albastru UPT și Sidebar
 st.markdown("""
 <style>
-    /* Zona Centrală: Albastru UPT cu Text Alb */
-    .stApp {
-        background-color: #003366;
-    }
+    /* Zona Centrală: Albastru UPT */
+    .stApp { background-color: #003366; }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown {
         color: white !important;
     }
     
-    /* SIDEBAR: Fundal deschis cu Text Întunecat (pentru lizibilitate) */
+    /* SIDEBAR: Contrast pentru lizibilitate */
     [data-testid="stSidebar"] {
         background-color: #f8f9fa !important;
         border-right: 1px solid #ddd;
     }
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
-        color: #003366 !important; /* Text Albastru închis pe fond gri-alb */
+        color: #003366 !important;
     }
-    
-    /* Ajustare Input-uri în Sidebar să aibă text vizibil */
     [data-testid="stSidebar"] input {
         color: #31333F !important;
         background-color: white !important;
@@ -63,13 +59,11 @@ if not st.session_state.autorizat_p1:
     st.markdown("<h4 style='text-align: center; color: #FF4B4B !important;'>Acces restricționat</h4>", unsafe_allow_html=True)
     
     st.write("") 
-
     col_stanga, col_centru, col_dreapta = st.columns([1.3, 0.5, 1.3])
     
     with col_centru:
         st.write("Parola de acces:")
         parola_introdusa = st.text_input("Parola", type="password", label_visibility="collapsed", key="p1_pass")
-        
         if st.button("Autorizare acces", use_container_width=True):
             if parola_introdusa == "EverDream2SZ":
                 st.session_state.autorizat_p1 = True
@@ -85,7 +79,6 @@ st.sidebar.markdown("<h1 style='text-align: center;'>🛡️👤</h1>", unsafe_a
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold;'>Identificare Operator</p>", unsafe_allow_html=True)
 
 if not st.session_state.operator_identificat:
-    # Codul de operator - acum textul va fi negru pe fundal alb în sidebar
     cod_introdus = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod")
     if cod_introdus:
         try:
@@ -119,8 +112,8 @@ if st.session_state.operator_identificat:
             if res_cat.data:
                 liste_categorii = [item["denumire_categorie"] for item in res_cat.data]
                 cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
-        except Exception as e:
-            st.error(f"Eroare la încărcarea categoriilor.")
+        except:
+            st.error("Eroare la încărcarea categoriilor.")
 
     with col_b:
         if cat_selectata == "Contracte & Proiecte":
@@ -129,8 +122,8 @@ if st.session_state.operator_identificat:
                 if res_sub.data:
                     liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data]
                     st.selectbox("Selectați tipul de contract sau proiect:", ["---"] + liste_sub)
-            except Exception as e:
-                st.error(f"Eroare la încărcarea acronimelor.")
+            except:
+                st.error("Eroare la încărcarea acronimelor.")
         else:
             st.selectbox("Selectați tipul de contract sau proiect:", ["---"], disabled=True)
 
