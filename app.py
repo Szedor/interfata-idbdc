@@ -10,20 +10,28 @@ st.set_page_config(page_title="IDBDC UPT", layout="wide")
 query_params = st.query_params
 calea_activa = query_params.get("pagina", "explorator")
 
-# Conectare API Supabase
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# Stil Vizual UPT
+# Stil Vizual UPT - ÎMBUNĂTĂȚIT PENTRU VIZIBILITATE
 st.markdown("""
 <style>
     .stApp { background-color: #003366; }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; }
+    
+    /* Sidebar si Inputuri pentru vizibilitate maxima */
     [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 1px solid #ddd; }
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #003366 !important; }
-    [data-testid="stSidebar"] input { color: #31333F !important; background-color: white !important; }
-    label { font-size: 14px !important; font-weight: 400 !important; }
+    
+    /* Fortam casetele de text din Sidebar sa fie albe cu scris negru */
+    [data-testid="stSidebar"] input { 
+        color: #000000 !important; 
+        background-color: #ffffff !important; 
+        border: 1px solid #003366 !important;
+    }
+    
+    label { font-size: 14px !important; font-weight: bold !important; }
     .stMultiSelect [data-baseweb="select"] div[aria-live="polite"] { display: none; }
     .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
 </style>
@@ -53,7 +61,6 @@ if calea_activa == "explorator":
                 tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
             except: tipuri_sel = []
 
-    # Concatenare secțiuni
     if "Contracte & Proiecte" in categorii_sel and tipuri_sel:
         st.write("---")
         st.markdown("##### 📂 Contracte & Proiecte")
@@ -86,32 +93,28 @@ if calea_activa == "explorator":
         with p3: st.multiselect("Autor", [], placeholder="", key="f_pi_autor")
 
 # ==========================================
-# CALEA 2: ADMINISTRARE (BAZAT PE DOCX)
+# CALEA 2: ADMINISTRARE (Baza: com_operatori)
 # ==========================================
 elif calea_activa == "admin":
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
-    # POARTA 1: Bariera Centrală
     if not st.session_state.autorizat_p1:
-        st.markdown("<h1 style='text-align: center;'> 🛡️ </h1>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center;'>Sistemul de administrare IDBDC</h2>", unsafe_allow_html=True)
-        c_st, c_ce, c_dr = st.columns([1.3, 0.6, 1.3])
-        with c_ce:
-            st.write("Parola de acces:")
-            p_in = st.text_input("Parola", type="password", label_visibility="collapsed", key="p1_pass")
+        st.markdown("<h2 style='text-align: center;'>🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
+        _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
+        with col_ce:
+            parola_m = st.text_input("Parola master:", type="password", key="p1_pass")
             if st.button("Autorizare acces", use_container_width=True):
-                if p_in == "EverDream2SZ":
+                if parola_m == "EverDream2SZ":
                     st.session_state.autorizat_p1 = True
                     st.rerun()
-                else:
-                    st.markdown("<div class='eroare-idbdc'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
+                else: st.markdown("<div class='eroare-idbdc'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
         st.stop()
 
-    # POARTA 2: Sidebar
-    st.sidebar.markdown("<h1 style='text-align: center;'> 🛡️👤 </h1>", unsafe_allow_html=True)
+    st.sidebar.markdown("### 👤 Identificare Operator")
     if not st.session_state.operator_identificat:
-        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod")
+        # Legatura corecta cu coloana cod_operatori
+        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_final")
         if cod_in:
             try:
                 res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
@@ -119,7 +122,7 @@ elif calea_activa == "admin":
                     st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
                     st.rerun()
                 else: st.sidebar.error("Cod operator invalid!")
-            except: st.sidebar.error("Eroare de conexiune!")
+            except: st.sidebar.error("Eroare de conexiune la tabela operatori!")
         st.stop()
     else:
         st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
@@ -127,7 +130,6 @@ elif calea_activa == "admin":
             st.session_state.clear()
             st.rerun()
 
-    # PANOU DE LUCRU
     st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}")
     st.write("---")
     col_a, col_b = st.columns([1, 1])
