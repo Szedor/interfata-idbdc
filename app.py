@@ -1,55 +1,95 @@
+import streamlit as st
+import pandas as pd
+from supabase import create_client, Client
+
 # ==========================================
-# CALEA 2: CONSOLA DE ADMINISTRARE (SPECIALIȘTI)
+# 1. INITIALIZARE & DISPECER (ROUTING)
+# ==========================================
+st.set_page_config(page_title="IDBDC UPT", layout="wide")
+
+# Citim destinația din link
+query_params = st.query_params
+calea_activa = query_params.get("pagina", "explorator")
+
+# Stil Vizual UPT
+st.markdown("""
+<style>
+    .stApp { background-color: #003366; }
+    h1, h2, h3, h4, p, label, .stMarkdown { color: white !important; }
+    .stSelectbox label { color: #FFD700 !important; }
+</style>
+""", unsafe_allow_html=True)
+
+# Conectare Supabase
+url: str = st.secrets["SUPABASE_URL"]
+key: str = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url, key)
+
+# ==========================================
+# CALEA 1: EXPLORATOR DE DATE (Public)
+# ==========================================
+if calea_activa == "explorator":
+    st.markdown("# 🔍 Explorator de Date IDBDC")
+    st.write("Interogare informații de cercetare")
+    
+    # i) Alege categoria
+    try:
+        res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+        cat_selectata = st.selectbox("i) Alege categoria de informații:", ["---"] + [item["denumire_categorie"] for item in res_cat.data])
+
+        if cat_selectata == "Contracte & Proiecte":
+            res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+            tip_ales = st.selectbox("i1.1) Alege tipul de contract sau proiect:", ["---"] + [item["acronim_contracte_proiecte"] for item in res_tip.data])
+            
+            if tip_ales != "---":
+                st.info(f"Filtre active pentru: {tip_ales}")
+                # Aici vom finisa casetele de interogare (An, ID, Director)
+    except Exception as e:
+        st.error("Eroare la încărcarea datelor.")
+
+# ==========================================
+# CALEA 2: CONSOLA DE ADMINISTRARE (Privat)
 # ==========================================
 elif calea_activa == "admin":
-    # --- 1. CONFIGURARE STĂRI (Dacă nu există deja) ---
-    if 'autorizat_p1' not in st.session_state:
-        st.session_state.autorizat_p1 = False
-    if 'operator_identificat' not in st.session_state:
-        st.session_state.operator_identificat = None
+    # Initializare stari securitate
+    if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
+    if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
-    # --- 2. POARTA 1: ACCES MASTER ---
+    # Poarta 1: Parola Master
     if not st.session_state.autorizat_p1:
-        st.markdown("<h2 style='text-align: center;'>🛡️ Acces Restricționat IDBDC</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>Introduceți parola de sistem pentru a activa consola.</p>", unsafe_allow_html=True)
-        
-        col_st, col_ce, col_dr = st.columns([1, 1, 1])
-        with col_ce:
-            parola_master = st.text_input("Parola Master", type="password", label_visibility="collapsed")
-            if st.button("Autorizare", use_container_width=True):
-                if parola_master == "EverDream2SZ":
-                    st.session_state.autorizat_p1 = True
-                    st.rerun()
-                else:
-                    st.error("Parolă incorectă!")
-        st.stop() # Încetează rularea dacă nu este autorizat P1
+        st.markdown("## 🛡️ Acces Restricționat")
+        p_master = st.text_input("Parola Master:", type="password")
+        if st.button("Autorizare"):
+            if p_master == "EverDream2SZ":
+                st.session_state.autorizat_p1 = True
+                st.rerun()
+            else: st.error("Parolă incorectă!")
+        st.stop()
 
-    # --- 3. POARTA 2: IDENTIFICARE OPERATOR (SIDEBAR) ---
-    st.sidebar.markdown("### 👤 Identificare Operator")
+    # Poarta 2: Identificare Operator
     if not st.session_state.operator_identificat:
-        cod_op = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_admin")
+        st.sidebar.markdown("### 👤 Identificare")
+        cod_op = st.sidebar.text_input("Cod Operator:", type="password")
         if cod_op:
-            try:
-                # Verificăm în tabela com_operatori după cod_operatori
-                res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_op).execute()
-                if res_op.data:
-                    st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
-                    st.rerun()
-                else:
-                    st.sidebar.error("Cod invalid!")
-            except Exception as e:
-                st.sidebar.error(f"Eroare DB: {e}")
-        st.stop() # Încetează rularea până se identifică operatorul
+            res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_op).execute()
+            if res_op.data:
+                st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
+                st.rerun()
+            else: st.sidebar.error("Cod invalid!")
+        st.stop()
     else:
         st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
-        if st.sidebar.button("Ieșire / Reset"):
+        if st.sidebar.button("Ieșire"):
             st.session_state.clear()
             st.rerun()
 
-    # --- 4. PANOU DE LUCRU ADMIN (După trecerea ambelor porți) ---
-    st.markdown(f"## 🛠️ Consola de Administrare: {st.session_state.operator_identificat}")
-    st.write("---")
-    
-    st.info("Aici urmează modulele de tip CRUD (Adăugare/Editare date).")
-    
-    # Aici vom pune logica de tip "Alege tabelul pentru editare"
+    # Panoul de lucru Admin
+    st.markdown(f"## 🛠️ Consola Admin: {st.session_state.operator_identificat}")
+    st.write("Sistemul este gata pentru gestionare date.")
+
+# ==========================================
+# CALEA 3: BRAINSTORMING AI
+# ==========================================
+elif calea_activa == "ai":
+    st.markdown("# 🧠 Brainstorming AI")
+    st.write("Modul dedicat analizei profesorilor.")
