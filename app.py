@@ -32,7 +32,7 @@ if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    # RÂNDUL 1: CATEGORIA ȘI TIPUL CONTRACTULUI
+    # RÂNDUL 1: CATEGORIA ȘI TIPUL CONTRACTULUI (PE ACELAȘI RÂND)
     c1, c2 = st.columns(2)
     with c1:
         res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
@@ -46,7 +46,7 @@ if calea_activa == "explorator":
             list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
             tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
 
-    # --- FILTRE CONTRACTE & PROIECTE ---
+    # --- SECTIUNEA: CONTRACTE & PROIECTE ---
     if "Contracte & Proiecte" in categorii_sel and tipuri_sel:
         st.write("---")
         st.text_input("5. Titlul proiectului / Obiectul contractului", key="f_titlu")
@@ -84,23 +84,27 @@ if calea_activa == "explorator":
             persoane = sorted(list(set([d['nume_prenume'] for d in res_pers.data])))
             st.multiselect("Persoana de contact", persoane, placeholder="", key="f_ev_pers")
 
-    # --- RÂNDUL UNIC: PROPRIETATE INTELECTUALĂ (ACUM PREZENT) ---
+    # --- RÂNDUL UNIC: PROPRIETATE INTELECTUALĂ ---
     if "Proprietate intelectuala" in categorii_sel:
         st.write("---")
         st.markdown("##### 💡 Proprietate intelectuală")
         pi_cols = st.columns(3)
         with pi_cols[0]:
-            # Tipul de proprietate din base_prop_intelect
-            res_prop = supabase.table("base_prop_intelect").select("tip_proprietate").execute()
-            tipuri_prop = sorted(list(set([d['tip_proprietate'] for d in res_prop.data if d.get('tip_proprietate')])))
-            st.multiselect("Tipul de proprietate", tipuri_prop, placeholder="", key="f_pi_tip")
+            # 1. Tipul de proprietate
+            try:
+                res_prop = supabase.table("base_prop_intelect").select("tip_proprietate").execute()
+                tipuri_prop = sorted(list(set([d['tip_proprietate'] for d in res_prop.data if d.get('tip_proprietate')])))
+                st.multiselect("Tipul de proprietate", tipuri_prop, placeholder="", key="f_pi_tip")
+            except: st.multiselect("Tipul de proprietate", [], placeholder="", key="f_pi_tip_err")
         with pi_cols[1]:
-            # Numar inregistrare cerere din base_prop_intelect (cod_identificare)
+            # 2. Numar inregistrare cerere
             st.text_input("Număr înregistrare cerere", key="f_pi_nr")
         with pi_cols[2]:
-            # Autor din det_resurse_umane
-            res_aut = supabase.table("det_resurse_umane").select("nume_prenume").execute()
-            autori = sorted(list(set([d['nume_prenume'] for d in res_aut.data])))
-            st.multiselect("Autor", autori, placeholder="", key="f_pi_autor")
+            # 3. Autor
+            try:
+                res_aut = supabase.table("det_resurse_umane").select("nume_prenume").execute()
+                autori = sorted(list(set([d['nume_prenume'] for d in res_aut.data])))
+                st.multiselect("Autor", autori, placeholder="", key="f_pi_autor")
+            except: st.multiselect("Autor", [], placeholder="", key="f_pi_autor_err")
 
     st.write("---")
