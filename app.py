@@ -15,11 +15,13 @@ url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# Stil Vizual UPT
+# Stil Vizual UPT - Forțăm culorile și fonturile să fie unitare
 st.markdown("""
 <style>
     .stApp { background-color: #003366; }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; }
+    /* Eliminăm gri-ul textului ajutător din multiselect pentru a lăsa doar eticheta deasupra */
+    .stMultiSelect [data-baseweb="select"] div[aria-live="polite"] { color: transparent !important; }
     .stMultiSelect span { color: #31333F !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -31,7 +33,7 @@ if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    # GRID SELECȚIE CATEGORIE ȘI TIP
+    # GRID SELECȚIE CATEGORIE ȘI TIP (Rândul 1)
     c1, c2 = st.columns(2)
     with c1:
         res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
@@ -45,68 +47,49 @@ if calea_activa == "explorator":
             list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
             tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="Opțiuni de alegere", key="f_tip_multi")
 
-    # FILTRE DINAMICE DIN BASE_... ȘI COM_...
+    # FILTRE DE RAFINARE
     if tipuri_sel:
         st.write("---")
         
-        # Colectăm datele din toate tabelele selectate pentru a popula filtrele
-        all_data = []
-        for tip in tipuri_sel:
-            tabel = f"base_proiecte_{tip.lower()}"
-            try:
-                res = supabase.table(tabel).select("*").execute()
-                if res.data:
-                    all_data.extend(res.data)
-            except:
-                st.warning(f"Tabelul {tabel} nu a fost găsit.")
+        # 5. TITLUL (Pe tot ecranul, font unitar cu label-urile Streamlit)
+        st.markdown("<label style='font-size: 16px; font-weight: 400;'>5. Titlul proiectului / Obiectul contractului</label>", unsafe_allow_html=True)
+        titlu_sel = st.text_input("Introduceți titlu", label_visibility="collapsed", key="f_titlu")
         
-        df_total = pd.DataFrame(all_data)
+        st.write("") # Spațiu
 
-        if not df_total.empty:
-            # 5. TITLUL (Pe tot ecranul conform cerinței)
-            st.markdown("##### 5. Titlul proiectului / Obiectul contractului")
-            titlu_sel = st.text_input("Introduceți cuvinte cheie din titlu:", label_visibility="collapsed", key="f_titlu")
+        # Cele 3 coloane pentru restul filtrelor
+        f1, f2, f3 = st.columns(3)
+        
+        with f1:
+            # 3. ID
+            id_sel = st.text_input("3. ID proiect / Nr. contract", key="f_id")
+            # 4. Acronim
+            acro_sel = st.text_input("4. Acronim proiect", key="f_acro")
+
+        with f2:
+            # 7. Anul de implementare
+            # Aici vom integra ulterior logica de calcul din Word
+            an_sel = st.number_input("7. Anul de implementare", min_value=2010, max_value=2030, value=2024, key="f_an")
             
-            st.write("") # Spațiu
+            # 6. Director (POZIȚIONAT SUB AN conform solicitării)
+            try:
+                res_dir = supabase.table("com_echipe_proiecte").select("nume_prenume_membru").eq("reprezinta_idbdc", "DA").execute()
+                directori = sorted(list(set([d['nume_prenume_membru'] for d in res_dir.data])))
+                dir_sel = st.multiselect("6. Director de proiect / Responsabil contract:", directori, placeholder="Opțiuni de alegere", key="f_dir")
+            except: dir_sel = []
 
-            f1, f2, f3 = st.columns(3)
+        with f3:
+            # 8. Rol UPT (Eticheta deasupra, fără text în interior)
+            rol_sel = st.multiselect("8. Rol UPT", ["Coordonator", "Partener"], placeholder="Opțiuni de alegere", key="f_rol")
             
-            with f1:
-                # 3. ID (Din coloana cod_identificare a df_total)
-                id_sel = st.text_input("3. ID proiect / Nr. contract", key="f_id")
-                # 4. Acronim (Din coloana acronim_proiect)
-                acro_sel = st.text_input("4. Acronim proiect", key="f_acro")
+            # 9. Statusul proiectului (Eticheta deasupra, fără text în interior)
+            status_sel = st.multiselect("9. Statusul proiectului", ["În derulare", "Finalizat"], placeholder="Opțiuni de alegere", key="f_status")
 
-            with f2:
-                # 7. Anul de implementare
-                # Extragem anii unici existenți în date
-                ani_disponibili = sorted(df_total['an_referinta'].unique().tolist()) if 'an_referinta' in df_total.columns else [2024]
-                an_sel = st.selectbox("7. Anul de implementare:", ani_disponibili, key="f_an")
-                
-                # 6. Director (Din com_echipe_proiecte unde reprezinta_idbdc='DA')
-                # Mutat SUB an conform cerinței
-                try:
-                    res_dir = supabase.table("com_echipe_proiecte").select("nume_prenume_membru").eq("reprezinta_idbdc", "DA").execute()
-                    directori = sorted(list(set([d['nume_prenume_membru'] for d in res_dir.data])))
-                    dir_sel = st.multiselect("6. Director de proiect / Responsabil:", directori, placeholder="Opțiuni de alegere", key="f_dir")
-                except: dir_sel = []
-
-            with f3:
-                # 8. Rolul UPT (Extras din datele reale)
-                roluri_reale = sorted(df_total['rol_upt'].unique().tolist()) if 'rol_upt' in df_total.columns else []
-                rol_sel = st.multiselect("8. Rolul UPT:", roluri_reale, placeholder="Opțiuni de alegere", key="f_rol")
-                
-                # 9. Status (Extras din datele reale)
-                statusuri_reale = sorted(df_total['status_contract_proiect'].unique().tolist()) if 'status_contract_proiect' in df_total.columns else []
-                status_sel = st.multiselect("9. Statusul proiectului:", statusuri_reale, placeholder="Opțiuni de alegere", key="f_status")
-
-            st.write("---")
-            st.success(f"Gata pentru interogare. S-au găsit {len(df_total)} înregistrări brute.")
-        else:
-            st.warning("Nu există date în tabelele selectate.")
+        st.write("---")
+        st.info(f"Interogare activă pentru: {', '.join(tipuri_sel)}")
 
 # ==========================================
-# CALEA 2: ADMIN (IZOLARE)
+# CALEA 2: ADMIN (Rămâne izolată)
 # ==========================================
 elif calea_activa == "admin":
-    st.info("Secțiune de administrare izolată.")
+    st.info("Secțiune de administrare izolată. Identificarea se face în Sidebar.")
