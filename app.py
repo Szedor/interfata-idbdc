@@ -20,7 +20,7 @@ st.markdown("""
 <style>
     .stApp { background-color: #003366; }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; }
-    label { font-size: 16px !important; font-weight: 400 !important; color: white !important; }
+    label { font-size: 14px !important; font-weight: 400 !important; color: white !important; }
     .stMultiSelect [data-baseweb="select"] div[aria-live="polite"] { color: transparent !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -32,22 +32,27 @@ if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    # 1. CATEGORIA DE INFORMAȚII (Sursa: nom_categorie)
+    # 1. CATEGORIA (Sursa: nom_categorie)
     res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
     list_cat = [i["denumire_categorie"] for i in res_cat.data]
+    
+    # Rândul principal de selecție categorie
     categorii_sel = st.multiselect("1. Categoria de informații:", list_cat, placeholder="", key="f_cat_multi")
 
     # --- SECTIUNEA A: CONTRACTE & PROIECTE ---
     if "Contracte & Proiecte" in categorii_sel:
-        st.markdown("### 📂 Filtre: Contracte & Proiecte")
-        c2_cp = st.columns(1)
-        with c2_cp[0]:
-            res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
-            list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
-            tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
+        st.write("---")
+        st.markdown("##### 📂 Gestiune: Contracte & Proiecte")
+        
+        # 2. Tipul pe același rând (vizual vorbind, imediat sub categorie)
+        res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+        list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
+        tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
 
         if tipuri_sel:
+            # 5. TITLUL - Lățime totală
             st.text_input("5. Titlul proiectului / Obiectul contractului", key="f_titlu")
+            
             f1, f2, f3 = st.columns(3)
             with f1:
                 st.text_input("3. ID proiect / Nr. contract", key="f_id")
@@ -66,40 +71,34 @@ if calea_activa == "explorator":
                 statusuri = [s['status_contract_proiect'] for s in res_st.data]
                 st.multiselect("9. Statusul proiectului", statusuri, placeholder="", key="f_status")
 
-    # --- SECTIUNEA B: EVENIMENTE STIINTIFICE ---
+    # --- SECTIUNEA B: EVENIMENTE STIINTIFICE (COMPACTĂ PE UN RÂND) ---
     if "Evenimente stiintifice" in categorii_sel:
         st.write("---")
-        st.markdown("### 🎤 Filtre: Evenimente științifice")
-        e1, e2, e3 = st.columns(3)
+        st.markdown("##### 🎤 Gestiune: Evenimente științifice")
+        e1, e2, e3 = st.columns(3) # Toate cele 3 pe același rând
         with e1:
-            # Tip eveniment (Sursa: base_evenimente_stiintifice -> natura_eveniment)
             res_ev = supabase.table("base_evenimente_stiintifice").select("natura_eveniment").execute()
             tipuri_ev = sorted(list(set([d['natura_eveniment'] for d in res_ev.data if d['natura_eveniment']])))
             st.multiselect("Tipul de eveniment", tipuri_ev, placeholder="", key="f_ev_tip")
         with e2:
-            # Anul desfasurarii (Interpretare data_inceput / data_sfarsit)
             st.number_input("Anul desfășurării", min_value=2010, max_value=2035, value=2024, key="f_ev_an")
         with e3:
-            # Persoana de contact (Sursa: det_resurse_umane -> nume_prenume)
             res_pers = supabase.table("det_resurse_umane").select("nume_prenume").execute()
             persoane = sorted(list(set([d['nume_prenume'] for d in res_pers.data])))
             st.multiselect("Persoana de contact", persoane, placeholder="", key="f_ev_pers")
 
-    # --- SECTIUNEA C: PROPRIETATE INTELECTUALA ---
+    # --- SECTIUNEA C: PROPRIETATE INTELECTUALA (COMPACTĂ PE UN RÂND) ---
     if "Proprietate intelectuala" in categorii_sel:
         st.write("---")
-        st.markdown("### 💡 Filtre: Proprietate intelectuală")
-        p1, p2, p3 = st.columns(3)
+        st.markdown("##### 💡 Gestiune: Proprietate intelectuală")
+        p1, p2, p3 = st.columns(3) # Toate cele 3 pe același rând
         with p1:
-            # Tipul de proprietate (Sursa: base_prop_intelect -> tip_proprietate - presupunem coloana conform logicii)
             res_prop = supabase.table("base_prop_intelect").select("tip_proprietate").execute()
             tipuri_prop = sorted(list(set([d['tip_proprietate'] for d in res_prop.data if d['tip_proprietate']])))
             st.multiselect("Tipul de proprietate", tipuri_prop, placeholder="", key="f_pi_tip")
         with p2:
-            # Numar inregistrare cerere (Sursa: base_prop_intelect -> cod_identificare)
             st.text_input("Număr înregistrare cerere", key="f_pi_nr")
         with p3:
-            # Autor (Sursa: det_resurse_umane -> nume_prenume)
             res_aut = supabase.table("det_resurse_umane").select("nume_prenume").execute()
             autori = sorted(list(set([d['nume_prenume'] for d in res_aut.data])))
             st.multiselect("Autor", autori, placeholder="", key="f_pi_autor")
