@@ -5,7 +5,7 @@ from supabase import create_client, Client
 # ==========================================
 # 1. CONFIGURARE & INIȚIALIZARE (FUNDAȚIA)
 # ==========================================
-st.set_page_config(page_title="Sistemul de administrare IDBDC", layout="wide")
+st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
 # Inițializăm stările de sesiune pentru persistența datelor
 if 'autorizat_p1' not in st.session_state:
@@ -13,11 +13,11 @@ if 'autorizat_p1' not in st.session_state:
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Stil Vizual Personalizat (Armonizat research.upt.ro)
+# Stil Vizual Personalizat (Fundal Albastru UPT #003366)
 st.markdown("""
 <style>
     .stApp {
-        background-color: #003366; /* Albastru UPT */
+        background-color: #003366;
     }
     h1, h2, h3, h4, p, label, .stMarkdown {
         color: white !important;
@@ -95,11 +95,10 @@ else:
         st.rerun()
 
 # ==========================================
-# 4. PANOU DE LUCRU (ZONA CENTRALĂ)
+# 4. ZONA CENTRALĂ: LOGICĂ CATEGORII
 # ==========================================
 if st.session_state.operator_identificat:
-    st.markdown(f"## Panou de Lucru IDBDC")
-    st.markdown(f"**Operator activ:** {st.session_state.operator_identificat}")
+    st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}")
     st.write("---")
     
     col_a, col_b = st.columns([1, 1])
@@ -110,4 +109,26 @@ if st.session_state.operator_identificat:
         try:
             res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
             if res_cat.data:
-                liste_categorii = [item
+                liste_categorii = [item["denumire_categorie"] for item in res_cat.data]
+                cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
+        except Exception as e:
+            st.error(f"Eroare la încărcarea categoriilor: {e}")
+
+    # CASETA 2: Selectare Tip Contract/Proiect
+    with col_b:
+        if cat_selectata == "Contracte & Proiecte":
+            try:
+                res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+                if res_sub.data:
+                    liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data]
+                    st.selectbox("Selectați tipul de contract sau proiect:", ["---"] + liste_sub)
+            except Exception as e:
+                st.error(f"Eroare la încărcarea acronimelor: {e}")
+        else:
+            st.selectbox("Selectați tipul de contract sau proiect:", ["---"], disabled=True)
+
+    if cat_selectata != "---":
+        st.info(f"Context activ: **{cat_selectata}**")
+
+else:
+    st.info("Sistemul așteaptă identificarea operatorului în partea stângă (Sidebar).")
