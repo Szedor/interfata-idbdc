@@ -3,25 +3,41 @@ import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
-# 1. CONFIGURARE & INIȚIALIZARE (FUNDAȚIA)
+# 1. CONFIGURARE & INIȚIALIZARE
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
-# Inițializăm stările de sesiune pentru persistența datelor
 if 'autorizat_p1' not in st.session_state:
     st.session_state.autorizat_p1 = False
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Stil Vizual Personalizat (Fundal Albastru UPT #003366)
+# Stil Vizual Corectat pentru Contrast (Zona Centrală vs Sidebar)
 st.markdown("""
 <style>
+    /* Zona Centrală: Albastru UPT cu Text Alb */
     .stApp {
         background-color: #003366;
     }
-    h1, h2, h3, h4, p, label, .stMarkdown {
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown {
         color: white !important;
     }
+    
+    /* SIDEBAR: Fundal deschis cu Text Întunecat (pentru lizibilitate) */
+    [data-testid="stSidebar"] {
+        background-color: #f8f9fa !important;
+        border-right: 1px solid #ddd;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
+        color: #003366 !important; /* Text Albastru închis pe fond gri-alb */
+    }
+    
+    /* Ajustare Input-uri în Sidebar să aibă text vizibil */
+    [data-testid="stSidebar"] input {
+        color: #31333F !important;
+        background-color: white !important;
+    }
+
     .eroare-idbdc { 
         color: white; 
         background-color: #FF4B4B; 
@@ -29,14 +45,6 @@ st.markdown("""
         border-radius: 8px; 
         text-align: center; 
         font-weight: bold; 
-    }
-    section[data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-        border-right: 1px solid #ddd;
-    }
-    section[data-testid="stSidebar"] .stMarkdown p, 
-    section[data-testid="stSidebar"] label {
-        color: #31333F !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -51,8 +59,8 @@ supabase: Client = create_client(url, key)
 # ==========================================
 if not st.session_state.autorizat_p1:
     st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️</h1>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; margin-top: 0; color: white;'>Sistemul de administrare IDBDC</h2>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center; color: #FF4B4B;'>Acces restricționat</h4>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; margin-top: 0;'>Sistemul de administrare IDBDC</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center; color: #FF4B4B !important;'>Acces restricționat</h4>", unsafe_allow_html=True)
     
     st.write("") 
 
@@ -77,6 +85,7 @@ st.sidebar.markdown("<h1 style='text-align: center;'>🛡️👤</h1>", unsafe_a
 st.sidebar.markdown("<p style='text-align: center; font-weight: bold;'>Identificare Operator</p>", unsafe_allow_html=True)
 
 if not st.session_state.operator_identificat:
+    # Codul de operator - acum textul va fi negru pe fundal alb în sidebar
     cod_introdus = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod")
     if cod_introdus:
         try:
@@ -95,7 +104,7 @@ else:
         st.rerun()
 
 # ==========================================
-# 4. ZONA CENTRALĂ: LOGICĂ CATEGORII
+# 4. ZONA CENTRALĂ: PANOU DE LUCRU
 # ==========================================
 if st.session_state.operator_identificat:
     st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}")
@@ -104,7 +113,6 @@ if st.session_state.operator_identificat:
     col_a, col_b = st.columns([1, 1])
     cat_selectata = "---"
 
-    # CASETA 1: Selectare Categorie Principală
     with col_a:
         try:
             res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
@@ -112,9 +120,8 @@ if st.session_state.operator_identificat:
                 liste_categorii = [item["denumire_categorie"] for item in res_cat.data]
                 cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii)
         except Exception as e:
-            st.error(f"Eroare la încărcarea categoriilor: {e}")
+            st.error(f"Eroare la încărcarea categoriilor.")
 
-    # CASETA 2: Selectare Tip Contract/Proiect
     with col_b:
         if cat_selectata == "Contracte & Proiecte":
             try:
@@ -123,12 +130,11 @@ if st.session_state.operator_identificat:
                     liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data]
                     st.selectbox("Selectați tipul de contract sau proiect:", ["---"] + liste_sub)
             except Exception as e:
-                st.error(f"Eroare la încărcarea acronimelor: {e}")
+                st.error(f"Eroare la încărcarea acronimelor.")
         else:
             st.selectbox("Selectați tipul de contract sau proiect:", ["---"], disabled=True)
 
     if cat_selectata != "---":
         st.info(f"Context activ: **{cat_selectata}**")
-
 else:
-    st.info("Sistemul așteaptă identificarea operatorului în partea stângă (Sidebar).")
+    st.info("Sistemul așteaptă identificarea operatorului în Sidebar.")
