@@ -23,7 +23,7 @@ st.markdown("""
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #003366 !important; }
     [data-testid="stSidebar"] input { color: #31333F !important; background-color: white !important; }
     label { font-size: 14px !important; font-weight: 400 !important; }
-    /* Elimină textul ajutător de sub multiselect */
+    /* Elimină textul ajutător de sub multiselect (Choose options) */
     .stMultiSelect [data-baseweb="select"] div[aria-live="polite"] { display: none; }
 </style>
 """, unsafe_allow_html=True)
@@ -41,7 +41,8 @@ if calea_activa == "explorator":
         try:
             res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
             list_cat = [i["denumire_categorie"] for i in res_cat.data]
-        except: list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
+        except: 
+            list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
         categorii_sel = st.multiselect("1. Categoria de informații:", list_cat, placeholder="", key="main_cat")
 
     with c2:
@@ -51,11 +52,12 @@ if calea_activa == "explorator":
                 res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
                 list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
                 tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
-            except: tipuri_sel = []
+            except: 
+                tipuri_sel = []
 
-    # --- CONCATENARE SECȚIUNI (Rând sub rând) ---
+    # --- CONCATENARE SECȚIUNI (Rând sub rând, fără dublări) ---
     
-    # CONTRACTE
+    # SECTIUNEA: CONTRACTE
     if "Contracte & Proiecte" in categorii_sel and tipuri_sel:
         st.write("---")
         st.markdown("##### 📂 Contracte & Proiecte")
@@ -72,62 +74,70 @@ if calea_activa == "explorator":
             st.multiselect("8. Rol UPT", ["Lider", "Coordonator", "Partener"], placeholder="", key="f_rol")
             st.multiselect("9. Statusul proiectului", [], placeholder="", key="f_status")
 
-    # EVENIMENTE
+    # SECTIUNEA: EVENIMENTE
     if "Evenimente stiintifice" in categorii_sel:
         st.write("---")
         st.markdown("##### 🎤 Evenimente științifice")
         e1, e2, e3 = st.columns(3)
         with e1:
-            st.multiselect("Tipul de eveniment", ["Conferinta", "Simpozion"], placeholder="", key="f_ev_tip")
+            st.multiselect("Tipul de eveniment", ["Conferinta", "Simpozion", "Workshop"], placeholder="", key="f_ev_tip")
         with e2:
             st.number_input("Anul desfășurării", 2010, 2035, 2024, key="f_ev_an")
         with e3:
             st.multiselect("Persoana de contact", [], placeholder="", key="f_ev_pers")
 
-    # PROPRIETATE INTELECTUALĂ (REPARAT)
+    # SECTIUNEA: PROPRIETATE INTELECTUALĂ (3 Casete pe un rând)
     if "Proprietate intelectuala" in categorii_sel:
         st.write("---")
         st.markdown("##### 💡 Proprietate intelectuală")
         p1, p2, p3 = st.columns(3)
         with p1:
-            st.multiselect("Tipul de proprietate", ["Patent", "Cerere"], placeholder="", key="f_pi_tip")
+            st.multiselect("Tipul de proprietate", ["Patent", "Cerere inregistrare", "Model utilitate"], placeholder="", key="f_pi_tip")
         with p2:
             st.text_input("Număr înregistrare cerere", key="f_pi_nr")
         with p3:
             st.multiselect("Autor", [], placeholder="", key="f_pi_autor")
 
 # ==========================================
-# CALEA 2: ADMINISTRARE (CONFORM DOCX)
+# CALEA 2: ADMINISTRARE (CONFORM PROTOCOL)
 # ==========================================
 elif calea_activa == "admin":
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
-    if 'operator_nume' not in st.session_state: st.session_state.operator_nume = None
+    if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
+    # POARTA 1: Bariera Centrală
     if not st.session_state.autorizat_p1:
-        st.markdown("<h2 style='text-align: center;'>🛡️ Acces Securizat</h2>", unsafe_allow_html=True)
-        _, col_c, _ = st.columns([1, 0.5, 1])
+        st.markdown("<h2 style='text-align: center;'>🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
+        _, col_c, _ = st.columns([1, 0.6, 1])
         with col_c:
-            parola = st.text_input("Parola master:", type="password")
+            parola_master = st.text_input("Parola master:", type="password")
             if st.button("Autorizare"):
-                if parola == "EverDream2SZ":
+                if parola_master == "EverDream2SZ":
                     st.session_state.autorizat_p1 = True
                     st.rerun()
+                else:
+                    st.error("Parolă incorectă!")
         st.stop()
 
-    st.sidebar.markdown("### 👤 Identificare")
-    if not st.session_state.operator_nume:
-        cod = st.sidebar.text_input("Cod Identificare", type="password")
-        if cod:
-            res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod).execute()
-            if res_op.data:
-                st.session_state.operator_nume = res_op.data[0]['nume_prenume']
-                st.rerun()
-            else: st.sidebar.error("Cod invalid!")
+    # POARTA 2: Sidebar Identificare
+    st.sidebar.markdown("### 👤 Identificare Operator")
+    if not st.session_state.operator_identificat:
+        cod_op = st.sidebar.text_input("Cod Identificare", type="password")
+        if cod_op:
+            try:
+                res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_op).execute()
+                if res_op.data:
+                    st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
+                    st.rerun()
+                else:
+                    st.sidebar.error("Cod invalid!")
+            except:
+                st.sidebar.error("Eroare conexiune!")
         st.stop()
     else:
-        st.sidebar.write(f"Salut, {st.session_state.operator_nume}!")
+        st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
         if st.sidebar.button("Logout"):
             st.session_state.clear()
             st.rerun()
     
-    st.markdown(f"### Panou de Lucru: {st.session_state.operator_nume}")
+    st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}")
