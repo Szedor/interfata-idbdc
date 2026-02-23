@@ -1,130 +1,55 @@
-import streamlit as st
-import pandas as pd
-from supabase import create_client, Client
-
 # ==========================================
-# 1. DISPECERUL DE PAGINI (ROUTING)
-# ==========================================
-st.set_page_config(page_title="IDBDC UPT", layout="wide")
-
-# Citim destinația din link (URL)
-query_params = st.query_params
-calea_activa = query_params.get("pagina", "explorator")
-
-# Stil Vizual UPT
-st.markdown("""
-<style>
-    .stApp { background-color: #003366; }
-    h1, h2, h3, h4, p, label { color: white !important; }
-    .stSelectbox label, .stMultiSelect label, .stTextInput label { font-weight: bold; color: #FFD700 !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# Conectare Supabase
-url: str = st.secrets["SUPABASE_URL"]
-key: str = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(url, key)
-
-# ==========================================
-# CALEA 1: EXPLORATOR DE DATE (PENTRU VIZITATORI)
-# ==========================================
-if calea_activa == "explorator":
-    st.markdown("# 🔍 Explorator de Date IDBDC")
-    st.write("Interogare informații publice de cercetare")
-    st.write("---")
-
-    # i) Titlul: Alege categoria de informatii
-    st.markdown("### i) Alege categoria de informații")
-    try:
-        res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
-        categorii = [item["denumire_categorie"] for item in res_cat.data]
-        cat_selectata = st.selectbox("Selectați categoria:", ["---"] + categorii, label_visibility="collapsed")
-    except:
-        st.error("Eroare la încărcarea nomenclatorului de categorii.")
-        cat_selectata = "---"
-
-    # i1) Daca alege Contracte & Proiecte
-    if cat_selectata == "Contracte & Proiecte":
-        st.write("")
-        st.markdown("### i1.1) Alege tipul de contract sau proiect")
-        
-        try:
-            res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
-            tipuri = [item["acronim_contracte_proiecte"] for item in res_tip.data]
-            tip_ales = st.selectbox("Selectați tipul (FDI, PNRR etc.):", ["---"] + tipuri, label_visibility="collapsed")
-            
-            if tip_ales != "---":
-                # Determinăm tabelul bază
-                tabel_tinta = f"base_proiecte_{tip_ales.lower()}"
-                
-                # Preluăm datele
-                res_date = supabase.table(tabel_tinta).select("*").execute()
-                df = pd.DataFrame(res_date.data)
-
-                if not df.empty:
-                    st.write("---")
-                    st.markdown("#### Casete de interogare specifice:")
-                    
-                    c1, c2, c3 = st.columns(3)
-                    
-                    with c1:
-                        # Filtru An Referință
-                        ani = sorted(df['an_referinta'].unique().tolist()) if 'an_referinta' in df.columns else []
-                        an_filtru = st.multiselect("Anul referință:", ani)
-                        
-                        # Filtru ID/Nr Contract (din cod_identificare)
-                        id_filtru = st.text_input("Cod identitificare / Nr. Contract:")
-
-                    with c2:
-                        # Filtru Director de Proiect (cu bifa reprezinta_idbdc = DA)
-                        try:
-                            res_dir = supabase.table("com_echipe_proiecte").select("nume_prenume_membru").eq("reprezinta_idbdc", "DA").execute()
-                            directori = sorted(list(set([d['nume_prenume_membru'] for d in res_dir.data])))
-                            dir_filtru = st.multiselect("Director de proiect (IDBDC):", directori)
-                        except:
-                            dir_filtru = []
-                            st.warning("Nu am putut încărca lista de directori.")
-
-                    with c3:
-                        # Filtru Departament & Acronim
-                        acronime = sorted(df['acronim'].unique().tolist()) if 'acronim' in df.columns else []
-                        acro_filtru = st.multiselect("Acronim proiect:", acronime)
-                        
-                        depts = sorted(df['departament'].unique().tolist()) if 'departament' in df.columns else []
-                        dept_filtru = st.multiselect("Departament:", depts)
-
-                    # --- APLICAREA FILTRELOR PE TABEL ---
-                    if an_filtru: df = df[df['an_referinta'].isin(an_filtru)]
-                    if id_filtru: df = df[df['cod_identificare'].str.contains(id_filtru, case=False, na=False)]
-                    if dir_filtru: 
-                        if 'director_proiect' in df.columns:
-                            df = df[df['director_proiect'].isin(dir_filtru)]
-                    if acro_filtru: df = df[df['acronim'].isin(acro_filtru)]
-                    if dept_filtru: df = df[df['departament'].isin(dept_filtru)]
-
-                    # --- AFIȘARE REZULTAT ---
-                    st.write("---")
-                    st.dataframe(df, use_container_width=True, hide_index=True)
-                    
-                    # Opțiuni export
-                    st.download_button("📥 Descarcă lista (CSV)", df.to_csv(index=False), f"interogare_{tip_ales}.csv", "text/csv")
-                else:
-                    st.warning(f"Nu există date înregistrate pentru {tip_ales}.")
-        except:
-            st.error(f"Eroare: Tabelul '{tabel_tinta}' nu a fost găsit.")
-
-# ==========================================
-# CALEA 2: CONSOLA DE ADMINISTRARE (CRUD)
+# CALEA 2: CONSOLA DE ADMINISTRARE (SPECIALIȘTI)
 # ==========================================
 elif calea_activa == "admin":
-    # Aici rămâne logica cu barierele de securitate și identificare operator
-    st.markdown("# 🛡️ Consola de Administrare")
-    st.write("Identificați-vă pentru a gestiona datele.")
-    # (Păstrezi aici logica de parola și operator)
+    # --- 1. CONFIGURARE STĂRI (Dacă nu există deja) ---
+    if 'autorizat_p1' not in st.session_state:
+        st.session_state.autorizat_p1 = False
+    if 'operator_identificat' not in st.session_state:
+        st.session_state.operator_identificat = None
 
-# ==========================================
-# CALEA 3: BRAINSTORMING AI (PROFESORI)
-# ==========================================
-elif calea_activa == "ai":
-    st.markdown("# 🧠 Brainstorming AI")
-    st.write("Modul de analiză inteligentă pentru cadre didactice.")
+    # --- 2. POARTA 1: ACCES MASTER ---
+    if not st.session_state.autorizat_p1:
+        st.markdown("<h2 style='text-align: center;'>🛡️ Acces Restricționat IDBDC</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Introduceți parola de sistem pentru a activa consola.</p>", unsafe_allow_html=True)
+        
+        col_st, col_ce, col_dr = st.columns([1, 1, 1])
+        with col_ce:
+            parola_master = st.text_input("Parola Master", type="password", label_visibility="collapsed")
+            if st.button("Autorizare", use_container_width=True):
+                if parola_master == "EverDream2SZ":
+                    st.session_state.autorizat_p1 = True
+                    st.rerun()
+                else:
+                    st.error("Parolă incorectă!")
+        st.stop() # Încetează rularea dacă nu este autorizat P1
+
+    # --- 3. POARTA 2: IDENTIFICARE OPERATOR (SIDEBAR) ---
+    st.sidebar.markdown("### 👤 Identificare Operator")
+    if not st.session_state.operator_identificat:
+        cod_op = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_admin")
+        if cod_op:
+            try:
+                # Verificăm în tabela com_operatori după cod_operatori
+                res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_op).execute()
+                if res_op.data:
+                    st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
+                    st.rerun()
+                else:
+                    st.sidebar.error("Cod invalid!")
+            except Exception as e:
+                st.sidebar.error(f"Eroare DB: {e}")
+        st.stop() # Încetează rularea până se identifică operatorul
+    else:
+        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
+        if st.sidebar.button("Ieșire / Reset"):
+            st.session_state.clear()
+            st.rerun()
+
+    # --- 4. PANOU DE LUCRU ADMIN (După trecerea ambelor porți) ---
+    st.markdown(f"## 🛠️ Consola de Administrare: {st.session_state.operator_identificat}")
+    st.write("---")
+    
+    st.info("Aici urmează modulele de tip CRUD (Adăugare/Editare date).")
+    
+    # Aici vom pune logica de tip "Alege tabelul pentru editare"
