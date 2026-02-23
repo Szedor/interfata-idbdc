@@ -26,13 +26,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# CALEA 1: EXPLORATOR DE DATE
+# CALEA 1: EXPLORATOR DE DATE (ÎNGHEȚATĂ)
 # ==========================================
 if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    # RÂNDUL 1: CATEGORIA ȘI TIPUL CONTRACTULUI (PE ACELAȘI RÂND)
+    # RÂNDUL 1: CATEGORIA ȘI TIPUL CONTRACTULUI
     c1, c2 = st.columns(2)
     with c1:
         res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
@@ -90,21 +90,38 @@ if calea_activa == "explorator":
         st.markdown("##### 💡 Proprietate intelectuală")
         pi_cols = st.columns(3)
         with pi_cols[0]:
-            # 1. Tipul de proprietate
-            try:
-                res_prop = supabase.table("base_prop_intelect").select("tip_proprietate").execute()
-                tipuri_prop = sorted(list(set([d['tip_proprietate'] for d in res_prop.data if d.get('tip_proprietate')])))
-                st.multiselect("Tipul de proprietate", tipuri_prop, placeholder="", key="f_pi_tip")
-            except: st.multiselect("Tipul de proprietate", [], placeholder="", key="f_pi_tip_err")
+            res_prop = supabase.table("base_prop_intelect").select("tip_proprietate").execute()
+            tipuri_prop = sorted(list(set([d['tip_proprietate'] for d in res_prop.data if d.get('tip_proprietate')])))
+            st.multiselect("Tipul de proprietate", tipuri_prop, placeholder="", key="f_pi_tip")
         with pi_cols[1]:
-            # 2. Numar inregistrare cerere
             st.text_input("Număr înregistrare cerere", key="f_pi_nr")
         with pi_cols[2]:
-            # 3. Autor
-            try:
-                res_aut = supabase.table("det_resurse_umane").select("nume_prenume").execute()
-                autori = sorted(list(set([d['nume_prenume'] for d in res_aut.data])))
-                st.multiselect("Autor", autori, placeholder="", key="f_pi_autor")
-            except: st.multiselect("Autor", [], placeholder="", key="f_pi_autor_err")
+            res_aut = supabase.table("det_resurse_umane").select("nume_prenume").execute()
+            autori = sorted(list(set([d['nume_prenume'] for d in res_aut.data])))
+            st.multiselect("Autor", autori, placeholder="", key="f_pi_autor")
 
-    st.write("---")
+# ==========================================
+# CALEA 2: ADMINISTRARE (LOGICA DE ACCES)
+# ==========================================
+elif calea_activa == "admin":
+    if 'autorizat' not in st.session_state:
+        st.session_state.autorizat = False
+
+    if not st.session_state.autorizat:
+        st.markdown("<h2 style='text-align: center;'>🛡️ Acces Securizat Administrare</h2>", unsafe_allow_html=True)
+        col_s, col_c, col_d = st.columns([1, 1, 1])
+        with col_c:
+            parola = st.text_input("Introduceți parola master:", type="password")
+            if st.button("Autentificare"):
+                if parola == "EverDream2SZ":
+                    st.session_state.autorizat = True
+                    st.rerun()
+                else:
+                    st.error("Parolă incorectă!")
+        st.stop()
+
+    st.success("🔓 Sunteți autorizat în zona de Administrare IDBDC.")
+    st.write("Aici vom implementa instrumentele de management al bazei de date.")
+    if st.button("Ieșire (Logout)"):
+        st.session_state.autorizat = False
+        st.rerun()
