@@ -5,32 +5,32 @@ from supabase import create_client, Client
 # ==========================================
 # 0. CONFIGURARE & DISPECER (ROUTING)
 # ==========================================
-st.set_page_config(page_title="IDBDC UPT", layout="wide") [cite: 8]
+st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
-query_params = st.query_params [cite: 10]
-calea_activa = query_params.get("pagina", "explorator") [cite: 11]
+query_params = st.query_params
+calea_activa = query_params.get("pagina", "explorator")
 
 # Conectare API Supabase
-url: str = st.secrets["SUPABASE_URL"] [cite: 13]
-key: str = st.secrets["SUPABASE_KEY"] [cite: 14]
-supabase: Client = create_client(url, key) [cite: 15]
+url: str = st.secrets["SUPABASE_URL"]
+key: str = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url, key)
 
-# Stil Vizual UPT (Conform 2.administrare.docx)
+# Stil Vizual UPT
 st.markdown("""
 <style>
-    .stApp { background-color: #003366; } [cite: 19]
-    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; } [cite: 20]
-    [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 1px solid #ddd; } [cite: 21]
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #003366 !important; } [cite: 22]
-    [data-testid="stSidebar"] input { color: #31333F !important; background-color: white !important; } [cite: 23]
-    .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; } [cite: 24]
-    /* Elimină "choose options" */
+    .stApp { background-color: #003366; }
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; }
+    [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 1px solid #ddd; }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #003366 !important; }
+    [data-testid="stSidebar"] input { color: #31333F !important; background-color: white !important; }
+    label { font-size: 14px !important; font-weight: 400 !important; }
     .stMultiSelect [data-baseweb="select"] div[aria-live="polite"] { display: none; }
+    .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
 </style>
-""", unsafe_allow_html=True) [cite: 17, 26]
+""", unsafe_allow_html=True)
 
 # ==========================================
-# CALEA 1: EXPLORATOR DE DATE (VALIDATĂ)
+# CALEA 1: EXPLORATOR DE DATE
 # ==========================================
 if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
@@ -86,64 +86,63 @@ if calea_activa == "explorator":
         with p3: st.multiselect("Autor", [], placeholder="", key="f_pi_autor")
 
 # ==========================================
-# CALEA 2: ADMIN (RESTAURATĂ DIN DOCX)
+# CALEA 2: ADMINISTRARE (BAZAT PE DOCX)
 # ==========================================
-elif calea_activa == "admin": [cite: 37]
-    if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False [cite: 39]
-    if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None [cite: 40]
+elif calea_activa == "admin":
+    if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
+    if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
-    # POARTA 1: ACCES SISTEM [cite: 41]
-    if not st.session_state.autorizat_p1: [cite: 42]
-        st.markdown("<h1 style='text-align: center; margin-bottom: 0;'> 🛡️ </h1>", unsafe_allow_html=True) [cite: 43]
-        st.markdown("<h2 style='text-align: center;'>Sistemul de administrare IDBDC</h2>", unsafe_allow_html=True) [cite: 44]
-        col_st, col_ce, col_dr = st.columns([1.3, 0.5, 1.3]) [cite: 45]
-        with col_ce:
-            st.write("Parola de acces:") [cite: 47]
-            parola_introdusa = st.text_input("Parola", type="password", label_visibility="collapsed", key="p1_pass") [cite: 48]
-            if st.button("Autorizare acces", use_container_width=True): [cite: 49]
-                if parola_introdusa == "EverDream2SZ": [cite: 50]
-                    st.session_state.autorizat_p1 = True [cite: 51]
-                    st.rerun() [cite: 52]
+    # POARTA 1: Bariera Centrală
+    if not st.session_state.autorizat_p1:
+        st.markdown("<h1 style='text-align: center;'> 🛡️ </h1>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>Sistemul de administrare IDBDC</h2>", unsafe_allow_html=True)
+        c_st, c_ce, c_dr = st.columns([1.3, 0.6, 1.3])
+        with c_ce:
+            st.write("Parola de acces:")
+            p_in = st.text_input("Parola", type="password", label_visibility="collapsed", key="p1_pass")
+            if st.button("Autorizare acces", use_container_width=True):
+                if p_in == "EverDream2SZ":
+                    st.session_state.autorizat_p1 = True
+                    st.rerun()
                 else:
-                    st.markdown("<div class='eroare-idbdc'> ⚠️ Parolă incorectă.</div>", unsafe_allow_html=True) [cite: 54]
-        st.stop() [cite: 55]
+                    st.markdown("<div class='eroare-idbdc'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
+        st.stop()
 
-    # POARTA 2: IDENTIFICARE (SIDEBAR) [cite: 56]
-    st.sidebar.markdown("<h1 style='text-align: center;'> 🛡️👤 </h1>", unsafe_allow_html=True) [cite: 57]
-    if not st.session_state.operator_identificat: [cite: 58]
-        cod_introdus = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod") [cite: 59]
-        if cod_introdus:
+    # POARTA 2: Sidebar
+    st.sidebar.markdown("<h1 style='text-align: center;'> 🛡️👤 </h1>", unsafe_allow_html=True)
+    if not st.session_state.operator_identificat:
+        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod")
+        if cod_in:
             try:
-                res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_introdus).execute() [cite: 62]
+                res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
                 if res_op.data:
-                    st.session_state.operator_identificat = res_op.data[0]['nume_prenume'] [cite: 64]
-                    st.rerun() [cite: 65]
-                else: st.sidebar.error("Cod operator invalid!") [cite: 66]
-            except Exception as e: st.sidebar.error(f"Eroare DB: {e}") [cite: 67]
-        st.stop() [cite: 68]
+                    st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
+                    st.rerun()
+                else: st.sidebar.error("Cod operator invalid!")
+            except: st.sidebar.error("Eroare de conexiune!")
+        st.stop()
     else:
-        st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!") [cite: 70]
-        if st.sidebar.button("Ieșire/Resetare"): [cite: 71]
-            st.session_state.clear() [cite: 72]
-            st.rerun() [cite: 73]
+        st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
+        if st.sidebar.button("Ieșire/Resetare"):
+            st.session_state.clear()
+            st.rerun()
 
-    # PANOU DE LUCRU [cite: 74]
-    st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}") [cite: 75]
-    st.write("---") [cite: 76]
-    col_a, col_b = st.columns([1, 1]) [cite: 77]
-    cat_selectata = "---" [cite: 78]
+    # PANOU DE LUCRU
+    st.markdown(f"### Panou de Lucru: {st.session_state.operator_identificat}")
+    st.write("---")
+    col_a, col_b = st.columns([1, 1])
+    cat_sel = "---"
     with col_a:
         try:
-            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute() [cite: 81]
-            liste_categorii = [item["denumire_categorie"] for item in res_cat.data] [cite: 82]
-            cat_selectata = st.selectbox("Selectați Categoria:", ["---"] + liste_categorii) [cite: 83]
-        except: st.error("Eroare la încărcarea categoriilor.") [cite: 84]
+            res_c = supabase.table("nom_categorie").select("denumire_categorie").execute()
+            l_cat = [i["denumire_categorie"] for i in res_c.data]
+            cat_sel = st.selectbox("Selectați Categoria:", ["---"] + l_cat)
+        except: st.error("Eroare DB Categorii.")
     with col_b:
-        if cat_selectata == "Contracte & Proiecte": [cite: 86]
+        if cat_sel == "Contracte & Proiecte":
             try:
-                res_sub = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute() [cite: 88]
-                liste_sub = [item["acronim_contracte_proiecte"] for item in res_sub.data] [cite: 89]
-                st.selectbox("Selectați tipul de contract sau proiect:", ["---"] + liste_sub) [cite: 90]
-            except: st.error("Eroare la încărcarea acronimelor.") [cite: 91]
-        else:
-            st.selectbox("Selectați tipul:", ["---"], disabled=True) [cite: 93]
+                res_s = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+                l_sub = [i["acronim_contracte_proiecte"] for i in res_s.data]
+                st.selectbox("Tip contract/proiect:", ["---"] + l_sub)
+            except: st.error("Eroare DB Subcategorii.")
+        else: st.selectbox("Tip:", ["---"], disabled=True)
