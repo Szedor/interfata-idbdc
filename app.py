@@ -3,7 +3,7 @@ import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
-# 0. CONFIGURARE & STIL (CONTRAST MAXIM)
+# 0. CONFIGURARE & STIL (ÎNGHEȚAT)
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
@@ -26,7 +26,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# CALEA 1: EXPLORATOR (ÎNGHEȚAT)
+# CALEA 1: EXPLORATOR (ÎNGHEȚAT - NU SE INTERVINE)
 # ==========================================
 if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
@@ -46,7 +46,6 @@ if calea_activa == "explorator":
                 list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
                 tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
             except: tipuri_sel = []
-
     if "Contracte & Proiecte" in categorii_sel and tipuri_sel:
         st.write("---")
         st.text_input("5. Titlul proiectului / Obiectul contractului", key="f_titlu")
@@ -63,13 +62,12 @@ if calea_activa == "explorator":
             st.multiselect("9. Statusul proiectului", ["În derulare", "Finalizat"], placeholder="", key="f_status")
 
 # ==========================================
-# CALEA 2: ADMINISTRARE (RECONSTRUITĂ)
+# CALEA 2: ADMINISTRARE (ÎNGHEȚATĂ LA NIVEL DE LOGARE)
 # ==========================================
 elif calea_activa == "admin":
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
-    # POARTA 1: MASTER
     if not st.session_state.autorizat_p1:
         st.markdown("<h2 style='text-align: center;'>🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
@@ -82,14 +80,13 @@ elif calea_activa == "admin":
                 else: st.markdown("<div class='eroare-idbdc-rosu'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
         st.stop()
 
-    # POARTA 2: IDENTIFICARE (SIDEBAR)
     st.sidebar.markdown("### 👤 Identificare Operator")
     if not st.session_state.operator_identificat:
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
         if cod_in:
             try:
                 res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
-                if res_op.data and len(res_op.data) > 0:
+                if res_op.data:
                     st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
                     st.rerun()
                 else: st.sidebar.markdown("<div class='eroare-idbdc-rosu'>Cod invalid!</div>", unsafe_allow_html=True)
@@ -101,27 +98,22 @@ elif calea_activa == "admin":
             st.session_state.clear()
             st.rerun()
 
-    # --- PANOU DE LUCRU ADMIN (Aici era lipsa) ---
+    # ZONA DE LUCRU ADMIN (Aici vom construi, restul e inghetat)
     st.markdown(f"<h3 style='text-align: center;'>🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
-    
     col_a, col_b = st.columns(2)
     with col_a:
         try:
             res_c = supabase.table("nom_categorie").select("denumire_categorie").execute()
             l_cat = [i["denumire_categorie"] for i in res_c.data]
-            cat_admin = st.selectbox("1. Selectați Categoria pentru Administrare:", ["---"] + l_cat)
+            cat_admin = st.selectbox("1. Categorie:", ["---"] + l_cat)
         except: st.error("Eroare DB Categorii.")
-    
     with col_b:
         if cat_admin == "Contracte & Proiecte":
             try:
                 res_s = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
                 l_sub = [i["acronim_contracte_proiecte"] for i in res_s.data]
-                st.selectbox("2. Selectați Tipul:", ["---"] + l_sub)
+                st.selectbox("2. Tip proiect:", ["---"] + l_sub)
             except: st.error("Eroare DB Tipuri.")
         else:
-            st.selectbox("2. Selectați Tipul:", ["---"], disabled=True)
-
-    st.write("---")
-    st.info("După selecție, aici vor apărea datele ce pot fi editate sau șterse.")
+            st.selectbox("2. Tip proiect:", ["---
