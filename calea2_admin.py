@@ -7,23 +7,19 @@ def run():
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    # 1. Stil Vizual - Fundal albastru peste tot (inclusiv Sidebar)
+    # 1. Stil Vizual - Fundal albastru consistent (inclusiv Sidebar)
     st.markdown("""
     <style>
-        /* Fundal general și Sidebar albastru */
         .stApp, [data-testid="stSidebar"] { 
             background-color: #003366 !important; 
         }
-        /* Text alb peste tot */
         .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { 
             color: white !important; 
         }
-        /* Input-uri albe cu text negru pentru contrast */
         input { 
             color: #000000 !important; 
             background-color: #ffffff !important; 
         }
-        /* Stil pentru erori */
         .eroare-idbdc-rosu { 
             color: #ffffff !important; 
             background-color: #ff0000 !important; 
@@ -54,32 +50,36 @@ def run():
                     st.markdown("<div class='eroare-idbdc-rosu'> ⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
         st.stop()
 
-    # PAS 2: IDENTIFICARE OPERATOR (SIDEBAR)
+    # PAS 2: IDENTIFICARE OPERATOR (SIDEBAR) - Corelație cu tabela com_operatori
     st.sidebar.markdown("### 👤 Identificare Operator")
     if not st.session_state.operator_identificat:
+        # Folosim cod_operatori pentru legătură conform protocolului 
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
         if cod_in:
             try:
+                # Interogare strictă: căutăm codul introdus în coloana cod_operatori 
                 res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
-                if res_op.data:
+                
+                if res_op.data and len(res_op.data) > 0:
+                    # Dacă am găsit codul, salvăm corespondentul din nume_prenume 
                     st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
                     st.rerun()
                 else:
-                    st.sidebar.markdown("<div class='eroare-idbdc-rosu'>Cod invalid!</div>", unsafe_allow_html=True)
-            except:
-                st.sidebar.markdown("<div class='eroare-idbdc-rosu'>Eroare conexiune DB.</div>", unsafe_allow_html=True)
+                    st.sidebar.markdown("<div class='eroare-idbdc-rosu'>Cod operator inexistent!</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.sidebar.markdown(f"<div class='eroare-idbdc-rosu'>Eroare tehnică DB.</div>", unsafe_allow_html=True)
         st.stop()
     else:
-        st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
+        # Afișează numele extras din tabelă 
+        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
         if st.sidebar.button("Ieșire / Resetare"):
             st.session_state.clear()
             st.rerun()
 
-    # 2. ZONA DE LUCRU - CELE 3 CASETE PE ACEEAȘI LINIE
+    # ZONA DE LUCRU - CELE 3 CASETE PE ACEEAȘI LINIE
     st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
 
-    # Definire coloane pentru cele 3 filtre solicitate
     c1, c2, c3 = st.columns(3)
 
     with c1:
