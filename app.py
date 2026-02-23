@@ -26,7 +26,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# CALEA 1: EXPLORATOR (ÎNGHEȚAT - NU SE INTERVINE)
+# CALEA 1: EXPLORATOR (ÎNGHEȚAT - REPARAT SINTAXA)
 # ==========================================
 if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
@@ -46,6 +46,7 @@ if calea_activa == "explorator":
                 list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
                 tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
             except: tipuri_sel = []
+    
     if "Contracte & Proiecte" in categorii_sel and tipuri_sel:
         st.write("---")
         st.text_input("5. Titlul proiectului / Obiectul contractului", key="f_titlu")
@@ -62,7 +63,7 @@ if calea_activa == "explorator":
             st.multiselect("9. Statusul proiectului", ["În derulare", "Finalizat"], placeholder="", key="f_status")
 
 # ==========================================
-# CALEA 2: ADMINISTRARE (ÎNGHEȚATĂ LA NIVEL DE LOGARE)
+# CALEA 2: ADMINISTRARE (ÎNGHEȚATĂ LA LOGARE)
 # ==========================================
 elif calea_activa == "admin":
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
@@ -98,7 +99,7 @@ elif calea_activa == "admin":
             st.session_state.clear()
             st.rerun()
 
-    # ZONA DE LUCRU ADMIN (Aici vom construi, restul e inghetat)
+    # ZONA DE LUCRU ADMIN
     st.markdown(f"<h3 style='text-align: center;'>🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
     col_a, col_b = st.columns(2)
@@ -116,4 +117,5 @@ elif calea_activa == "admin":
                 st.selectbox("2. Tip proiect:", ["---"] + l_sub)
             except: st.error("Eroare DB Tipuri.")
         else:
-            st.selectbox("2. Tip proiect:", ["---
+            st.selectbox("2. Tip proiect:", ["---"], disabled=True)
+    st.write("---")
