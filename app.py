@@ -3,7 +3,7 @@ import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
-# 0. CONFIGURARE & STIL (REGLAT PENTRU CONTRAST MAXIM)
+# 0. CONFIGURARE & STIL (CONTRAST MAXIM CONFORM PROTOCOL)
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
@@ -19,33 +19,32 @@ st.markdown("""
     .stApp { background-color: #003366; }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; }
     
-    /* SIDEBAR - REGLAJE VIZIBILITATE */
-    [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 2px solid #ddd; }
+    /* SIDEBAR - STILIZARE VIZIBILA */
+    [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 3px solid #ddd; }
     
-    /* Titlul casetei (label) din Sidebar - Albastru pe Gri */
+    /* Titlul casetei (label) - Albastru inchis pe Gri deschis */
     [data-testid="stSidebar"] label p { 
         color: #003366 !important; 
-        font-weight: bold !important; 
+        font-weight: 900 !important; 
         font-size: 16px !important;
-        margin-bottom: 0px;
     }
     
-    /* Caseta de text din Sidebar - Alb cu text Negru */
+    /* Caseta input - Alb pur cu text Negru intens */
     [data-testid="stSidebar"] input { 
         color: #000000 !important; 
         background-color: #ffffff !important; 
         border: 2px solid #003366 !important;
     }
     
-    /* MESAJ EROARE - MODIFICAT PENTRU CONTRAST (ROSU PE ALB) */
-    .eroare-idbdc-critica { 
+    /* EROARE - ROSU PUR PE ALB (Fara roz!) */
+    .eroare-idbdc-rosu { 
         color: #ffffff !important; 
-        background-color: #b30000 !important; 
-        padding: 15px; 
-        border-radius: 5px; 
+        background-color: #ff0000 !important; 
+        padding: 10px; 
+        border-radius: 4px; 
         text-align: center; 
         font-weight: bold;
-        border: 2px solid #ff0000;
+        border: 2px solid #8b0000;
         margin-top: 10px;
     }
 </style>
@@ -57,7 +56,6 @@ st.markdown("""
 if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
     st.write("---")
-    
     c1, c2 = st.columns(2)
     with c1:
         try:
@@ -65,7 +63,6 @@ if calea_activa == "explorator":
             list_cat = [i["denumire_categorie"] for i in res_cat.data]
         except: list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
         categorii_sel = st.multiselect("1. Categoria de informații:", list_cat, placeholder="", key="main_cat")
-    
     with c2:
         tipuri_sel = []
         if "Contracte & Proiecte" in categorii_sel:
@@ -91,12 +88,13 @@ if calea_activa == "explorator":
             st.multiselect("9. Statusul proiectului", ["În derulare", "Finalizat"], placeholder="", key="f_status")
 
 # ==========================================
-# CALEA 2: ADMINISTRARE
+# CALEA 2: ADMINISTRARE (CONFIRMATA)
 # ==========================================
 elif calea_activa == "admin":
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
+    # POARTA 1: MASTER
     if not st.session_state.autorizat_p1:
         st.markdown("<h2 style='text-align: center;'>🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
@@ -105,35 +103,3 @@ elif calea_activa == "admin":
             if st.button("Autorizare acces", use_container_width=True):
                 if parola_m == "EverDream2SZ":
                     st.session_state.autorizat_p1 = True
-                    st.rerun()
-                else: 
-                    st.markdown("<div class='eroare-idbdc-critica'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
-        st.stop()
-
-    # PAS 2: IDENTIFICARE (SIDEBAR)
-    st.sidebar.markdown("### 👤 Identificare Operator")
-    if not st.session_state.operator_identificat:
-        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
-        
-        if cod_in:
-            try:
-                # Interogare strictă: tabela nom_operatori, coloana cod_operatori
-                res_op = supabase.table("nom_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
-                
-                if res_op.data and len(res_op.data) > 0:
-                    st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
-                    st.rerun()
-                else:
-                    st.sidebar.markdown("<div class='eroare-idbdc-critica'>Cod invalid!</div>", unsafe_allow_html=True)
-            except Exception as e:
-                # Afișăm eroarea tehnică pentru a înțelege de ce nu se leagă
-                st.sidebar.markdown(f"<div class='eroare-idbdc-critica'>Eroare DB: {str(e)}</div>", unsafe_allow_html=True)
-        st.stop()
-    else:
-        st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
-        if st.sidebar.button("Ieșire / Resetare"):
-            st.session_state.clear()
-            st.rerun()
-
-    st.markdown(f"### 🛠️ Panou de Administrare: {st.session_state.operator_identificat}")
-    st.write("---")
