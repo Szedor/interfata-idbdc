@@ -3,10 +3,11 @@ import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
-# 0. DISPECERUL (MOTORUL DE NAVIGARE)
+# 0. CONFIGURARE & DISPECER (ROUTING)
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
+# Citim destinația din link (URL)
 query_params = st.query_params
 calea_activa = query_params.get("pagina", "explorator")
 
@@ -15,30 +16,33 @@ url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# Stil Vizual UPT
+# Stil Vizual UPT (Conform fișierului 2.administrare.docx)
 st.markdown("""
 <style>
     .stApp { background-color: #003366; }
     .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; }
-    label { font-size: 14px !important; font-weight: 400 !important; color: white !important; }
+    /* Stil Sidebar conform cerințelor */
+    [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 1px solid #ddd; }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #003366 !important; }
+    [data-testid="stSidebar"] input { color: #31333F !important; background-color: white !important; }
     .stMultiSelect [data-baseweb="select"] div[aria-live="polite"] { color: transparent !important; }
+    .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# CALEA 1: EXPLORATOR DE DATE (ÎNGHEȚATĂ)
+# CALEA 1: EXPLORATOR (VERSIUNE ÎNGHEȚATĂ)
 # ==========================================
 if calea_activa == "explorator":
     st.markdown("<h1 style='text-align: center;'>🔍 Explorator de date</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    # RÂNDUL 1: CATEGORIA ȘI TIPUL CONTRACTULUI
+    # Rândul 1: Categoria și Tipul (Pe același rând)
     c1, c2 = st.columns(2)
     with c1:
         res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
         list_cat = [i["denumire_categorie"] for i in res_cat.data]
         categorii_sel = st.multiselect("1. Categoria de informații:", list_cat, placeholder="", key="f_cat_multi")
-
     with c2:
         tipuri_sel = []
         if "Contracte & Proiecte" in categorii_sel:
@@ -46,7 +50,7 @@ if calea_activa == "explorator":
             list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
             tipuri_sel = st.multiselect("2. Tipul de contract / proiect:", list_tip, placeholder="", key="f_tip_multi")
 
-    # --- SECTIUNEA: CONTRACTE & PROIECTE ---
+    # Sectiunea Contracte
     if "Contracte & Proiecte" in categorii_sel and tipuri_sel:
         st.write("---")
         st.text_input("5. Titlul proiectului / Obiectul contractului", key="f_titlu")
@@ -68,60 +72,14 @@ if calea_activa == "explorator":
             statusuri = [s['status_contract_proiect'] for s in res_st.data]
             st.multiselect("9. Statusul proiectului", statusuri, placeholder="", key="f_status")
 
-    # --- RÂNDUL UNIC: EVENIMENTE ȘTIINȚIFICE ---
+    # Rândul unic: Evenimente
     if "Evenimente stiintifice" in categorii_sel:
         st.write("---")
         st.markdown("##### 🎤 Evenimente științifice")
         ev_cols = st.columns(3)
         with ev_cols[0]:
             res_ev = supabase.table("base_evenimente_stiintifice").select("natura_eveniment").execute()
-            tipuri_ev = sorted(list(set([d['natura_eveniment'] for d in res_ev.data if d['natura_eveniment']])))
-            st.multiselect("Tipul de eveniment", tipuri_ev, placeholder="", key="f_ev_tip")
+            tip_ev = sorted(list(set([d['natura_eveniment'] for d in res_ev.data if d['natura_eveniment']])))
+            st.multiselect("Tipul de eveniment", tip_ev, placeholder="", key="f_ev_tip")
         with ev_cols[1]:
-            st.number_input("Anul desfășurării", min_value=2010, max_value=2035, value=2024, key="f_ev_an")
-        with ev_cols[2]:
-            res_pers = supabase.table("det_resurse_umane").select("nume_prenume").execute()
-            persoane = sorted(list(set([d['nume_prenume'] for d in res_pers.data])))
-            st.multiselect("Persoana de contact", persoane, placeholder="", key="f_ev_pers")
-
-    # --- RÂNDUL UNIC: PROPRIETATE INTELECTUALĂ ---
-    if "Proprietate intelectuala" in categorii_sel:
-        st.write("---")
-        st.markdown("##### 💡 Proprietate intelectuală")
-        pi_cols = st.columns(3)
-        with pi_cols[0]:
-            res_prop = supabase.table("base_prop_intelect").select("tip_proprietate").execute()
-            tipuri_prop = sorted(list(set([d['tip_proprietate'] for d in res_prop.data if d.get('tip_proprietate')])))
-            st.multiselect("Tipul de proprietate", tipuri_prop, placeholder="", key="f_pi_tip")
-        with pi_cols[1]:
-            st.text_input("Număr înregistrare cerere", key="f_pi_nr")
-        with pi_cols[2]:
-            res_aut = supabase.table("det_resurse_umane").select("nume_prenume").execute()
-            autori = sorted(list(set([d['nume_prenume'] for d in res_aut.data])))
-            st.multiselect("Autor", autori, placeholder="", key="f_pi_autor")
-
-# ==========================================
-# CALEA 2: ADMINISTRARE (LOGICA DE ACCES)
-# ==========================================
-elif calea_activa == "admin":
-    if 'autorizat' not in st.session_state:
-        st.session_state.autorizat = False
-
-    if not st.session_state.autorizat:
-        st.markdown("<h2 style='text-align: center;'>🛡️ Acces Securizat Administrare</h2>", unsafe_allow_html=True)
-        col_s, col_c, col_d = st.columns([1, 1, 1])
-        with col_c:
-            parola = st.text_input("Introduceți parola master:", type="password")
-            if st.button("Autentificare"):
-                if parola == "EverDream2SZ":
-                    st.session_state.autorizat = True
-                    st.rerun()
-                else:
-                    st.error("Parolă incorectă!")
-        st.stop()
-
-    st.success("🔓 Sunteți autorizat în zona de Administrare IDBDC.")
-    st.write("Aici vom implementa instrumentele de management al bazei de date.")
-    if st.button("Ieșire (Logout)"):
-        st.session_state.autorizat = False
-        st.rerun()
+            st.number_input("Anul desfășurării", min_value=20
