@@ -13,7 +13,7 @@ if 'autorizat_p1' not in st.session_state:
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Stil Vizual Personalizat - MODIFICARE: Fundal Albastru UPT și text alb
+# Stil Vizual Personalizat (Fundal Albastru UPT #003366)
 st.markdown("""
 <style>
     .stApp {
@@ -30,7 +30,6 @@ st.markdown("""
         text-align: center; 
         font-weight: bold; 
     }
-    /* Stil pentru Sidebar să rămână lizibil */
     section[data-testid="stSidebar"] {
         background-color: #f8f9fa;
     }
@@ -51,9 +50,7 @@ supabase: Client = create_client(url, key)
 # ==========================================
 if not st.session_state.autorizat_p1:
     st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️</h1>", unsafe_allow_html=True)
-    # MODIFICARE: Schimbare din Gestiune în administrare
     st.markdown("<h2 style='text-align: center; margin-top: 0; color: white;'>Sistemul de administrare IDBDC</h2>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: #cbd5e0;'>Universitatea Politehnica Timișoara</h3>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align: center; color: #FF4B4B;'>Acces restricționat</h4>", unsafe_allow_html=True)
     
     st.write("") 
@@ -130,10 +127,8 @@ if st.session_state.operator_identificat:
             except:
                 st.error("Eroare la încărcarea acronimelor de proiecte.")
         else:
-            # Rămâne inactivă pentru celelalte două categorii
             st.selectbox("Selectati tipul de contract sau proiect", ["---"], disabled=True)
 
-    # Info bar pentru confirmare context
     if cat_selectata != "---":
         st.info(f"Context activ: **{cat_selectata}**")
 
