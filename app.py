@@ -3,7 +3,7 @@ import pandas as pd
 from supabase import create_client, Client
 
 # ==========================================
-# 0. CONFIGURARE & STIL (REGLAT PENTRU VIZIBILITATE)
+# 0. CONFIGURARE & STIL (REGLAT PENTRU CONTRAST MAXIM)
 # ==========================================
 st.set_page_config(page_title="IDBDC UPT", layout="wide")
 
@@ -22,11 +22,12 @@ st.markdown("""
     /* SIDEBAR - REGLAJE VIZIBILITATE */
     [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 2px solid #ddd; }
     
-    /* Titlul casetei (label) din Sidebar - sa fie vizibil */
+    /* Titlul casetei (label) din Sidebar - Albastru pe Gri */
     [data-testid="stSidebar"] label p { 
         color: #003366 !important; 
         font-weight: bold !important; 
         font-size: 16px !important;
+        margin-bottom: 0px;
     }
     
     /* Caseta de text din Sidebar - Alb cu text Negru */
@@ -36,7 +37,17 @@ st.markdown("""
         border: 2px solid #003366 !important;
     }
     
-    .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
+    /* MESAJ EROARE - MODIFICAT PENTRU CONTRAST (ROSU PE ALB) */
+    .eroare-idbdc-critica { 
+        color: #ffffff !important; 
+        background-color: #b30000 !important; 
+        padding: 15px; 
+        border-radius: 5px; 
+        text-align: center; 
+        font-weight: bold;
+        border: 2px solid #ff0000;
+        margin-top: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -80,7 +91,7 @@ if calea_activa == "explorator":
             st.multiselect("9. Statusul proiectului", ["În derulare", "Finalizat"], placeholder="", key="f_status")
 
 # ==========================================
-# CALEA 2: ADMINISTRARE (CORECTATĂ)
+# CALEA 2: ADMINISTRARE
 # ==========================================
 elif calea_activa == "admin":
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
@@ -96,27 +107,27 @@ elif calea_activa == "admin":
                     st.session_state.autorizat_p1 = True
                     st.rerun()
                 else: 
-                    st.markdown("<div class='eroare-idbdc'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='eroare-idbdc-critica'>⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
         st.stop()
 
     # PAS 2: IDENTIFICARE (SIDEBAR)
     st.sidebar.markdown("### 👤 Identificare Operator")
     if not st.session_state.operator_identificat:
-        # Legătura cu tabela nom_operatori și coloana cod_operatori
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
         
         if cod_in:
             try:
-                # Verificăm în tabela nom_operatori, pe coloana cod_operatori
+                # Interogare strictă: tabela nom_operatori, coloana cod_operatori
                 res_op = supabase.table("nom_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
                 
                 if res_op.data and len(res_op.data) > 0:
                     st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
                     st.rerun()
                 else:
-                    st.sidebar.error("Cod operator invalid!")
+                    st.sidebar.markdown("<div class='eroare-idbdc-critica'>Cod invalid!</div>", unsafe_allow_html=True)
             except Exception as e:
-                st.sidebar.error("Eroare legătură tabelă nom_operatori.")
+                # Afișăm eroarea tehnică pentru a înțelege de ce nu se leagă
+                st.sidebar.markdown(f"<div class='eroare-idbdc-critica'>Eroare DB: {str(e)}</div>", unsafe_allow_html=True)
         st.stop()
     else:
         st.sidebar.success(f"Salut, {st.session_state.operator_identificat}!")
@@ -124,7 +135,5 @@ elif calea_activa == "admin":
             st.session_state.clear()
             st.rerun()
 
-    # PANOU DE LUCRU
     st.markdown(f"### 🛠️ Panou de Administrare: {st.session_state.operator_identificat}")
     st.write("---")
-    # Aici va urma logica de editare după confirmarea logării
