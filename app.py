@@ -13,11 +13,31 @@ if 'autorizat_p1' not in st.session_state:
 if 'operator_identificat' not in st.session_state:
     st.session_state.operator_identificat = None
 
-# Stil Vizual Personalizat
+# Stil Vizual Personalizat - MODIFICARE: Fundal Albastru UPT și text alb
 st.markdown("""
 <style>
-    .eroare-idbdc { color: white; background-color: #FF4B4B; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; }
-    .stSidebar { background-color: #f8f9fa; border-right: 1px solid #ddd; }
+    .stApp {
+        background-color: #003366;
+    }
+    h1, h2, h3, h4, p, label, .stMarkdown {
+        color: white !important;
+    }
+    .eroare-idbdc { 
+        color: white; 
+        background-color: #FF4B4B; 
+        padding: 12px; 
+        border-radius: 8px; 
+        text-align: center; 
+        font-weight: bold; 
+    }
+    /* Stil pentru Sidebar să rămână lizibil */
+    section[data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+    }
+    section[data-testid="stSidebar"] .stMarkdown p, 
+    section[data-testid="stSidebar"] label {
+        color: #31333F !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -31,9 +51,10 @@ supabase: Client = create_client(url, key)
 # ==========================================
 if not st.session_state.autorizat_p1:
     st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>🛡️</h1>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; margin-top: 0;'>Sistemul de Gestiune IDBDC</h2>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: #555;'>Universitatea Politehnica Timișoara</h3>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center; color: #CC0000;'>Acces restricționat</h4>", unsafe_allow_html=True)
+    # MODIFICARE: Schimbare din Gestiune în administrare
+    st.markdown("<h2 style='text-align: center; margin-top: 0; color: white;'>Sistemul de administrare IDBDC</h2>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #cbd5e0;'>Universitatea Politehnica Timișoara</h3>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center; color: #FF4B4B;'>Acces restricționat</h4>", unsafe_allow_html=True)
     
     st.write("") 
 
@@ -118,4 +139,3 @@ if st.session_state.operator_identificat:
 
 else:
     st.info("Sistemul așteaptă identificarea operatorului în partea stângă (Sidebar).")
-Ce am asigurat în această variantă:
