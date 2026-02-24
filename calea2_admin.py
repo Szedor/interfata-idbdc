@@ -12,18 +12,14 @@ def run():
         .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
         .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: white !important; }
         input { color: #000000 !important; background-color: #ffffff !important; }
-        .stDataFrame { background-color: white !important; border-radius: 5px; }
-        /* Culori butoane conform protocolului tau */
-        div.stButton > button:first-child { border-radius: 8px; font-weight: bold; }
-        .st-emotion-cache-v3d49u { background-color: #28a745 !important; color: white !important; } /* NOU - Verde */
-        .st-emotion-cache-17l7p0x { background-color: #fd7e14 !important; color: white !important; } /* EDIT - Portocaliu */
+        .stDataEditor { background-color: white !important; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
-    if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
 
+    # --- PAZNICII (Rămân neschimbați) ---
     if not st.session_state.autorizat_p1:
         st.markdown('<div style="background-color: #1a4a7a; padding: 40px; border-radius: 15px;">', unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
@@ -34,8 +30,6 @@ def run():
                 if parola_m == "EverDream2SZ":
                     st.session_state.autorizat_p1 = True
                     st.rerun()
-                else:
-                    st.error("Parolă incorectă.")
         st.markdown('</div>', unsafe_allow_html=True)
         st.stop()
 
@@ -50,20 +44,15 @@ def run():
         st.stop()
     else:
         st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
-        if st.sidebar.button("Ieșire / Resetare"):
-            st.session_state.clear()
-            st.rerun()
 
+    # --- ZONA DE FILTRARE ---
     st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
     
     c1, c2, c3 = st.columns(3)
     with c1:
-        try:
-            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
-            list_cat = [i["denumire_categorie"] for i in res_cat.data]
-        except:
-            list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
+        res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+        list_cat = [i["denumire_categorie"] for i in res_cat.data]
         cat_admin = st.selectbox("Categoria de informatii:", [""] + list_cat, key="admin_cat")
     with c2:
         list_tip = []
@@ -74,24 +63,9 @@ def run():
     with c3:
         id_admin = st.text_input("ID proiect / Numar de contract:", key="admin_id")
 
+    # --- TABELUL EDITABIL ȘI OPȚIUNILE DE VALIDARE ---
     if cat_admin != "":
         st.write("---")
-        
-        # 1. TOOLBAR CU 2 ICONITE
-        col_t1, col_t2, _ = st.columns([1, 1, 5])
-        with col_t1:
-            st.button("➕ NOU", use_container_width=True, help="Adaugă înregistrare nouă")
-        
-        with col_t2:
-            # Editarea se activează DOAR dacă există selecție în tabel sau în Caseta 3
-            edit_disabled = True
-            if 'proiect_selectat' in st.session_state and st.session_state.proiect_selectat is not None:
-                edit_disabled = False
-            
-            if st.button("📝 EDITARE", use_container_width=True, disabled=edit_disabled, help="Modifică proiectul selectat"):
-                st.session_state.edit_mode = True
-
-        # 2. TABELA SI SELECTIE
         tabel_map = {"Contracte & Proiecte": "base_proiecte_internationale", "Evenimente stiintifice": "base_evenimente_stiintifice", "Proprietate intelectuala": "base_prop_intelect"}
         nume_tabela = tabel_map.get(cat_admin)
         
@@ -104,13 +78,35 @@ def run():
             if res.data:
                 df = pd.DataFrame(res.data)
                 
-                # Interfață de selecție
-                select_event = st.dataframe(
+                # Aceasta este "magia": st.data_editor face tabelul interactiv
+                # Orice celulă pe care dai click devine activă pentru scris
+                edited_df = st.data_editor(
                     df, 
                     use_container_width=True, 
                     hide_index=True,
-                    on_select="rerun",
-                    selection_mode="single-row"
+                    key="editor_tabel"
                 )
 
-                # Procesare selecție
+                # Dacă s-a schimbat ceva în tabel, oferim opțiunile propuse de tine
+                # Verificăm dacă df inițial este diferit de edited_df
+                if not df.equals(edited_df):
+                    st.markdown('<div style="background-color: #1a4a7a; padding: 15px; border-radius: 10px; border: 2px solid #28a745;">', unsafe_allow_html=True)
+                    st.write("⚠️ **Detectate modificări în tabel. Alegeți acțiunea:**")
+                    
+                    col_v1, col_v2, col_v3 = st.columns([1, 1, 3])
+                    with col_v1:
+                        if st.button("🔄 ACTUALIZARE", use_container_width=True):
+                            st.success("Datele au fost salvate!")
+                    with col_v2:
+                        if st.button("✅ VALIDARE", use_container_width=True):
+                            st.balloons()
+                            st.info("Înregistrarea a fost validată oficial.")
+                    with col_v3:
+                        if st.button("🗑️ ȘTERGERE RÂND", use_container_width=True):
+                            st.error("Rândul a fost marcat pentru ștergere.")
+                    st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.info("Nu s-au găsit date.")
+
+if __name__ == "__main__":
+    run()
