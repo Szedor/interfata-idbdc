@@ -4,12 +4,10 @@ import pandas as pd
 
 def run():
     # --- START PARTE ÎNGHEȚATĂ (LINIILE 1-94 DIN DOCX) ---
-    # Conexiune Supabase
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    # 1. Stil Vizual - Fundal albastru consistent (inclusiv Sidebar)
     st.markdown("""
     <style>
         .stApp, [data-testid="stSidebar"] { 
@@ -32,16 +30,11 @@ def run():
             border: 2px solid #8b0000; 
             margin-top: 10px; 
         }
-        /* CSS adițional pentru butoane text CRUD la final */
-        .stDataEditor { background-color: white !important; border-radius: 5px; }
-        div.stButton > button { font-weight: bold !important; }
     </style>
     """, unsafe_allow_html=True)
 
-    if 'autorizat_p1' not in st.session_state:
-        st.session_state.autorizat_p1 = False
-    if 'operator_identificat' not in st.session_state:
-        st.session_state.operator_identificat = None
+    if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
+    if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
     if not st.session_state.autorizat_p1:
         st.markdown("<h2 style='text-align: center;'>  🛡️  Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
@@ -56,8 +49,8 @@ def run():
                     st.markdown("<div class='eroare-idbdc-rosu'>  ⚠️  Parolă incorectă.</div>", unsafe_allow_html=True)
         st.stop()
 
+    st.sidebar.markdown("###  👤  Identificare Operator")
     if not st.session_state.operator_identificat:
-        st.sidebar.markdown("###  👤  Identificare Operator")
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
         if cod_in:
             try:
@@ -99,53 +92,11 @@ def run():
     st.write("---")
     # --- SFÂRȘIT PARTE ÎNGHEȚATĂ ---
 
-    # --- EXTENSIE CRUD (ADAUGATĂ FĂRĂ A MODIFICA CE E SUS) ---
+    # EXTENSIE CRUD (ADAUGATĂ FĂRĂ MODIFICĂRI SUS)
     if cat_admin != "":
         tabel_map = {
             "Contracte & Proiecte": "base_proiecte_internationale", 
             "Evenimente stiintifice": "base_evenimente_stiintifice", 
             "Proprietate intelectuala": "base_prop_intelect"
         }
-        nume_tabela = tabel_map.get(cat_admin)
-
-        # 1. Încărcare date
-        if f'data_{nume_tabela}' not in st.session_state:
-            query = supabase.table(nume_tabela).select("*")
-            if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
-            if id_admin: query = query.eq("cod_identificare", id_admin)
-            res = query.execute()
-            st.session_state[f'data_{nume_tabela}'] = pd.DataFrame(res.data)
-
-        # 2. Bara de control (Text)
-        col_nou, col_sp, col_save, col_val, col_del = st.columns([1.5, 4.5, 1.3, 1.3, 1.3])
-        
-        with col_nou:
-            if st.button("RAND NOU", use_container_width=True):
-                df_temp = st.session_state[f'data_{nume_tabela}']
-                empty_row = pd.DataFrame([{col: None for col in df_temp.columns}])
-                st.session_state[f'data_{nume_tabela}'] = pd.concat([empty_row, df_temp], ignore_index=True)
-                st.rerun()
-
-        # 3. Editorul
-        edited_df = st.data_editor(
-            st.session_state[f'data_{nume_tabela}'],
-            use_container_width=True,
-            hide_index=True,
-            key=f"editor_{nume_tabela}"
-        )
-
-        # 4. Butoane contextuale în dreapta (Text)
-        if not st.session_state[f'data_{nume_tabela}'].equals(edited_df):
-            with col_save:
-                if st.button("ACTUALIZARE", use_container_width=True):
-                    st.session_state[f'data_{nume_tabela}'] = edited_df
-                    st.success("Date pregătite!")
-            with col_val:
-                if st.button("VALIDARE", use_container_width=True):
-                    st.info("Protocol OK!")
-            with col_del:
-                if st.button("STERGERE", use_container_width=True):
-                    st.error("Rand marcat!")
-
-if __name__ == "__main__":
-    run()
+        nume_tabela = tabel_map
