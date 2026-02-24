@@ -1,81 +1,73 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
-def executa_logica(supabase):
-    # 1. FETCH OPTIUNI (Preluare nomenclatoare pentru Dropdown)
-    def fetch(t, c):
-        try:
-            res = supabase.table(t).select(c).execute()
-            return sorted(list(set([i[c] for i in res.data if i[c]])))
-        except: return []
+def porneste_motorul(supabase):
+    # 1. PRELUARE NOMENCLATOARE (Pentru dropdown-uri funcționale)
+    def fetch_opt(t, c):
+        res = supabase.table(t).select(c).execute()
+        return sorted(list(set([r[c] for r in res.data if r[c]])))
 
-    opts = {
-        "cat": fetch("nom_categorie", "denumire_categorie"),
-        "tip": fetch("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-        "stat": fetch("nom_status_proiect", "status_contract_proiect"),
-        "op": fetch("com_operatori", "cod_operatori"),
-        "pers": fetch("det_resurse_umane", "nume_prenume")
-    }
+    lista_acronime = [""] + fetch_opt("nom_contracte_proiecte", "acronim_contracte_proiecte")
+    lista_categorii = fetch_opt("nom_categorie", "denumire_categorie")
+    lista_status = fetch_opt("nom_status_proiect", "status_contract_proiect")
 
-    # 2. CELE 4 CASETE (Interfața de control)
-    st.markdown("### 🛠️ CONSOLA DE ADMINISTRARE - IDBDC")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: op_admin = st.selectbox("1. Operator", opts["op"])
-    with c2: tip_admin = st.selectbox("2. Tip Proiect", opts["tip"])
-    with c3: id_admin = st.text_input("3. ID Proiect (Filtru)", placeholder="ex: PN-III...")
-    with c4: comp_sel = st.multiselect("4. Componente", ["Date financiare", "Echipe", "Aspecte tehnice"])
+    # 2. ZONA FILTRE (CASETELE 1-4) - Păstrăm aspectul tău
+    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare IDBDC: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
+    
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1.2])
+    with c1: cat_admin = st.selectbox("1. Categoria:", ["", "Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"], key="admin_cat")
+    with c2: tip_admin = st.selectbox("2. Tip (Acronim):", lista_acronime, key="admin_tip")
+    with c3: id_admin = st.text_input("3. ID Proiect (Cod Identificare):", key="admin_id")
+    with c4: componente_com = st.multiselect("4. Componente (COM):", ["Date financiare", "Resurse umane", "Aspecte tehnice"], key="admin_com")
 
-    # 3. MAPARE TABELE BASE (Inclusiv INTERNATIONALE)
-    map_base = {
+    st.markdown("---")
+
+    # 3. IDENTIFICARE TABELA (Rezolvăm aici problema cu toate tabelele)
+    map_baze = {
         "FDI": "base_proiecte_fdi", "PNRR": "base_proiecte_pnrr",
         "INTERNATIONALE": "base_proiecte_internationale", "PNCDI": "base_proiecte_pncdi",
         "INTERREG": "base_proiecte_interreg", "NONEU": "base_proiecte_noneu",
-        "CEP": "base_contracte_cep", "TERTI": "base_contracte_terti",
-        "EVENIMENTE": "base_evenimente_stiintifice", "PROP_INTELECT": "base_prop_intelect"
+        "CEP": "base_contracte_cep", "TERTI": "base_contracte_terti"
     }
-    tabela = map_base.get(tip_admin)
+    
+    nume_tabela = map_baze.get(tip_admin) if cat_admin == "Contracte & Proiecte" else None
+    if cat_admin == "Evenimente stiintifice": nume_tabela = "base_evenimente_stiintifice"
+    if cat_admin == "Proprietate intelectuala": nume_tabela = "base_prop_intelect"
 
-    if tabela:
-        st.write("---")
-        query = supabase.table(tabela).select("*")
-        if id_admin: query = query.eq("cod_identificare", id_admin)
-        
-        df_init = pd.DataFrame(query.execute().data)
+    # 4. AFIȘARE ȘI CRUD
+    if nume_tabela:
+        res_main = supabase.table(nume_tabela).select("*")
+        if id_admin: res_main = res_main.eq("cod_identificare", id_admin)
+        df_main = pd.DataFrame(res_main.execute().data)
 
-        # CONFIGURARE COLOANE (Dropdown-ul care a lipsit la Internationale)
-        config = {
+        # CONFIGURARE COLOANE (Ghidul care forțează dropdown-ul în tabel)
+        config_ghid = {
             "cod_identificare": st.column_config.TextColumn("ID", required=True),
-            "denumire_categorie": st.column_config.SelectboxColumn("Categorie", options=opts["cat"], required=True),
-            "acronim_contracte_proiecte": st.column_config.SelectboxColumn("Tip", options=opts["tip"]),
-            "status_contract_proiect": st.column_config.SelectboxColumn("Status", options=opts["stat"]),
-            "data_ultimei_modificari": st.column_config.DatetimeColumn("Update", disabled=True)
+            "denumire_categorie": st.column_config.SelectboxColumn("Categorie", options=lista_categorii),
+            "status_contract_proiect": st.column_config.SelectboxColumn("Status", options=lista_status)
         }
 
-        # Editorul de date - Randul nou apare jos la "Add item"
-        ed_df = st.data_editor(df_init, column_config=config, use_container_width=True, hide_index=True, num_rows="dynamic", key=f"editor_{tabela}")
+        st.markdown(f"**📂 Tabel Principal: {nume_tabela}**")
+        edited_df = st.data_editor(df_main, column_config=config_ghid, use_container_width=True, hide_index=True, key=f"ed_{nume_tabela}", num_rows="dynamic")
 
-        # 4. BUTOANE CRUD (SQL pentru Salvare și Ștergere)
-        st.write("---")
-        b1, b2, b3, b4, b5 = st.columns(5)
-        with b2:
+        # BUTOANELE CRUD (Logica cerută)
+        col_n, col_s, col_v, col_d, col_a = st.columns(5)
+        with col_s:
             if st.button("💾 SALVARE"):
-                # LOGICA ȘTERGERE SQL
-                if not df_init.empty:
-                    vechi = set(df_init['cod_identificare'].dropna())
-                    noi = set(ed_df['cod_identificare'].dropna())
-                    for s in (vechi - noi): 
-                        supabase.table(tabela).delete().eq("cod_identificare", s).execute()
-                
-                # LOGICA UPSERT SQL (Adăugare/Modificare)
-                for _, r in ed_df.iterrows():
-                    if pd.notna(r['cod_identificare']):
-                        vals = r.to_dict()
-                        vals['cod_operatori'] = op_admin
-                        supabase.table(tabela).upsert(vals).execute()
-                
-                st.success(f"Tabela {tabela} a fost actualizată!")
-                st.rerun()
+                # A. ȘTERGERE (SQL Real)
+                if not df_main.empty:
+                    ids_initiale = set(df_main['cod_identificare'].dropna())
+                    ids_actuale = set(edited_df['cod_identificare'].dropna())
+                    de_sters = ids_initiale - ids_actuale
+                    for id_s in de_sters:
+                        supabase.table(nume_tabela).delete().eq("cod_identificare", id_s).execute()
 
-        with b5:
-            if st.button("❌ ANULARE"):
+                # B. UPSERT (Update + Insert)
+                for _, row in edited_df.iterrows():
+                    if pd.notna(row['cod_identificare']):
+                        data = row.to_dict()
+                        data['data_ultimei_modificari'] = datetime.now().isoformat()
+                        supabase.table(nume_tabela).upsert(data).execute()
+                st.success("Baza de date sincronizată!")
                 st.rerun()
