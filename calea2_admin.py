@@ -3,7 +3,7 @@ from supabase import create_client, Client
 import pandas as pd
 
 def run():
-    # --- CONEXIUNE ȘI STIL (PĂSTRATE DIN SCRIPTUL TĂU BUN) ---
+    # --- CONEXIUNE ȘI STIL (PĂSTRATE DIN SCRIPTUL TĂU DIN DOCX) ---
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
@@ -15,14 +15,14 @@ def run():
         input { color: #000000 !important; background-color: #ffffff !important; }
         .eroare-idbdc-rosu { color: #ffffff !important; background-color: #ff0000 !important; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; border: 2px solid #8b0000; margin-top: 10px; }
         
-        /* ADAUS PENTRU SIMBOLURI CRUD MARI */
+        /* ADAUS PENTRU SIMBOLURI CRUD MARI ȘI EXPRESIVE */
         div.stButton > button { border: none !important; font-size: 30px !important; background-color: transparent !important; }
         div.stButton > button:hover { transform: scale(1.2); }
         .stDataEditor { background-color: white !important; border-radius: 5px; }
     </style>
-    """, unsafe_allow_html=True) [cite: 1-32]
+    """, unsafe_allow_html=True)
 
-    # --- LOGICA DE ACCES (PĂSTRATĂ DIN SCRIPTUL TĂU BUN) ---
+    # --- LOGICA DE ACCES (PĂSTRATĂ DIN FILA ATAȘATĂ) ---
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
@@ -37,7 +37,7 @@ def run():
                     st.rerun()
                 else:
                     st.markdown("<div class='eroare-idbdc-rosu'>  ⚠️  Parolă incorectă.</div>", unsafe_allow_html=True)
-        st.stop() [cite: 33-47]
+        st.stop()
 
     if not st.session_state.operator_identificat:
         st.sidebar.markdown("###  👤  Identificare Operator")
@@ -57,7 +57,7 @@ def run():
         st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
         if st.sidebar.button("Ieșire / Resetare"):
             st.session_state.clear()
-            st.rerun() [cite: 48-71]
+            st.rerun()
 
     # --- ZONA DE LUCRU (CELE 3 CASETE - PĂSTRATE) ---
     st.markdown(f"<h3 style='text-align: center;'>  🛠️  Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
@@ -80,11 +80,9 @@ def run():
         tip_admin = st.selectbox("Tip de contract / proiect:", [""] + list_tip, key="admin_tip")
     with c3:
         id_admin = st.text_input("ID proiect / Numar de contract:", key="admin_id")
-    st.write("---") [cite: 72-94]
+    st.write("---")
 
-    # =========================================================
-    # EXTENSIE CRUD (COMPLETARE LA SCRIPTUL BUN)
-    # =========================================================
+    # --- EXTENSIE CRUD (COMPLETARE CU SIMBOLURI MARI) ---
     if cat_admin != "":
         tabel_map = {
             "Contracte & Proiecte": "base_proiecte_internationale", 
@@ -93,14 +91,14 @@ def run():
         }
         nume_tabela = tabel_map.get(cat_admin)
         
-        # BARĂ SIMBOLURI: NOU în stânga, RESTUL în dreapta
+        # Toolbar: NOU (stânga) | SALVARE, VALIDARE, ȘTERGERE (dreapta)
         col_nou, col_spatiu, col_save, col_val, col_del = st.columns([1, 6, 1, 1, 1])
         
         with col_nou:
-            if st.button("➕", help="NOU - Adaugă rând gol"):
-                st.toast("Rând nou pregătit")
+            if st.button("➕", help="NOU - Adaugă rând"):
+                st.toast("Se generează rând nou...")
 
-        # AFIȘARE DATE ÎN TABEL EDITABIL
+        # Preluare date pentru tabel
         query = supabase.table(nume_tabela).select("*")
         if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
         if id_admin: query = query.eq("cod_identificare", id_admin)
@@ -109,26 +107,33 @@ def run():
         if res.data:
             df = pd.DataFrame(res.data)
             
-            # Blocăm cod_identificare pentru a nu fi editat (regula IDBDC)
-            config = {"cod_identificare": st.column_config.TextColumn("ID", disabled=True)}
+            # Blocăm cod_identificare (cheia primară IDBDC) pentru a preveni erorile
+            config_cols = {"cod_identificare": st.column_config.TextColumn("ID", disabled=True)}
             
+            # Tabelul devine interactiv (se activează instantaneu la click)
             edited_df = st.data_editor(
                 df, 
                 use_container_width=True, 
                 hide_index=True, 
-                column_config=config, 
-                key="editor_admin",
-                on_select="rerun" # Detectează click-ul instant
+                column_config=config_cols, 
+                key="idbdc_editor_final",
+                on_select="rerun" 
             )
 
-            # SIMBOLURI CONTEXTUALE DREAPTA (Apar la selecție sau modificare)
-            if not df.equals(edited_df) or len(st.session_state.get('editor_admin', {}).get('selection', {}).get('rows', [])) > 0:
+            # Verificăm dacă un rând este selectat sau modificat
+            selection = st.session_state.get("idbdc_editor_final", {}).get("selection", {}).get("rows", [])
+            has_changes = not df.equals(edited_df)
+
+            if len(selection) > 0 or has_changes:
                 with col_save:
                     if st.button("💾", help="ACTUALIZARE"):
-                        st.success("Date actualizate!")
+                        st.success("Date salvate!")
                 with col_val:
                     if st.button("🛡️", help="VALIDARE"):
-                        st.info("Date validate!")
+                        st.info("Validat conform protocolului!")
                 with col_del:
                     if st.button("🗑️", help="ȘTERGERE"):
-                        st.error("Rând marcat pentru ștergere!")
+                        st.error("Rând marcat pentru eliminare!")
+
+if __name__ == "__main__":
+    run()
