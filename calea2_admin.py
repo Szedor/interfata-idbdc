@@ -52,7 +52,6 @@ def run():
     # --- ZONA FILTRE (CASETELE 1-4) ---
     st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare IDBDC: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     
-    # Interogare Acronime (din Nomenclator)
     try:
         res_nom = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
         lista_acronime = [""] + [r['acronim_contracte_proiecte'] for r in res_nom.data] if res_nom.data else [""]
@@ -67,27 +66,34 @@ def run():
 
     st.markdown("---")
 
-    # --- FUNCȚIE DE SALVARE (STATUIA VIVANTĂ) ---
-    def salveaza_date(tabela, key_editor):
+    # --- FUNCȚIE DE SALVARE (REVIZUITĂ PENTRU ȘTERGERE ȘI UPSERT) ---
+    def proceseaza_crud(tabela, key_editor, df_original):
         if key_editor in st.session_state:
             state = st.session_state[key_editor]
-            # Colectăm editările (modificări, adăugări)
-            updates = state.get('edited_rows', {})
-            additions = state.get('added_rows', [])
             
-            # Procesăm rândurile editate
-            for row_idx, changes in updates.items():
-                # Luăm datele originale din session_state pentru a identifica rândul (presupunem df încărcat)
-                # Notă: Pentru simplitate și siguranță, trimitem changes + coloanele de audit
-                changes['data_ultimei_modificari'] = datetime.now().isoformat()
-                changes['observatii_idbdc'] = f"Modificat de {st.session_state.operator_identificat}"
-                # Aici ar trebui un ID pentru .eq(), dar UPSERT e mai sigur dacă avem cheie primară definită
-                # În IDBDC, presupunem că UPSERT se ocupă de potrivire
-                supabase.table(tabela).upsert(changes).execute()
+            # 1. LOGICA DE ȘTERGERE (Rânduri eliminate din interfață)
+            if 'deleted_rows' in state and state['deleted_rows']:
+                indices_de_sters = state['deleted_rows']
+                for idx in indices_de_sters:
+                    if idx < len(df_original):
+                        id_rând = df_original.iloc[idx]['cod_identificare']
+                        supabase.table(tabela).delete().eq("cod_identificare", id_rând).execute()
 
-            # Procesăm rândurile noi
+            # 2. LOGICA DE MODIFICARE (Updates)
+            updates = state.get('edited_rows', {})
+            for row_idx, changes in updates.items():
+                # Identificăm rândul după indexul din DF-ul original
+                if int(row_idx) < len(df_original):
+                    id_rând = df_original.iloc[int(row_idx)]['cod_identificare']
+                    changes['data_ultimei_modificari'] = datetime.now().isoformat()
+                    changes['observatii_idbdc'] = f"Editat de {st.session_state.operator_identificat}"
+                    supabase.table(tabela).update(changes).eq("cod_identificare", id_rând).execute()
+
+            # 3. LOGICA DE ADĂUGARE (Additions)
+            additions = state.get('added_rows', [])
             for row in additions:
-                if id_admin: row['cod_identificare'] = id_admin
+                if 'cod_identificare' not in row or not row['cod_identificare']:
+                    if id_admin: row['cod_identificare'] = id_admin
                 row['data_ultimei_modificari'] = datetime.now().isoformat()
                 row['status_confirmare'] = "Draft"
                 supabase.table(tabela).insert(row).execute()
@@ -95,23 +101,33 @@ def run():
     # --- PANOU BUTOANE CRUD ---
     col_n, col_s, col_v, col_d, col_a = st.columns(5)
     
+    with col_n:
+        if st.button("➕ RAND NOU"):
+            st.info("Folosiți butonul '+' din partea de jos a tabelului pentru a insera.")
+
     with col_s: 
         if st.button("💾 SALVARE"):
             if cat_admin != "":
-                # Salvează tabel principal
                 tabel_p = "base_proiecte_internationale" if tip_admin != "FDI" else "base_proiecte_fdi"
                 if cat_admin == "Evenimente stiintifice": tabel_p = "base_evenimente_stiintifice"
                 if cat_admin == "Proprietate intelectuala": tabel_p = "base_prop_intelect"
                 
-                salveaza_date(tabel_p, f"ed_{tabel_p}")
+                # Avem nevoie de DF original pentru a identifica ID-urile la ștergere/update
+                res_main = supabase.table(tabel_p).select("*")
+                if id_admin: res_main = res_main.eq("cod_identificare", id_admin)
+                df_ref = pd.DataFrame(res_main.execute().data)
                 
-                # Salvează componente COM active
-                map_com = {"Date financiare": "com_date_financiare", "Resurse umane": "com_echipe_proiect", "Aspecte tehnice": "com_aspecte_tehnice"}
-                for comp in componente_com:
-                    salveaza_date(map_com[comp], f"ed_{map_com[comp]}")
-                
-                st.success("✅ Toate modificările au fost salvate în baza de date!")
+                proceseaza_crud(tabel_p, f"ed_{tabel_p}", df_ref)
+                st.success("✅ Date salvate!")
                 st.rerun()
+
+    with col_v:
+        if st.button("✅ VALIDARE"):
+            st.warning("Funcția de validare schimbă statusul în 'Validat'.")
+
+    with col_d:
+        if st.button("🗑️ ȘTERGERE"):
+            st.info("Selectați rândurile din tabel și apăsați tasta 'Delete', apoi 'SALVARE'.")
 
     with col_a:
         if st.button("❌ ANULARE"):
@@ -126,7 +142,6 @@ def run():
         }
         nume_tabela = tabel_map.get(cat_admin)
 
-        # 1. Tabel Principal
         res_main = supabase.table(nume_tabela).select("*")
         if id_admin: res_main = res_main.eq("cod_identificare", id_admin)
         df_main = pd.DataFrame(res_main.execute().data)
@@ -134,7 +149,6 @@ def run():
         st.markdown(f"**📂 Tabel Principal: {nume_tabela}**")
         st.data_editor(df_main, use_container_width=True, hide_index=True, key=f"ed_{nume_tabela}", num_rows="dynamic")
 
-        # 2. Tabele Componente (COM)
         if componente_com:
             map_tabele_com = {"Date financiare": "com_date_financiare", "Resurse umane": "com_echipe_proiect", "Aspecte tehnice": "com_aspecte_tehnice"}
             for comp in componente_com:
