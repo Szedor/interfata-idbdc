@@ -26,7 +26,7 @@ def run():
         st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
         with col_ce:
-            parola_m = st.text_input("Parola master:", type="password", key="p1_pass")
+            parola_m = st.text_input("Parola:", type="password", key="p1_pass")
             if st.button("Autorizare acces"):
                 if parola_m == "EverDream2SZ":
                     st.session_state.autorizat_p1 = True
