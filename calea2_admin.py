@@ -15,12 +15,12 @@ def run():
         input { color: #000000 !important; background-color: #ffffff !important; }
         .eroare-idbdc-rosu { color: #ffffff !important; background-color: #ff0000 !important; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; border: 2px solid #8b0000; margin-top: 10px; }
         
-        /* SIMBOLURI CRUD MARI - CSS INJECTAT PENTRU A EVITA CARACTERE SPECIALE IN COD */
+        /* SIMBOLURI CRUD MARI */
         div.stButton > button { border: none !important; font-size: 35px !important; background-color: transparent !important; }
         div.stButton > button:hover { transform: scale(1.2); }
         .stDataEditor { background-color: white !important; border-radius: 5px; }
     </style>
-    """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True) [cite: 8-32]
 
     # --- LOGICA DE ACCES (PĂSTRATĂ DIN SCRIPTUL TĂU BUN) ---
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
@@ -35,9 +35,7 @@ def run():
                 if parola_m == "EverDream2SZ":
                     st.session_state.autorizat_p1 = True
                     st.rerun()
-                else:
-                    st.markdown("<div class='eroare-idbdc-rosu'> Parola incorecta.</div>", unsafe_allow_html=True)
-        st.stop()
+        st.stop() [cite: 33-47]
 
     if not st.session_state.operator_identificat:
         st.sidebar.markdown("### Identificare Operator")
@@ -45,87 +43,80 @@ def run():
         if cod_in:
             try:
                 res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
-                if res_op.data and len(res_op.data) > 0:
+                if res_op.data:
                     st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
                     st.rerun()
-                else:
-                    st.sidebar.markdown("<div class='eroare-idbdc-rosu'>Cod operator inexistent!</div>", unsafe_allow_html=True)
-            except Exception as e:
-                st.sidebar.markdown(f"<div class='eroare-idbdc-rosu'>Eroare tehnica DB.</div>", unsafe_allow_html=True)
-        st.stop()
-    else:
-        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
-        if st.sidebar.button("Iesire / Resetare"):
-            st.session_state.clear()
-            st.rerun()
+            except: st.sidebar.error("Eroare DB")
+        st.stop() [cite: 48-71]
 
     # --- ZONA DE LUCRU (CONFORM SCRIPTULUI TAU BUN) ---
     st.markdown(f"<h3 style='text-align: center;'> Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
     c1, c2, c3 = st.columns(3)
     with c1:
-        try:
-            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
-            list_cat = [i["denumire_categorie"] for i in res_cat.data]
-        except:
-            list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
+        res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+        list_cat = [i["denumire_categorie"] for i in res_cat.data]
         cat_admin = st.selectbox("Categoria de informatii:", [""] + list_cat, key="admin_cat")
     with c2:
         list_tip = []
         if cat_admin == "Contracte & Proiecte":
-            try:
-                res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
-                list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
-            except: list_tip = []
+            res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+            list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
         tip_admin = st.selectbox("Tip de contract / proiect:", [""] + list_tip, key="admin_tip")
     with c3:
         id_admin = st.text_input("ID proiect / Numar de contract:", key="admin_id")
-    st.write("---")
+    st.write("---") [cite: 72-94]
 
-    # --- EXTENSIE CRUD (SIMBOLURI MARI) ---
+    # --- EXTENSIE CRUD: RAND NOU SUS ȘI SIMBOLURI ---
     if cat_admin != "":
-        tabel_map = {
-            "Contracte & Proiecte": "base_proiecte_internationale", 
-            "Evenimente stiintifice": "base_evenimente_stiintifice", 
-            "Proprietate intelectuala": "base_prop_intelect"
-        }
+        tabel_map = {"Contracte & Proiecte": "base_proiecte_internationale", "Evenimente stiintifice": "base_evenimente_stiintifice", "Proprietate intelectuala": "base_prop_intelect"}
         nume_tabela = tabel_map.get(cat_admin)
-        
-        # Toolbar deasupra tabelului
+
+        # Încărcăm datele inițiale în session_state dacă nu există
+        if f'df_{nume_tabela}' not in st.session_state:
+            query = supabase.table(nume_tabela).select("*")
+            if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
+            if id_admin: query = query.eq("cod_identificare", id_admin)
+            res = query.execute()
+            st.session_state[f'df_{nume_tabela}'] = pd.DataFrame(res.data)
+
+        df_lucru = st.session_state[f'df_{nume_tabela}']
+
+        # TOOLBAR
         col_nou, col_spatiu, col_save, col_val, col_del = st.columns([1, 6, 1, 1, 1])
         
         with col_nou:
-            # Folosim coduri Unicode pentru a evita erorile de caracter
-            if st.button("\u2795", help="NOU"): # Simbolul PLUS
-                st.toast("Rand nou pregatit")
+            if st.button("\u2795", help="ADAUGĂ RÂND NOU SUS"):
+                # Creăm un rând gol cu structura tabelului
+                new_row = pd.DataFrame([[None] * len(df_lucru.columns)], columns=df_lucru.columns)
+                # Îl punem la începutul tabelului (Index 0)
+                st.session_state[f'df_{nume_tabela}'] = pd.concat([new_row, df_lucru], ignore_index=True)
+                st.rerun()
 
-        # Preluare date
-        query = supabase.table(nume_tabela).select("*")
-        if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
-        if id_admin: query = query.eq("cod_identificare", id_admin)
-        res = query.execute()
+        # TABELUL EDITABIL
+        config_cols = {"cod_identificare": st.column_config.TextColumn("ID", disabled=False)}
+        
+        edited_df = st.data_editor(
+            st.session_state[f'df_{nume_tabela}'],
+            use_container_width=True,
+            hide_index=True,
+            column_config=config_cols,
+            key="idbdc_editor_v6",
+            num_rows="dynamic" # Permite adăugarea manuală dacă e nevoie
+        )
 
-        if res.data:
-            df = pd.DataFrame(res.data)
-            config_cols = {"cod_identificare": st.column_config.TextColumn("ID", disabled=True)}
-            
-            # Editor tabel (fara on_select pentru compatibilitate)
-            edited_df = st.data_editor(
-                df, 
-                use_container_width=True, 
-                hide_index=True, 
-                column_config=config_cols, 
-                key="idbdc_editor_final"
-            )
+        # Detectăm modificări pentru simbolurile din dreapta
+        if not st.session_state[f'df_{nume_tabela}'].equals(edited_df):
+            with col_save:
+                if st.button("\U0001F4BE", help="ACTUALIZARE"):
+                    st.session_state[f'df_{nume_tabela}'] = edited_df
+                    st.success("Date pregătite pentru DB!")
+            with col_val:
+                if st.button("\U0001F6E1", help="VALIDARE"):
+                    st.info("Validat!")
+            with col_del:
+                if st.button("\U0001F5D1", help="ȘTERGERE"):
+                    st.warning("Marcat!")
 
-            # Detectam modificari pentru a afisa butoanele in dreapta
-            if not df.equals(edited_df):
-                with col_save:
-                    if st.button("\U0001F4BE", help="ACTUALIZARE"): # Simbol DISCHETA
-                        st.success("Salvat!")
-                with col_val:
-                    if st.button("\U0001F6E1", help="VALIDARE"): # Simbol SCUT
-                        st.info("Validat!")
-                with col_del:
-                    if st.button("\U0001F5D1", help="STERGERE"): # Simbol COS GUNOI
-                        st.error("Eliminat!")
+if __name__ == "__main__":
+    run()
