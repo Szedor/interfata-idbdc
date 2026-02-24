@@ -3,34 +3,19 @@ from supabase import create_client, Client
 import pandas as pd
 
 def run():
-    # --- CONEXIUNE ȘI STIL (CONFORM PROTOCOLULUI IDBDC) ---
+    # --- CONEXIUNE ȘI STIL ---
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
     st.markdown("""
     <style>
-        .stApp, [data-testid="stSidebar"] { 
-            background-color: #003366 !important; 
-        }
-        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { 
-            color: white !important; 
-        }
-        input { 
-            color: #000000 !important; 
-            background-color: #ffffff !important; 
-        }
-        .eroare-idbdc-rosu { 
-            color: #ffffff !important; 
-            background-color: #ff0000 !important; 
-            padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; border: 2px solid #8b0000; margin-top: 10px; 
-        }
-        /* Stil butoane text CRUD */
-        div.stButton > button { 
-            border: 1px solid white !important; 
-            color: white !important; 
-            background-color: rgba(255, 255, 255, 0.1) !important;
-        }
+        .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
+        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: white !important; }
+        input { color: #000000 !important; background-color: #ffffff !important; }
+        .eroare-idbdc-rosu { color: #ffffff !important; background-color: #ff0000 !important; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; border: 2px solid #8b0000; margin-top: 10px; }
+        div.stButton > button { border: 1px solid white !important; color: white !important; background-color: rgba(255,255,255,0.1) !important; width: 100%; }
+        div.stButton > button:hover { background-color: white !important; color: #003366 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -51,7 +36,7 @@ def run():
                     st.markdown("<div class='eroare-idbdc-rosu'> ⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
         st.stop()
 
-    # --- PAS 2: IDENTIFICARE OPERATOR (SIDEBAR) ---
+    # --- PAS 2: IDENTIFICARE OPERATOR ---
     st.sidebar.markdown("### 👤 Identificare Operator")
     if not st.session_state.operator_identificat:
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
@@ -75,8 +60,8 @@ def run():
     # --- ZONA DE LUCRU ---
     st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
-    c1, c2, c3 = st.columns(3)
     
+    c1, c2, c3 = st.columns(3)
     with c1:
         try:
             res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
@@ -89,7 +74,23 @@ def run():
         list_tip = []
         if cat_admin == "Contracte & Proiecte":
             try:
-                res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiect
+                res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+                list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
+            except:
+                list_tip = []
+        tip_admin = st.selectbox("Tip de contract / proiect:", [""] + list_tip, key="admin_tip")
+    
+    with c3:
+        id_admin = st.text_input("ID proiect / Numar de contract:", key="admin_id")
+    st.write("---")
 
-    # --- ZONA DE LUCRU (CELE 3 CASETE) ---
-    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator
+    # --- CRUD CU TEXT ---
+    if cat_admin != "":
+        tabel_map = {
+            "Contracte & Proiecte": "base_proiecte_internationale", 
+            "Evenimente stiintifice": "base_evenimente_stiintifice", 
+            "Proprietate intelectuala": "base_prop_intelect"
+        }
+        nume_tabela = tabel_map.get(cat_admin)
+
+        if f'df_{nume_tabela}' not
