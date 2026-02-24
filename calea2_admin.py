@@ -1,87 +1,106 @@
 import streamlit as st
-import pandas as pd
 from supabase import create_client, Client
 
 def run():
-    # 1. Conexiune Supabase
+    # Conexiune Supabase
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    # 2. Stil Vizual (Fundal albastru IDBDC)
+    # 1. Stil Vizual - Fundal albastru consistent (inclusiv Sidebar)
     st.markdown("""
     <style>
-        .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
-        .stApp h1, .stApp h2, .stApp h3, .stApp p, .stApp label { color: white !important; }
-        .stDataEditor { background-color: white !important; border-radius: 5px; }
+        .stApp, [data-testid="stSidebar"] { 
+            background-color: #003366 !important; 
+        }
+        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { 
+            color: white !important; 
+        }
+        input { 
+            color: #000000 !important; 
+            background-color: #ffffff !important; 
+        }
+        .eroare-idbdc-rosu { 
+            color: #ffffff !important; 
+            background-color: #ff0000 !important; 
+            padding: 10px; 
+            border-radius: 4px; 
+            text-align: center; 
+            font-weight: bold; 
+            border: 2px solid #8b0000; 
+            margin-top: 10px; 
+        }
     </style>
     """, unsafe_allow_html=True)
 
-    # Verificăm dacă avem operatorul identificat (din scriptul principal)
-    operator = st.session_state.get('operator_identificat', 'Admin')
-    st.title(f"🛠️ Panou Control Administrare: {operator}")
+    if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
+    if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
+
+    # PAS 1: POARTA MASTER
+    if not st.session_state.autorizat_p1:
+        st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
+        _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
+        with col_ce:
+            parola_m = st.text_input("Parola master:", type="password", key="p1_pass")
+            if st.button("Autorizare acces", use_container_width=True):
+                if parola_m == "EverDream2SZ":
+                    st.session_state.autorizat_p1 = True
+                    st.rerun()
+                else:
+                    st.markdown("<div class='eroare-idbdc-rosu'> ⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
+        st.stop()
+
+    # PAS 2: IDENTIFICARE OPERATOR (SIDEBAR) - Corelație cu tabela com_operatori
+    st.sidebar.markdown("### 👤 Identificare Operator")
+    if not st.session_state.operator_identificat:
+        # Folosim cod_operatori pentru legătură conform protocolului 
+        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
+        if cod_in:
+            try:
+                # Interogare strictă: căutăm codul introdus în coloana cod_operatori 
+                res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
+                
+                if res_op.data and len(res_op.data) > 0:
+                    # Dacă am găsit codul, salvăm corespondentul din nume_prenume 
+                    st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
+                    st.rerun()
+                else:
+                    st.sidebar.markdown("<div class='eroare-idbdc-rosu'>Cod operator inexistent!</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.sidebar.markdown(f"<div class='eroare-idbdc-rosu'>Eroare tehnică DB.</div>", unsafe_allow_html=True)
+        st.stop()
+    else:
+        # Afișează numele extras din tabelă 
+        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
+        if st.sidebar.button("Ieșire / Resetare"):
+            st.session_state.clear()
+            st.rerun()
+
+    # ZONA DE LUCRU - CELE 3 CASETE PE ACEEAȘI LINIE
+    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
 
-    # 3. ZONA DE FILTRARE (Cele 3 casete pe o linie)
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        # Dinamism din nom_categorie
         try:
             res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
             list_cat = [i["denumire_categorie"] for i in res_cat.data]
         except:
             list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
-        cat_admin = st.selectbox("1. Categoria de informații:", [""] + list_cat, key="adm_cat")
+        cat_admin = st.selectbox("Categoria de informatii:", [""] + list_cat, key="admin_cat")
 
     with c2:
-        # Mapare tabelă în funcție de categorie
-        mapare_tabele = {
-            "Contracte & Proiecte": "base_proiecte_internationale", # Exemplu pentru testul tău
-            "Evenimente stiintifice": "base_evenimente_stiintifice",
-            "Proprietate intelectuala": "base_prop_intelect"
-        }
-        tabela_activa = mapare_tabele.get(cat_admin, None)
-        
-        # Preluare tipuri din nomenclator (simulat)
-        st.selectbox("2. Tip de contract / proiect:", ["Toate"], key="adm_tip")
+        list_tip = []
+        if cat_admin == "Contracte & Proiecte":
+            try:
+                res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+                list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
+            except:
+                list_tip = []
+        st.selectbox("Tip de contract / proiect:", [""] + list_tip, key="admin_tip")
 
     with c3:
-        filtru_id = st.text_input("3. Caută după Cod Identificare:", key="adm_id_search")
+        st.text_input("ID proiect / Numar de contract:", key="admin_id")
 
     st.write("---")
-
-    # 4. ZONA DE LUCRU (CRUD - Vizualizare și Editare)
-    if tabela_activa:
-        st.subheader(f"Gestionare Date: {tabela_activa}")
-        
-        try:
-            # Interogare date
-            query = supabase.table(tabela_activa).select("*")
-            if filtru_id:
-                query = query.eq("cod_identificare", filtru_id)
-            
-            res_date = query.execute()
-            df = pd.DataFrame(res_date.data)
-
-            if not df.empty:
-                st.info(f"S-au găsit {len(df)} înregistrări. Poți edita valorile direct în tabelul de mai jos.")
-                
-                # Editor de date (Modificări în timp real)
-                edited_df = st.data_editor(df, num_rows="dynamic", key="editor_idbdc", use_container_width=True)
-
-                if st.button("💾 Salvează Modificările în Baza de Date"):
-                    # Logica de salvare (Update/Insert)
-                    # Pentru simplitate, aici am putea implementa un loop de update
-                    st.success("Modificările au fost trimise către Supabase!")
-            else:
-                st.warning("Nu există date pentru selecția actuală.")
-        
-        except Exception as e:
-            st.error(f"Eroare la încărcarea datelor: {e}")
-    else:
-        st.info("Te rugăm să selectezi o Categorie pentru a afișa panoul de editare.")
-
-# Pentru rulare individuală la test
-if __name__ == "__main__":
-    run()
