@@ -18,7 +18,7 @@ def run():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- SISTEM AUTORIZARE (RESTAURAT) ---
+    # --- SISTEM AUTORIZARE (ÎNGHEȚAT) ---
     if 'autorizat_p1' not in st.session_state:
         st.session_state.autorizat_p1 = False
 
@@ -26,14 +26,14 @@ def run():
         st.subheader("🔒 Acces Securizat - Consola Admin")
         cod_acces = st.text_input("Introduceți codul de autorizare", type="password")
         if st.button("Validare Acces"):
-            if cod_acces == "IDBDC2024": # Codul stabilit anterior
+            if cod_acces == "IDBDC2024":
                 st.session_state.autorizat_p1 = True
                 st.rerun()
             else:
                 st.error("Cod incorect!")
         return
 
-    # --- 2. MOTORUL DE NOMENCLATOARE (FUNCȚII SUPORT) ---
+    # --- 2. MOTORUL DE NOMENCLATOARE (INTEGRAT) ---
     def fetch_options(table, column):
         try:
             res = supabase.table(table).select(column).execute()
@@ -46,20 +46,16 @@ def run():
     list_operatori = fetch_options("com_operatori", "cod_operatori")
     list_personal = fetch_options("det_resurse_umane", "nume_prenume")
 
-    # --- 3. CELE 4 CASETE (INTERFAȚA DE CONTROL) ---
+    # --- 3. CELE 4 CASETE (CONFORM CODULUI TĂU) ---
     st.markdown("### 🛠️ CONSOLA DE ADMINISTRARE - IDBDC")
     
     c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        op_admin = st.selectbox("1. Operator", list_operatori)
-    with c2:
-        tip_admin = st.selectbox("2. Tip Proiect", list_acronime)
-    with c3:
-        id_admin = st.text_input("3. ID Proiect (Filtru)", placeholder="ex: PN-III-P1...")
-    with c4:
-        componente_sel = st.multiselect("4. Componente", ["Date financiare", "Echipe", "Aspecte tehnice", "Resurse umane"])
+    with c1: op_admin = st.selectbox("1. Operator", list_operatori)
+    with c2: tip_admin = st.selectbox("2. Tip Proiect", list_acronime)
+    with c3: id_admin = st.text_input("3. ID Proiect (Filtru)", placeholder="ex: PN-III-P1...")
+    with c4: componente_com = st.multiselect("4. Componente", ["Date financiare", "Resurse umane", "Aspecte tehnice"])
 
-    # Mapare COMPLETĂ (Asigurăm că niciun tabel nu este omis)
+    # Mapare completă tabele BASE
     map_base = {
         "FDI": "base_proiecte_fdi", "PNRR": "base_proiecte_pnrr",
         "INTERNATIONALE": "base_proiecte_internationale", "PNCDI": "base_proiecte_pncdi",
@@ -67,64 +63,87 @@ def run():
         "CEP": "base_contracte_cep", "TERTI": "base_contracte_terti",
         "EVENIMENTE": "base_evenimente_stiintifice", "PROP_INTELECT": "base_prop_intelect"
     }
-    tabela_activa = map_base.get(tip_admin)
+    nume_tabela = map_base.get(tip_admin)
 
-    # --- 4. AFIȘARE ȘI EDITARE CU DROPDOWN ---
-    if tabela_activa:
+    # --- 4. ZONA DE EDITARE (CU FILTRE ȘI DROPDOWN) ---
+    if nume_tabela:
         st.write("---")
-        query = supabase.table(tabela_activa).select("*")
-        if id_admin:
-            query = query.eq("cod_identificare", id_admin)
+        st.markdown(f"**📄 Tabela Principală: {nume_tabela}**")
         
-        res = query.execute()
-        df_initial = pd.DataFrame(res.data)
+        query_base = supabase.table(nume_tabela).select("*")
+        if id_admin:
+            query_base = query_base.eq("cod_identificare", id_admin)
+        
+        res_base = query_base.execute()
+        df_initial = pd.DataFrame(res_base.data)
 
-        # Configurare Ghid (Dropdown-uri active peste tot)
+        # CONFIGURARE COLOANE - "Ghidul" care forțează dropdown-ul
         config_ghid = {
             "cod_identificare": st.column_config.TextColumn("Cod Identificare", required=True),
-            "denumire_categorie": st.column_config.SelectboxColumn("Categorie", options=list_categorii),
+            "denumire_categorie": st.column_config.SelectboxColumn("Categorie", options=list_categorii, required=True),
             "acronim_contracte_proiecte": st.column_config.SelectboxColumn("Tip", options=list_acronime),
             "status_contract_proiect": st.column_config.SelectboxColumn("Status", options=list_status),
             "data_ultimei_modificari": st.column_config.DatetimeColumn("Update", disabled=True)
         }
 
+        # Editorul de date - permite rânduri noi și ștergere
         edited_df = st.data_editor(
             df_initial, 
             column_config=config_ghid, 
             use_container_width=True, 
             hide_index=True, 
-            key=f"editor_{tabela_activa}", 
-            num_rows="dynamic"
+            key=f"ed_{nume_tabela}", 
+            num_rows="dynamic" # Aici apare rândul nou la finalul listei
         )
 
-        # --- 5. BUTOANE CRUD (SQL SPECIFIC) ---
+        # --- 5. COMPONENTE (COM) ---
+        if componente_com and id_admin:
+            map_tabele_com = {
+                "Date financiare": "com_date_financiare",
+                "Resurse umane": "com_echipe_proiect",
+                "Aspecte tehnice": "com_aspecte_tehnice"
+            }
+            for comp in componente_com:
+                tabel_com = map_tabele_com[comp]
+                st.write("---")
+                st.markdown(f"**🔍 Componenta: {comp}**")
+                res_com = supabase.table(tabel_com).select("*").eq("cod_identificare", id_admin).execute()
+                df_com = pd.DataFrame(res_com.data)
+                
+                if df_com.empty: df_com = pd.DataFrame([{"cod_identificare": id_admin}])
+                
+                # Dropdown pentru membrii echipei dacă e cazul
+                config_com = {"cod_identificare": st.column_config.TextColumn("ID Proiect", disabled=True)}
+                if comp == "Resurse umane":
+                    config_com["nume_prenume"] = st.column_config.SelectboxColumn("Membru", options=list_personal)
+                
+                st.data_editor(df_com, column_config=config_com, use_container_width=True, hide_index=True, key=f"ed_{tabel_com}", num_rows="dynamic")
+
+        # --- 6. BUTOANE CRUD (CU SQL SPECIFIC) ---
         st.write("---")
-        b1, b2, b3, b4, b5 = st.columns(5)
+        btn_rand_nou, btn_salvare, btn_validare, btn_stergere, btn_anulare = st.columns(5)
         
-        with b2:
+        with btn_salvare:
             if st.button("💾 SALVARE"):
-                # 1. Comanda DELETE pentru rândurile eliminate vizual
+                # A. LOGICA DE ȘTERGERE (Identifică ce lipsește din tabelul editat față de cel inițial)
                 if not df_initial.empty:
                     ids_vechi = set(df_initial['cod_identificare'].dropna())
                     ids_noi = set(edited_df['cod_identificare'].dropna())
                     de_sters = ids_vechi - ids_noi
                     for id_s in de_sters:
-                        supabase.table(tabela_activa).delete().eq("cod_identificare", id_s).execute()
+                        supabase.table(nume_tabela).delete().eq("cod_identificare", id_s).execute()
 
-                # 2. Comanda UPSERT pentru restul
+                # B. LOGICA DE UPSERT (Adăugare / Modificare)
                 for _, row in edited_df.iterrows():
                     if pd.notna(row['cod_identificare']):
                         valori = row.to_dict()
-                        valori['cod_operatori'] = op_admin
-                        supabase.table(tabela_activa).upsert(valori).execute()
+                        valori['cod_operatori'] = op_admin # Asumare automată
+                        supabase.table(nume_tabela).upsert(valori).execute()
                 
-                st.success("Datele au fost sincronizate cu succes!")
+                st.success("Sincronizare completă cu baza de date!")
                 st.rerun()
 
-        with b3:
-            st.button("✅ VALIDARE")
-
-        with b5:
+        with btn_anulare:
             if st.button("❌ ANULARE"):
                 st.rerun()
 
