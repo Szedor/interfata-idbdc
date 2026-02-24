@@ -1,8 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
-import pandas as pd
-from datetime import datetime
-import motor_admin # Importăm motorul extern
+import motor_admin
 
 def run():
     # --- SECȚIUNE VALIDATĂ / ÎNGHEȚATĂ (Rămâne intactă) ---
@@ -49,9 +47,5 @@ def run():
             st.session_state.clear()
             st.rerun()
 
-    # --- TRANSMITEM CONTROLUL CĂTRE MOTOR ---
-    # Motorul va desena Casetele 1-4, Butoanele și Tabelele conform cerințelor tale
+    # --- APEL MOTOR ---
     motor_admin.porneste_motorul(supabase)
-
-if __name__ == "__main__":
-    run()
