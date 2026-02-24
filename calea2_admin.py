@@ -55,7 +55,7 @@ def run():
             st.session_state.clear()
             st.rerun()
 
-    st.markdown(f"<h3 style='text-align: center;'>  🛠️  Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
     
     c1, c2, c3 = st.columns(3)
@@ -82,7 +82,29 @@ def run():
 
     if cat_admin != "":
         st.write("---")
-        tabel_map = {"Contracte & Proiecte": "base_proiecte_internationale", "Evenimente stiintifice": "base_evenimente_stiintifice", "Proprietate intelectuala": "base_prop_intelect"}
+        tabel_map = {
+            "Contracte & Proiecte": "base_proiecte_internationale",
+            "Evenimente stiintifice": "base_evenimente_stiintifice",
+            "Proprietate intelectuala": "base_prop_intelect"
+        }
         nume_tabela = tabel_map.get(cat_admin)
         
-        if
+        if nume_tabela:
+            try:
+                query = supabase.table(nume_tabela).select("*")
+                if tip_admin != "":
+                    query = query.eq("acronim_contracte_proiecte", tip_admin)
+                if id_admin != "":
+                    query = query.eq("cod_identificare", id_admin)
+                
+                res = query.execute()
+                if res.data:
+                    df = pd.DataFrame(res.data)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nu s-au găsit date.")
+            except Exception as e:
+                st.error(f"Eroare filtrare: {e}")
+
+if __name__ == "__main__":
+    run()
