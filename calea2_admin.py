@@ -1,20 +1,89 @@
-# ... (codul de conexiune și filtre rămâne la fel) ...
+import streamlit as st
+from supabase import create_client, Client
+import pandas as pd
+
+def run():
+    url: str = st.secrets["SUPABASE_URL"]
+    key: str = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(url, key)
+
+    st.markdown("""
+    <style>
+        .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
+        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: white !important; }
+        input { color: #000000 !important; background-color: #ffffff !important; }
+        .stDataFrame { background-color: white !important; border-radius: 5px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
+    if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
+
+    if not st.session_state.autorizat_p1:
+        st.markdown('<div style="background-color: #1a4a7a; padding: 40px; border-radius: 15px;">', unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
+        _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
+        with col_ce:
+            parola_m = st.text_input("Parola:", type="password", key="p1_pass")
+            if st.button("Autorizare acces", use_container_width=True):
+                if parola_m == "EverDream2SZ":
+                    st.session_state.autorizat_p1 = True
+                    st.rerun()
+                else:
+                    st.error("Parolă incorectă.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.stop()
+
+    st.sidebar.markdown("### 👤 Autentificare")
+    if not st.session_state.operator_identificat:
+        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
+        if cod_in:
+            res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
+            if res_op.data:
+                st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
+                st.rerun()
+        st.stop()
+    else:
+        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
+        if st.sidebar.button("Ieșire / Resetare"):
+            st.session_state.clear()
+            st.rerun()
+
+    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
+    st.write("---")
+    
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        try:
+            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+            list_cat = [i["denumire_categorie"] for i in res_cat.data]
+        except:
+            list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
+        cat_admin = st.selectbox("Categoria de informatii:", [""] + list_cat, key="admin_cat")
+    with c2:
+        list_tip = []
+        if cat_admin == "Contracte & Proiecte":
+            res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+            list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
+        tip_admin = st.selectbox("Tip de contract / proiect:", [""] + list_tip, key="admin_tip")
+    with c3:
+        id_admin = st.text_input("ID proiect / Numar de contract:", key="admin_id")
 
     if cat_admin != "":
         st.write("---")
         
-        # 1. BARĂ DE UNELTE (TOOLBAR)
+        # BARĂ DE UNELTE (CRUD Toolbar)
         c_btn1, c_btn2, c_btn3, _ = st.columns([1, 1, 1, 4])
         with c_btn1:
-            btn_add = st.button("➕ Adaugă", use_container_width=True)
+            st.button("➕ Adaugă", use_container_width=True, key="btn_c")
         with c_btn2:
-            # Activăm butonul doar dacă avem ceva selectat (simulăm prin session_state)
-            btn_edit = st.button("📝 Modifică", use_container_width=True, disabled=('selected_row' not in st.session_state))
+            st.button("📝 Modifică", use_container_width=True, key="btn_u")
         with c_btn3:
-            btn_del = st.button("🗑️ Șterge", use_container_width=True, disabled=('selected_row' not in st.session_state))
+            st.button("🗑️ Șterge", use_container_width=True, key="btn_d")
 
-        # 2. TABELUL CU SELECȚIE (Folosim st.dataframe cu selection_mode)
+        tabel_map = {"Contracte & Proiecte": "base_proiecte_internationale", "Evenimente stiintifice": "base_evenimente_stiintifice", "Proprietate intelectuala": "base_prop_intelect"}
         nume_tabela = tabel_map.get(cat_admin)
+        
         if nume_tabela:
             query = supabase.table(nume_tabela).select("*")
             if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
@@ -23,41 +92,9 @@
             res = query.execute()
             if res.data:
                 df = pd.DataFrame(res.data)
-                
-                # Interfață modernă de selecție
-                event = st.dataframe(
-                    df, 
-                    use_container_width=True, 
-                    hide_index=True,
-                    on_select="rerun", # Când dăm click, aplicația reîncarcă pentru a activa butoanele
-                    selection_mode="single-row"
-                )
-
-                # Dacă operatorul a selectat un rând
-                if len(event.selection.rows) > 0:
-                    selected_index = event.selection.rows[0]
-                    st.session_state.selected_row = df.iloc[selected_index]
-                    st.success(f"Ați selectat proiectul: {st.session_state.selected_row['cod_identificare']}")
-                else:
-                    if 'selected_row' in st.session_state:
-                        del st.session_state.selected_row
+                st.dataframe(df, use_container_width=True, hide_index=True)
             else:
                 st.info("Nu s-au găsit date.")
 
-        # 3. ZONA DE FORMULAR (Apare doar la click pe Adaugă sau Modifică)
-        if btn_add or ('selected_row' in st.session_state and btn_edit):
-            st.write("---")
-            st.subheader("🛠️ Editor Proiect")
-            # Aici apar casetele de editare (Update)
-            with st.form("form_edit"):
-                # Dacă e Adăugare, câmpurile sunt goale. Dacă e Modificare, sunt precompletate.
-                val_id = st.session_state.selected_row['cod_identificare'] if 'selected_row' in st.session_state else ""
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    noul_id = st.text_input("Cod Identificare", value=val_id)
-                with col2:
-                    st.text_input("Titlu Proiect", value=st.session_state.selected_row['titlu_proiect'] if 'selected_row' in st.session_state else "")
-                
-                if st.form_submit_button("Salvează în Baza de Date"):
-                    st.success("Datele au fost salvate cu succes!") # Aici vine logica de DB
+if __name__ == "__main__":
+    run()
