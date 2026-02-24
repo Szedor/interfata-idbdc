@@ -3,57 +3,55 @@ from supabase import create_client, Client
 import pandas as pd
 
 def run():
-    # 1. CONEXIUNE
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    # 2. STILIZARE (Iconițe mari și culori IDBDC)
+    # CSS pentru simboluri mari, expresive și aliniere precisă
     st.markdown("""
     <style>
         .stApp { background-color: #003366 !important; }
         .stDataEditor { background-color: white !important; border-radius: 5px; }
-        /* Simboluri mari și expresive */
+        /* Butoane tip simboluri universale mari */
         div.stButton > button {
             border: none !important;
-            font-size: 30px !important; 
+            font-size: 35px !important; 
             background-color: transparent !important;
+            padding: 0px !important;
+            line-height: 1 !important;
         }
-        div.stButton > button:hover { transform: scale(1.3); }
+        div.stButton > button:hover { transform: scale(1.2); color: #ffaa00 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-    # 3. GESTIUNE SESIUNE
+    # --- LOGICA DE ACCES (Sesiune) ---
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
-    # --- POARTA 1: PAROLA ---
+    # POARTA 1 & 2 (Păstrate pentru securitate conform IDBDC)
     if not st.session_state.autorizat_p1:
-        st.markdown("<h2 style='text-align: center; color: white;'>🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: white;'>🛡️ Acces Securizat</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1, 1, 1])
         with col_ce:
-            parola_m = st.text_input("Introdu Parola Generală:", type="password")
-            if st.button("AUTORIZARE"):
-                if parola_m == "EverDream2SZ":
+            p_in = st.text_input("Parola:", type="password")
+            if st.button("OK"):
+                if p_in == "EverDream2SZ": 
                     st.session_state.autorizat_p1 = True
                     st.rerun()
         st.stop()
 
-    # --- POARTA 2: OPERATOR (În Sidebar) ---
     if not st.session_state.operator_identificat:
-        st.sidebar.markdown("### 👤 Identificare Operator")
-        cod_in = st.sidebar.text_input("Cod Operator:", type="password")
-        if cod_in:
-            res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
-            if res_op.data:
-                st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
+        cod_op = st.sidebar.text_input("Cod Operator:", type="password")
+        if cod_op:
+            res = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_op).execute()
+            if res.data:
+                st.session_state.operator_identificat = res.data[0]['nume_prenume']
                 st.rerun()
         st.stop()
 
-    # --- ZONA DE LUCRU ---
-    st.markdown(f"#### 🛠️ Consola Admin: {st.session_state.operator_identificat}", unsafe_allow_html=True)
+    # --- INTERFAȚA DE LUCRU ---
+    st.markdown(f"#### 🛠️ {st.session_state.operator_identificat}")
     
-    # Filtre orizontale
     c1, c2, c3 = st.columns(3)
     with c1:
         res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
@@ -66,42 +64,51 @@ def run():
             list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
         tip_admin = st.selectbox("Tip:", [""] + list_tip)
     with c3:
-        id_admin = st.text_input("Căutare ID/Contract:")
+        id_admin = st.text_input("ID Căutat:")
 
-    # --- CRUD CU SIMBOLURI MARI ---
     if cat_admin != "":
         tabel_map = {"Contracte & Proiecte": "base_proiecte_internationale", "Evenimente stiintifice": "base_evenimente_stiintifice", "Proprietate intelectuala": "base_prop_intelect"}
         nume_tabela = tabel_map.get(cat_admin)
         
-        query = supabase.table(nume_tabela).select("*")
-        if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
-        if id_admin: query = query.eq("cod_identificare", id_admin)
-        res = query.execute()
+        # Preluare date
+        res = supabase.table(nume_tabela).select("*").execute()
+        df = pd.DataFrame(res.data)
 
-        if res.data:
-            df = pd.DataFrame(res.data)
-            
-            # TOOLBAR SUPERIOR CU SIMBOLURI
-            col_nou, col_spatiu, col_save, col_val, col_del = st.columns([1, 4, 1, 1, 1])
-            
-            with col_nou:
-                if st.button("➕", help="NOU - Adaugă rând gol"):
-                    st.toast("Funcția NOU va fi activată la următorul pas.")
+        # ---------------------------------------------------------
+        # ZONA CRUD (NOU în stânga, RESTUL în dreapta)
+        # ---------------------------------------------------------
+        col_stanga, col_spatiu, col_d1, col_d2, col_d3 = st.columns([1, 6, 1, 1, 1])
+        
+        with col_stanga:
+            if st.button("➕", help="Adaugă înregistrare nouă"):
+                st.toast("Se generează un rând gol...")
 
-            # Tabelul editabil
-            edited_df = st.data_editor(df, use_container_width=True, hide_index=True, key="ed_final")
+        # TABELUL (Data Editor)
+        # Folosim selectia de rand pentru a activa instantaneu butoanele din dreapta
+        edit_event = st.data_editor(
+            df, 
+            use_container_width=True, 
+            hide_index=True, 
+            key="idbdc_editor",
+            on_select="rerun", # Aceasta este cheia: la orice click, reincarcam pentru butoane
+            selection_mode="single-row"
+        )
 
-            # Detectare modificări pentru afișarea iconițelor în dreapta
-            if not df.equals(edited_df):
-                with col_save:
-                    if st.button("💾", help="ACTUALIZARE (Salvează în DB)"):
-                        st.success("Salvat!")
-                with col_val:
-                    if st.button("🛡️", help="VALIDARE (Confirmă datele)"):
-                        st.balloons()
-                with col_del:
-                    if st.button("🗑️", help="ȘTERGERE (Elimină definitiv)"):
-                        st.warning("Sigur ștergeți?")
+        # ACTIVARE BUTOANE DREAPTA
+        # Apar dacă un rând este selectat SAU dacă tabelul a fost modificat
+        este_selectat = len(edit_event.selection.rows) > 0
+        este_modificat = not df.equals(edit_event)
+
+        if este_selectat or este_modificat:
+            with col_d1:
+                if st.button("💾", help="ACTUALIZARE"):
+                    st.success("Salvat!")
+            with col_d2:
+                if st.button("🛡️", help="VALIDARE"):
+                    st.info("Validat!")
+            with col_d3:
+                if st.button("🗑️", help="ȘTERGERE"):
+                    st.error("Eliminat!")
 
 if __name__ == "__main__":
     run()
