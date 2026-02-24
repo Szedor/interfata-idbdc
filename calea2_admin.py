@@ -7,19 +7,22 @@ def run():
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
+    # STILIZARE UNITARĂ IDBDC
     st.markdown("""
     <style>
         .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
         .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: white !important; }
         input { color: #000000 !important; background-color: #ffffff !important; }
         .stDataEditor { background-color: white !important; border-radius: 5px; }
+        /* Stil butoane scurte deasupra */
+        div.stButton > button { height: 35px; padding-top: 0; padding-bottom: 0; font-size: 12px !important; }
     </style>
     """, unsafe_allow_html=True)
 
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
-    # --- PAZNICII (Rămân neschimbați) ---
+    # --- ACCES SI AUTENTIFICARE ---
     if not st.session_state.autorizat_p1:
         st.markdown('<div style="background-color: #1a4a7a; padding: 40px; border-radius: 15px;">', unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
@@ -33,80 +36,69 @@ def run():
         st.markdown('</div>', unsafe_allow_html=True)
         st.stop()
 
-    st.sidebar.markdown("### 👤 Autentificare")
     if not st.session_state.operator_identificat:
-        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
+        st.sidebar.markdown("### 👤 Autentificare")
+        cod_in = st.sidebar.text_input("Cod Operator", type="password", key="p2_cod")
         if cod_in:
             res_op = supabase.table("com_operatori").select("nume_prenume").eq("cod_operatori", cod_in).execute()
             if res_op.data:
                 st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
                 st.rerun()
         st.stop()
-    else:
-        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
 
-    # --- ZONA DE FILTRARE ---
-    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
-    st.write("---")
+    # --- FILTRE ---
+    st.markdown(f"<h4 style='text-align: left;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h4>", unsafe_allow_html=True)
     
     c1, c2, c3 = st.columns(3)
     with c1:
         res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
         list_cat = [i["denumire_categorie"] for i in res_cat.data]
-        cat_admin = st.selectbox("Categoria de informatii:", [""] + list_cat, key="admin_cat")
+        cat_admin = st.selectbox("Categoria:", [""] + list_cat, key="admin_cat")
     with c2:
         list_tip = []
         if cat_admin == "Contracte & Proiecte":
             res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
             list_tip = [i["acronim_contracte_proiecte"] for i in res_tip.data]
-        tip_admin = st.selectbox("Tip de contract / proiect:", [""] + list_tip, key="admin_tip")
+        st.selectbox("Tip:", [""] + list_tip, key="admin_tip")
     with c3:
-        id_admin = st.text_input("ID proiect / Numar de contract:", key="admin_id")
+        id_admin = st.text_input("ID / Contract:", key="admin_id")
 
-    # --- TABELUL EDITABIL ȘI OPȚIUNILE DE VALIDARE ---
+    # --- LOGICA TABEL SI BUTOANE DREAPTA ---
     if cat_admin != "":
-        st.write("---")
         tabel_map = {"Contracte & Proiecte": "base_proiecte_internationale", "Evenimente stiintifice": "base_evenimente_stiintifice", "Proprietate intelectuala": "base_prop_intelect"}
         nume_tabela = tabel_map.get(cat_admin)
         
         if nume_tabela:
-            query = supabase.table(nume_tabela).select("*")
-            if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
-            if id_admin: query = query.eq("cod_identificare", id_admin)
-            
-            res = query.execute()
+            res = supabase.table(nume_tabela).select("*").execute()
             if res.data:
                 df = pd.DataFrame(res.data)
                 
-                # Aceasta este "magia": st.data_editor face tabelul interactiv
-                # Orice celulă pe care dai click devine activă pentru scris
-                edited_df = st.data_editor(
-                    df, 
-                    use_container_width=True, 
-                    hide_index=True,
-                    key="editor_tabel"
-                )
+                # CREĂM RÂNDUL PENTRU BUTOANE (ALINIATE LA DREAPTA)
+                st.write("") # Spatiu fin
+                col_tabel, b1, b2, b3 = st.columns([6, 1.2, 1.2, 1.2])
+                
+                with col_tabel:
+                    st.markdown(f"📊 **{nume_tabela}** ({len(df)} înregistrări)")
+                
+                # Initializam tabelul editabil
+                edited_df = st.data_editor(df, use_container_width=True, hide_index=True, key="editor_v3")
 
-                # Dacă s-a schimbat ceva în tabel, oferim opțiunile propuse de tine
-                # Verificăm dacă df inițial este diferit de edited_df
-                if not df.equals(edited_df):
-                    st.markdown('<div style="background-color: #1a4a7a; padding: 15px; border-radius: 10px; border: 2px solid #28a745;">', unsafe_allow_html=True)
-                    st.write("⚠️ **Detectate modificări în tabel. Alegeți acțiunea:**")
-                    
-                    col_v1, col_v2, col_v3 = st.columns([1, 1, 3])
-                    with col_v1:
+                # Detectăm dacă s-a modificat ceva
+                has_changes = not df.equals(edited_df)
+
+                # Plasăm butoanele în coloanele din dreapta (doar dacă sunt schimbări)
+                if has_changes:
+                    with b1:
                         if st.button("🔄 ACTUALIZARE", use_container_width=True):
-                            st.success("Datele au fost salvate!")
-                    with col_v2:
+                            st.success("Salvat")
+                    with b2:
                         if st.button("✅ VALIDARE", use_container_width=True):
-                            st.balloons()
-                            st.info("Înregistrarea a fost validată oficial.")
-                    with col_v3:
-                        if st.button("🗑️ ȘTERGERE RÂND", use_container_width=True):
-                            st.error("Rândul a fost marcat pentru ștergere.")
-                    st.markdown('</div>', unsafe_allow_html=True)
+                            st.toast("Validat cu succes!")
+                    with b3:
+                        if st.button("🗑️ ȘTERGERE", use_container_width=True):
+                            st.warning("Șters")
             else:
-                st.info("Nu s-au găsit date.")
+                st.info("Baza de date este goală pentru această selecție.")
 
 if __name__ == "__main__":
     run()
