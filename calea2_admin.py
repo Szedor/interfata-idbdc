@@ -50,4 +50,92 @@ def run():
             st.rerun()
 
     # --- FILTRARE (CELE 4 CASETE) ---
-    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True
+    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1.2])
+    
+    with c1:
+        cat_admin = st.selectbox("1. Categoria:", ["", "Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"], key="admin_cat")
+    with c2:
+        optiuni_tip = ["", "FDI", "PNCDI", "ORIZONT", "POC", "POCU", "POIM", "POCA", "PNDR"]
+        tip_admin = st.selectbox("2. Tip:", optiuni_tip, key="admin_tip")
+    with c3:
+        id_admin = st.text_input("3. ID Proiect (Cod Inregistrare):", key="admin_id")
+    with c4:
+        # LOGICA CASETA 4: Activă doar dacă id_admin este completat
+        blocat_com = True if not id_admin else False
+        componente_com = st.multiselect(
+            "Componente:", 
+            ["Date financiare", "Resurse umane", "Aspecte tehnice"], 
+            disabled=blocat_com, 
+            key="admin_com"
+        )
+
+    st.write("---")
+
+    # --- LOGICA CRUD ---
+    if cat_admin != "":
+        tabel_map = {
+            "Contracte & Proiecte": "base_proiecte_internationale", 
+            "Evenimente stiintifice": "base_evenimente_stiintifice", 
+            "Proprietate intelectuala": "base_prop_intelect"
+        }
+        nume_tabela = tabel_map.get(cat_admin)
+
+        if f'df_{nume_tabela}' not in st.session_state:
+            query = supabase.table(nume_tabela).select("*")
+            if id_admin: query = query.eq("cod_identificare", id_admin)
+            res = query.execute()
+            st.session_state[f'df_{nume_tabela}'] = pd.DataFrame(res.data)
+
+        df_curent = st.session_state[f'df_{nume_tabela}']
+
+        # BUTOANE CRUD (Poziționate deasupra)
+        col_n, col_s, col_v, col_d, col_a = st.columns([1, 1, 1, 1, 1])
+        with col_n:
+            if st.button("RÂND NOU"):
+                new_row = pd.DataFrame([{col: None for col in df_curent.columns}])
+                st.session_state[f'df_{nume_tabela}'] = pd.concat([new_row, df_curent], ignore_index=True)
+                st.rerun()
+
+        with col_s:
+            if st.button("SALVARE"):
+                st.success("Salvare solicitată...")
+        
+        with col_v:
+            if st.button("VALIDARE"): st.info("Validare în curs...")
+        
+        with col_d:
+            if st.button("ȘTERGERE"): st.error("Ștergere solicitată...")
+            
+        with col_a:
+            if st.button("ANULARE"):
+                if f'df_{nume_tabela}' in st.session_state: del st.session_state[f'df_{nume_tabela}']
+                st.rerun()
+
+        # Afișare tabel principal
+        st.markdown(f"**Tabel Principal: {cat_admin}**")
+        st.data_editor(st.session_state[f'df_{nume_tabela}'], use_container_width=True, hide_index=True, key=f"ed_{nume_tabela}")
+
+        # Afișare tabele COM selectate
+        if componente_com and id_admin:
+            st.write("---")
+            map_tabele_com = {
+                "Date financiare": "com_date_financiare",
+                "Resurse umane": "com_echipe_proiect",
+                "Aspecte tehnice": "com_aspecte_tehnice"
+            }
+            
+            for comp in componente_com:
+                nume_tabel_com = map_tabele_com[comp]
+                st.markdown(f"**Componenta: {comp} (ID: {id_admin})**")
+                res_com = supabase.table(nume_tabel_com).select("*").eq("cod_identificare", id_admin).execute()
+                df_com = pd.DataFrame(res_com.data)
+                
+                # Inițializare rând dacă este gol
+                if df_com.empty:
+                    df_com = pd.DataFrame([{"cod_identificare": id_admin}])
+                
+                st.data_editor(df_com, use_container_width=True, hide_index=True, key=f"ed_{nume_tabel_com}")
+
+if __name__ == "__main__":
+    run()
