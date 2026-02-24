@@ -15,19 +15,19 @@ def run():
         input { color: #000000 !important; background-color: #ffffff !important; }
         .eroare-idbdc-rosu { color: #ffffff !important; background-color: #ff0000 !important; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; border: 2px solid #8b0000; margin-top: 10px; }
         
-        /* SIMBOLURI CRUD MARI */
+        /* SIMBOLURI CRUD MARI ȘI EXPRESIVE */
         div.stButton > button { border: none !important; font-size: 35px !important; background-color: transparent !important; }
         div.stButton > button:hover { transform: scale(1.2); }
         .stDataEditor { background-color: white !important; border-radius: 5px; }
     </style>
-    """, unsafe_allow_html=True) [cite: 8-32]
+    """, unsafe_allow_html=True)
 
     # --- LOGICA DE ACCES (PĂSTRATĂ DIN SCRIPTUL TĂU BUN) ---
     if 'autorizat_p1' not in st.session_state: st.session_state.autorizat_p1 = False
     if 'operator_identificat' not in st.session_state: st.session_state.operator_identificat = None
 
     if not st.session_state.autorizat_p1:
-        st.markdown("<h2 style='text-align: center;'> Scut Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>  🛡️  Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
         with col_ce:
             parola_m = st.text_input("Parola master:", type="password", key="p1_pass")
@@ -35,10 +35,10 @@ def run():
                 if parola_m == "EverDream2SZ":
                     st.session_state.autorizat_p1 = True
                     st.rerun()
-        st.stop() [cite: 33-47]
+        st.stop()
 
     if not st.session_state.operator_identificat:
-        st.sidebar.markdown("### Identificare Operator")
+        st.sidebar.markdown("###  👤  Identificare Operator")
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
         if cod_in:
             try:
@@ -47,10 +47,15 @@ def run():
                     st.session_state.operator_identificat = res_op.data[0]['nume_prenume']
                     st.rerun()
             except: st.sidebar.error("Eroare DB")
-        st.stop() [cite: 48-71]
+        st.stop()
+    else:
+        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
+        if st.sidebar.button("Ieșire / Resetare"):
+            st.session_state.clear()
+            st.rerun()
 
-    # --- ZONA DE LUCRU (CONFORM SCRIPTULUI TAU BUN) ---
-    st.markdown(f"<h3 style='text-align: center;'> Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
+    # --- ZONA DE FILTRARE (PĂSTRATĂ DIN SCRIPTUL TĂU BUN) ---
+    st.markdown(f"<h3 style='text-align: center;'>  🛠️  Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
     st.write("---")
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -65,58 +70,54 @@ def run():
         tip_admin = st.selectbox("Tip de contract / proiect:", [""] + list_tip, key="admin_tip")
     with c3:
         id_admin = st.text_input("ID proiect / Numar de contract:", key="admin_id")
-    st.write("---") [cite: 72-94]
+    st.write("---")
 
-    # --- EXTENSIE CRUD: RAND NOU SUS ȘI SIMBOLURI ---
+    # --- LOGICA CRUD: RAND NOU LA ÎNCEPUT ---
     if cat_admin != "":
         tabel_map = {"Contracte & Proiecte": "base_proiecte_internationale", "Evenimente stiintifice": "base_evenimente_stiintifice", "Proprietate intelectuala": "base_prop_intelect"}
         nume_tabela = tabel_map.get(cat_admin)
 
-        # Încărcăm datele inițiale în session_state dacă nu există
-        if f'df_{nume_tabela}' not in st.session_state:
+        # Încărcare stabilă a datelor
+        if f'data_{nume_tabela}' not in st.session_state:
             query = supabase.table(nume_tabela).select("*")
             if tip_admin: query = query.eq("acronim_contracte_proiecte", tip_admin)
             if id_admin: query = query.eq("cod_identificare", id_admin)
             res = query.execute()
-            st.session_state[f'df_{nume_tabela}'] = pd.DataFrame(res.data)
+            st.session_state[f'data_{nume_tabela}'] = pd.DataFrame(res.data)
 
-        df_lucru = st.session_state[f'df_{nume_tabela}']
+        df_curent = st.session_state[f'data_{nume_tabela}']
 
-        # TOOLBAR
-        col_nou, col_spatiu, col_save, col_val, col_del = st.columns([1, 6, 1, 1, 1])
+        # Bara de instrumente cu simboluri
+        col_nou, col_sp, col_save, col_val, col_del = st.columns([1, 6, 1, 1, 1])
         
         with col_nou:
-            if st.button("\u2795", help="ADAUGĂ RÂND NOU SUS"):
+            if st.button("\u2795", help="ADAUGĂ RÂND NOU LA ÎNCEPUT"):
                 # Creăm un rând gol cu structura tabelului
-                new_row = pd.DataFrame([[None] * len(df_lucru.columns)], columns=df_lucru.columns)
-                # Îl punem la începutul tabelului (Index 0)
-                st.session_state[f'df_{nume_tabela}'] = pd.concat([new_row, df_lucru], ignore_index=True)
+                empty_row = pd.DataFrame([{col: None for col in df_curent.columns}])
+                # Îl punem primul în tabel (Index 0)
+                st.session_state[f'data_{nume_tabela}'] = pd.concat([empty_row, df_curent], ignore_index=True)
                 st.rerun()
 
-        # TABELUL EDITABIL
-        config_cols = {"cod_identificare": st.column_config.TextColumn("ID", disabled=False)}
-        
+        # Editorul de date - Acum rândul nou este primul!
         edited_df = st.data_editor(
-            st.session_state[f'df_{nume_tabela}'],
+            st.session_state[f'data_{nume_tabela}'],
             use_container_width=True,
             hide_index=True,
-            column_config=config_cols,
-            key="idbdc_editor_v6",
-            num_rows="dynamic" # Permite adăugarea manuală dacă e nevoie
+            key="editor_idbdc_v7"
         )
 
-        # Detectăm modificări pentru simbolurile din dreapta
-        if not st.session_state[f'df_{nume_tabela}'].equals(edited_df):
+        # Detectăm interacțiunea (dacă s-a modificat ceva)
+        if not st.session_state[f'data_{nume_tabela}'].equals(edited_df):
             with col_save:
                 if st.button("\U0001F4BE", help="ACTUALIZARE"):
-                    st.session_state[f'df_{nume_tabela}'] = edited_df
-                    st.success("Date pregătite pentru DB!")
+                    st.session_state[f'data_{nume_tabela}'] = edited_df
+                    st.success("Date pregătite!")
             with col_val:
                 if st.button("\U0001F6E1", help="VALIDARE"):
-                    st.info("Validat!")
+                    st.info("Protocol validat!")
             with col_del:
                 if st.button("\U0001F5D1", help="ȘTERGERE"):
-                    st.warning("Marcat!")
+                    st.error("Rând marcat!")
 
 if __name__ == "__main__":
     run()
