@@ -3,29 +3,33 @@ from supabase import create_client, Client
 import pandas as pd
 
 def run():
-    # --- CONEXIUNE ȘI STIL (CONFORM PROTOCOLULUI) ---
+    # --- CONEXIUNE ȘI STIL (CONFORM PROTOCOLULUI IDBDC) ---
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
     st.markdown("""
     <style>
-        .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
-        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: white !important; }
-        input { color: #000000 !important; background-color: #ffffff !important; }
-        .eroare-idbdc-rosu { color: #ffffff !important; background-color: #ff0000 !important; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; border: 2px solid #8b0000; margin-top: 10px; }
-        
+        .stApp, [data-testid="stSidebar"] { 
+            background-color: #003366 !important; 
+        }
+        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { 
+            color: white !important; 
+        }
+        input { 
+            color: #000000 !important; 
+            background-color: #ffffff !important; 
+        }
+        .eroare-idbdc-rosu { 
+            color: #ffffff !important; 
+            background-color: #ff0000 !important; 
+            padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; border: 2px solid #8b0000; margin-top: 10px; 
+        }
         /* Stil butoane text CRUD */
         div.stButton > button { 
             border: 1px solid white !important; 
             color: white !important; 
-            font-size: 14px !important; 
             background-color: rgba(255, 255, 255, 0.1) !important;
-            width: 100%;
-        }
-        div.stButton > button:hover { 
-            background-color: white !important; 
-            color: #003366 !important; 
         }
     </style>
     """, unsafe_allow_html=True)
@@ -47,7 +51,7 @@ def run():
                     st.markdown("<div class='eroare-idbdc-rosu'> ⚠️ Parolă incorectă.</div>", unsafe_allow_html=True)
         st.stop()
 
-    # --- PAS 2: IDENTIFICARE OPERATOR ---
+    # --- PAS 2: IDENTIFICARE OPERATOR (SIDEBAR) ---
     st.sidebar.markdown("### 👤 Identificare Operator")
     if not st.session_state.operator_identificat:
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
@@ -67,6 +71,25 @@ def run():
         if st.sidebar.button("Ieșire / Resetare"):
             st.session_state.clear()
             st.rerun()
+
+    # --- ZONA DE LUCRU ---
+    st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator_identificat}</h3>", unsafe_allow_html=True)
+    st.write("---")
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        try:
+            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+            list_cat = [i["denumire_categorie"] for i in res_cat.data]
+        except:
+            list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
+        cat_admin = st.selectbox("Categoria de informatii:", [""] + list_cat, key="admin_cat")
+    
+    with c2:
+        list_tip = []
+        if cat_admin == "Contracte & Proiecte":
+            try:
+                res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiect
 
     # --- ZONA DE LUCRU (CELE 3 CASETE) ---
     st.markdown(f"<h3 style='text-align: center;'> 🛠️ Administrare: {st.session_state.operator
