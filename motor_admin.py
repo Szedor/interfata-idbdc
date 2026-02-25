@@ -5,10 +5,9 @@ from datetime import datetime
 
 def porneste_motorul(supabase):
     # ----------------------------
-    # Helpers (simple + robuste)
+    # Helpers
     # ----------------------------
     def norm_text(x) -> str:
-        """Normalizeaza text: strip, spatii multiple -> 1 spatiu, case-insensitive."""
         if x is None:
             return ""
         s = str(x).strip()
@@ -16,7 +15,6 @@ def porneste_motorul(supabase):
         return s.casefold()
 
     def to_int_or_none(x):
-        """Conversie toleranta la int (pentru comparatii), altfel None."""
         if x is None:
             return None
         try:
@@ -36,7 +34,6 @@ def porneste_motorul(supabase):
 
     @st.cache_data(show_spinner=False, ttl=3600)
     def fetch_opt(table_name: str, col_name: str) -> list[str]:
-        """Lista distincta de valori pentru dropdown."""
         try:
             res = supabase.table(table_name).select(col_name).execute()
             vals = []
@@ -53,10 +50,7 @@ def porneste_motorul(supabase):
 
     @st.cache_data(show_spinner=False, ttl=3600)
     def fetch_map_norm(table_name: str, key_col: str, val_col: str) -> dict:
-        """
-        Mapare robusta: normalizeaza cheia.
-        Exemplu: natura_eveniment -> clasificare_eveniment
-        """
+        """Mapare robusta: normalizeaza cheia."""
         try:
             res = supabase.table(table_name).select(f"{key_col},{val_col}").execute()
             m = {}
@@ -72,10 +66,6 @@ def porneste_motorul(supabase):
             return {}
 
     def merge_with_existing(options: list[str], df: pd.DataFrame, col: str) -> list[str]:
-        """
-        Dropdown robust: include si valorile deja existente in tabel,
-        ca sa nu dispara daca nu sunt in nomenclator.
-        """
         if df is None or df.empty or col not in df.columns:
             return [""] + options
         existing = df[col].dropna().astype(str).map(lambda x: x.strip()).tolist()
@@ -83,7 +73,6 @@ def porneste_motorul(supabase):
         return list(dict.fromkeys([""] + options + sorted(list(set(existing)))))
 
     def get_table_columns(table_name: str) -> list[str]:
-        """Ia coloanele tabelului chiar daca nu are randuri (folosind functia SQL deja creata)."""
         try:
             res = supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
             return [r["column_name"] for r in (res.data or []) if r.get("column_name")]
@@ -91,7 +80,6 @@ def porneste_motorul(supabase):
             return []
 
     def empty_row_from_columns(columns: list[str]) -> dict:
-        """Rand gol (cu booleene implicit False daca exista)."""
         row = {c: None for c in columns}
         if "status_confirmare" in row:
             row["status_confirmare"] = False
@@ -100,7 +88,7 @@ def porneste_motorul(supabase):
         return row
 
     # ----------------------------
-    # Dropdown options (nomenclatoare)
+    # Dropdown options
     # ----------------------------
     opt_categorii = fetch_opt("nom_categorie", "denumire_categorie")
     opt_status_proiect = fetch_opt("nom_status_proiect", "status_contract_proiect")
@@ -113,7 +101,7 @@ def porneste_motorul(supabase):
     opt_domenii_fdi = fetch_opt("nom_domenii_fdi", "cod_domeniu_fdi")
 
     # ----------------------------
-    # Mapari pentru auto-completare
+    # Mapari auto-completare (din nomenclatoare)
     # ----------------------------
     map_natura_to_clasificare = fetch_map_norm(
         "nom_evenimente_stiintifice",
@@ -136,7 +124,7 @@ def porneste_motorul(supabase):
     )
 
     # ----------------------------
-    # CASETE 1-4 (denumiri finale)
+    # Casete 1-4 (denumiri finale)
     # ----------------------------
     c1, c2, c3, c4 = st.columns([1, 1.25, 1.25, 1.25])
 
@@ -165,10 +153,7 @@ def porneste_motorul(supabase):
             )
 
     with c3:
-        id_admin = st.text_input(
-            "3. ID Proiect / Numar contract:",
-            key="admin_id"
-        )
+        id_admin = st.text_input("3. ID Proiect / Numar contract:", key="admin_id")
 
     with c4:
         componente_com = st.multiselect(
@@ -203,14 +188,13 @@ def porneste_motorul(supabase):
         nume_tabela = None
 
     # ----------------------------
-    # CRUD (Rand nou sus)
+    # CRUD
     # ----------------------------
     col_n, col_s, col_v, col_d, col_a = st.columns(5)
 
     with col_n:
         if st.button("➕ RAND NOU"):
             st.session_state["adauga_rand_sus"] = True
-            st.rerun()
 
     with col_s:
         btn_salvare = st.button("💾 SALVARE")
@@ -219,13 +203,14 @@ def porneste_motorul(supabase):
         btn_validare = st.button("✅ VALIDARE")
 
     with col_d:
-        st.button("🗑️ ȘTERGERE")  # se sterge din tabelul editat + SALVARE
+        st.button("🗑️ ȘTERGERE")
 
     with col_a:
         if st.button("❌ ANULARE"):
             st.rerun()
 
     st.write("")
+    st.caption("Notă: completările automate se aplică la apăsarea butonului SALVARE.")
 
     if not nume_tabela:
         st.info("Alege Categoria si Tipul de Contracte sau Proiecte pentru incarcare tabel.")
@@ -243,13 +228,13 @@ def porneste_motorul(supabase):
         cols = get_table_columns(nume_tabela)
         df_main = pd.DataFrame(columns=cols)
 
-    # Session-state DF (ca auto-completarea sa fie vizibila imediat)
+    # Session-state DF (pentru rand nou sus)
     df_key = f"df_{nume_tabela}"
     if st.session_state.get("current_table") != nume_tabela or df_key not in st.session_state:
         st.session_state["current_table"] = nume_tabela
         st.session_state[df_key] = df_main.copy()
 
-    # Rand nou SUS (nu mai derulezi pana la final)
+    # Rand nou SUS
     if st.session_state.get("adauga_rand_sus"):
         cols = list(st.session_state[df_key].columns)
         if cols:
@@ -266,7 +251,6 @@ def porneste_motorul(supabase):
     # ----------------------------
     column_config = {}
 
-    # 1) Contracte / Proiecte
     if nume_tabela in [
         "base_contracte_cep", "base_contracte_terti",
         "base_proiecte_fdi", "base_proiecte_internationale",
@@ -284,7 +268,6 @@ def porneste_motorul(supabase):
                 options=merge_with_existing(opt_status_proiect, df_work, "status_contract_proiect")
             )
 
-    # 2) Evenimente stiintifice
     if nume_tabela == "base_evenimente_stiintifice":
         if "denumire_categorie" in df_work.columns:
             column_config["denumire_categorie"] = st.column_config.SelectboxColumn(
@@ -302,7 +285,6 @@ def porneste_motorul(supabase):
                 options=merge_with_existing(opt_format_eveniment, df_work, "format_eveniment")
             )
 
-    # 3) Proprietate intelectuala
     if nume_tabela == "base_prop_intelect":
         if "denumire_categorie" in df_work.columns:
             column_config["denumire_categorie"] = st.column_config.SelectboxColumn(
@@ -315,7 +297,6 @@ def porneste_motorul(supabase):
                 options=merge_with_existing(opt_acronim_pi, df_work, "acronim_prop_intelect")
             )
 
-    # 4) FDI
     if nume_tabela == "base_proiecte_fdi":
         if "cod_domeniu_fdi" in df_work.columns:
             column_config["cod_domeniu_fdi"] = st.column_config.SelectboxColumn(
@@ -337,92 +318,54 @@ def porneste_motorul(supabase):
         column_config=column_config if column_config else None,
     )
 
-    # ----------------------------
-    # Auto-completare REACTIVA (cu suprascriere a default-ului 1)
-    # ----------------------------
-    changed = False
-    df_auto = ed_df.copy()
-
-    # A) Evenimente: natura_eveniment -> clasificare_eveniment
-    if nume_tabela == "base_evenimente_stiintifice":
-        if "natura_eveniment" in df_auto.columns and "clasificare_eveniment" in df_auto.columns:
-            for i in range(len(df_auto)):
-                nat = df_auto.at[i, "natura_eveniment"]
-                nk = norm_text(nat)
-                if nk == "":
-                    continue
-
-                val = map_natura_to_clasificare.get(nk)
-                if val is None:
-                    continue
-
-                cur = df_auto.at[i, "clasificare_eveniment"]
-
-                # daca sunt numerice, comparam numeric
-                cur_i = to_int_or_none(cur)
-                val_i = to_int_or_none(val)
-
-                if val_i is not None:
-                    # IMPORTANT: suprascriem si daca era 1 default
-                    if cur_i != val_i:
-                        df_auto.at[i, "clasificare_eveniment"] = val_i
-                        changed = True
-                else:
-                    # fallback text
-                    if norm_text(cur) != norm_text(val):
-                        df_auto.at[i, "clasificare_eveniment"] = val
-                        changed = True
-
-    # B) PI: acronim_prop_intelect -> perioada_valabilitate (in base)
-    if nume_tabela == "base_prop_intelect":
-        if "acronim_prop_intelect" in df_auto.columns and "perioada_valabilitate" in df_auto.columns:
-            for i in range(len(df_auto)):
-                ac = df_auto.at[i, "acronim_prop_intelect"]
-                nk = norm_text(ac)
-                if nk == "":
-                    continue
-
-                val = map_pi_to_perioada_ani.get(nk)
-                if val is None:
-                    continue
-
-                cur = df_auto.at[i, "perioada_valabilitate"]
-
-                cur_i = to_int_or_none(cur)
-                val_i = to_int_or_none(val)
-
-                if val_i is not None:
-                    if cur_i != val_i:
-                        df_auto.at[i, "perioada_valabilitate"] = val_i
-                        changed = True
-                else:
-                    if norm_text(cur) != norm_text(val):
-                        df_auto.at[i, "perioada_valabilitate"] = val
-                        changed = True
-
-    # Persistam DF in session_state si rerun daca am auto-completari noi
-    if changed:
-        st.session_state[df_key] = df_auto
-        st.rerun()
-    else:
-        st.session_state[df_key] = df_auto
+    # pastram mereu ce a editat operatorul
+    st.session_state[df_key] = ed_df.copy()
 
     # ----------------------------
-    # SALVARE
+    # SALVARE (aici aplicam auto-completarea)
     # ----------------------------
     if btn_salvare:
+        df_to_save = st.session_state[df_key].copy()
+
+        # A) Evenimente: natura_eveniment -> clasificare_eveniment
+        if nume_tabela == "base_evenimente_stiintifice":
+            if "natura_eveniment" in df_to_save.columns and "clasificare_eveniment" in df_to_save.columns:
+                for i in range(len(df_to_save)):
+                    nat = df_to_save.at[i, "natura_eveniment"]
+                    nk = norm_text(nat)
+                    if nk == "":
+                        continue
+                    val = map_natura_to_clasificare.get(nk)
+                    if val is None:
+                        continue
+                    # suprascriem cu valoarea corecta
+                    val_i = to_int_or_none(val)
+                    df_to_save.at[i, "clasificare_eveniment"] = val_i if val_i is not None else val
+
+        # B) PI: acronim_prop_intelect -> perioada_valabilitate
+        if nume_tabela == "base_prop_intelect":
+            if "acronim_prop_intelect" in df_to_save.columns and "perioada_valabilitate" in df_to_save.columns:
+                for i in range(len(df_to_save)):
+                    ac = df_to_save.at[i, "acronim_prop_intelect"]
+                    nk = norm_text(ac)
+                    if nk == "":
+                        continue
+                    val = map_pi_to_perioada_ani.get(nk)
+                    if val is None:
+                        continue
+                    val_i = to_int_or_none(val)
+                    df_to_save.at[i, "perioada_valabilitate"] = val_i if val_i is not None else val
+
         saved = 0
-        for _, r in st.session_state[df_key].iterrows():
+        for _, r in df_to_save.iterrows():
             v = r.to_dict()
 
-            # Nu salvam rand fara cheie
             if "cod_identificare" not in v or v["cod_identificare"] is None or str(v["cod_identificare"]).strip() == "":
                 continue
 
             v["data_ultimei_modificari"] = now_iso()
             v["observatii_idbdc"] = f"Editat de {st.session_state.operator_identificat}"
 
-            # booleene implicite
             if "status_confirmare" in v and v["status_confirmare"] is None:
                 v["status_confirmare"] = False
             if "validat_idbdc" in v and v["validat_idbdc"] is None:
@@ -435,7 +378,7 @@ def porneste_motorul(supabase):
         st.rerun()
 
     # ----------------------------
-    # VALIDARE (marcheaza validate ce este filtrat/afisat)
+    # VALIDARE
     # ----------------------------
     if btn_validare:
         q = supabase.table(nume_tabela).update({
