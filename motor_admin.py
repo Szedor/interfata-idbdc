@@ -20,6 +20,25 @@ def porneste_motorul(supabase):
         except Exception:
             return []
 
+    @st.cache_data(show_spinner=False, ttl=3600)
+    def fetch_map(table_name: str, key_col: str, val_col: str) -> dict:
+        """
+        Intoarce un dictionar: key_col -> val_col
+        Ex: natura_eveniment -> clasificare_eveniment
+        """
+        try:
+            res = supabase.table(table_name).select(f"{key_col},{val_col}").execute()
+            m = {}
+            for r in (res.data or []):
+                k = r.get(key_col)
+                v = r.get(val_col)
+                if k is None or str(k).strip() == "":
+                    continue
+                m[str(k).strip()] = v
+            return m
+        except Exception:
+            return {}
+
     def merge_with_existing(options: list[str], df: pd.DataFrame, col: str) -> list[str]:
         if df is None or df.empty or col not in df.columns:
             return [""] + options
@@ -48,7 +67,6 @@ def porneste_motorul(supabase):
 
     # -------- options
     opt_categorii = fetch_opt("nom_categorie", "denumire_categorie")
-    opt_acronime_cp = fetch_opt("nom_contracte_proiecte", "acronim_contracte_proiecte")
     opt_status_proiect = fetch_opt("nom_status_proiect", "status_contract_proiect")
 
     opt_natura_eveniment = fetch_opt("nom_evenimente_stiintifice", "natura_eveniment")
@@ -56,10 +74,20 @@ def porneste_motorul(supabase):
 
     opt_acronim_pi = fetch_opt("nom_prop_intelect", "acronim_prop_intelect")
 
-    opt_status_personal = fetch_opt("nom_status_personal", "status_personal")
-    opt_nume_prenume = fetch_opt("det_resurse_umane", "nume_prenume")
-
     opt_domenii_fdi = fetch_opt("nom_domenii_fdi", "cod_domeniu_fdi")
+
+    # -------- mape (automatizari)
+    map_natura_to_clasificare = fetch_map(
+        "nom_evenimente_stiintifice",
+        "natura_eveniment",
+        "clasificare_eveniment"
+    )
+
+    map_pi_to_perioada = fetch_map(
+        "nom_prop_intelect",
+        "acronim_prop_intelect",
+        "perioada_valabilitate_ani"
+    )
 
     # -------- header
     st.markdown(
@@ -67,8 +95,8 @@ def porneste_motorul(supabase):
         unsafe_allow_html=True
     )
 
-    # -------- casete 1-4
-    c1, c2, c3, c4 = st.columns([1, 1, 1, 1.2])
+    # -------- casete 1-4 (cu denumiri cerute de tine)
+    c1, c2, c3, c4 = st.columns([1, 1.2, 1.2, 1.2])
 
     with c1:
         cat_admin = st.selectbox(
@@ -79,22 +107,30 @@ def porneste_motorul(supabase):
 
     with c2:
         if cat_admin == "Contracte & Proiecte":
-            # IMPORTANT: Tipurile trebuie sa includa si CEP / TERTI
             tip_admin = st.selectbox(
-                "2. Tip (Acronim):",
+                "2. Tipul de Contracte sau Proiecte:",
                 ["", "CEP", "TERTI", "FDI", "PNRR", "INTERNATIONALE", "INTERREG", "NONEU", "PNCDI"],
                 key="admin_tip"
             )
         else:
             tip_admin = ""
-            st.selectbox("2. Tip (Acronim):", ["(nu se aplica aici)"], index=0, key="admin_tip_disabled", disabled=True)
+            st.selectbox(
+                "2. Tipul de Contracte sau Proiecte:",
+                ["(nu se aplica aici)"],
+                index=0,
+                key="admin_tip_disabled",
+                disabled=True
+            )
 
     with c3:
-        id_admin = st.text_input("3. ID Proiect (Cod Identificare):", key="admin_id")
+        id_admin = st.text_input(
+            "3. ID Proiect / Numar contract:",
+            key="admin_id"
+        )
 
     with c4:
         componente_com = st.multiselect(
-            "4. Componente (COM):",
+            "4. Componente:",
             ["Date financiare", "Resurse umane", "Aspecte tehnice"],
             key="admin_com"
         )
@@ -146,7 +182,7 @@ def porneste_motorul(supabase):
     st.write("")
 
     if not nume_tabela:
-        st.info("Alege Categoria (si Tip daca e Contracte & Proiecte) ca sa incarcam tabelul.")
+        st.info("Alege Categoria si Tipul de Contracte sau Proiecte pentru incarcare tabel.")
         return
 
     # -------- citire tabela
@@ -170,7 +206,7 @@ def porneste_motorul(supabase):
     # -------- dropdown config
     column_config = {}
 
-    # 1) Contracte/Proiecte (inclusiv CEP/TERTI)
+    # contracte/proiecte
     if nume_tabela in [
         "base_contracte_cep", "base_contracte_terti",
         "base_proiecte_fdi", "base_proiecte_internationale",
@@ -181,16 +217,12 @@ def porneste_motorul(supabase):
             column_config["denumire_categorie"] = st.column_config.SelectboxColumn(
                 "denumire_categorie", options=merge_with_existing(opt_categorii, df_main, "denumire_categorie")
             )
-        if "acronim_contracte_proiecte" in df_main.columns:
-            column_config["acronim_contracte_proiecte"] = st.column_config.SelectboxColumn(
-                "acronim_contracte_proiecte", options=merge_with_existing(opt_acronime_cp, df_main, "acronim_contracte_proiecte")
-            )
         if "status_contract_proiect" in df_main.columns:
             column_config["status_contract_proiect"] = st.column_config.SelectboxColumn(
                 "status_contract_proiect", options=merge_with_existing(opt_status_proiect, df_main, "status_contract_proiect")
             )
 
-    # 2) Evenimente: PLUS denumire_categorie
+    # evenimente + auto-completare
     if nume_tabela == "base_evenimente_stiintifice":
         if "denumire_categorie" in df_main.columns:
             column_config["denumire_categorie"] = st.column_config.SelectboxColumn(
@@ -205,7 +237,7 @@ def porneste_motorul(supabase):
                 "format_eveniment", options=merge_with_existing(opt_format_eveniment, df_main, "format_eveniment")
             )
 
-    # 3) PI: PLUS denumire_categorie
+    # PI + auto-completare
     if nume_tabela == "base_prop_intelect":
         if "denumire_categorie" in df_main.columns:
             column_config["denumire_categorie"] = st.column_config.SelectboxColumn(
@@ -216,7 +248,7 @@ def porneste_motorul(supabase):
                 "acronim_prop_intelect", options=merge_with_existing(opt_acronim_pi, df_main, "acronim_prop_intelect")
             )
 
-    # 4) FDI: domeniu
+    # FDI
     if nume_tabela == "base_proiecte_fdi":
         if "cod_domeniu_fdi" in df_main.columns:
             column_config["cod_domeniu_fdi"] = st.column_config.SelectboxColumn(
@@ -234,6 +266,33 @@ def porneste_motorul(supabase):
         key=f"ed_{nume_tabela}",
         column_config=column_config if column_config else None,
     )
+
+    # -------- AUTO-COMPLETARE (inainte de SALVARE)
+    # Evenimente: natura_eveniment -> clasificare_eveniment
+    if nume_tabela == "base_evenimente_stiintifice":
+        if "natura_eveniment" in ed_df.columns and "clasificare_eveniment" in ed_df.columns:
+            # completam pentru fiecare rand unde natura e aleasa
+            for i in range(len(ed_df)):
+                nat = ed_df.at[i, "natura_eveniment"]
+                if pd.isna(nat) or str(nat).strip() == "":
+                    continue
+                nat_key = str(nat).strip()
+                clas = map_natura_to_clasificare.get(nat_key)
+                # completam doar daca e gol (nu suprascriem ce a scris operatorul)
+                if (pd.isna(ed_df.at[i, "clasificare_eveniment"]) or str(ed_df.at[i, "clasificare_eveniment"]).strip() == "") and (clas is not None):
+                    ed_df.at[i, "clasificare_eveniment"] = clas
+
+    # PI: acronim_prop_intelect -> perioada_valabilitate_ani
+    if nume_tabela == "base_prop_intelect":
+        if "acronim_prop_intelect" in ed_df.columns and "perioada_valabilitate_ani" in ed_df.columns:
+            for i in range(len(ed_df)):
+                ac = ed_df.at[i, "acronim_prop_intelect"]
+                if pd.isna(ac) or str(ac).strip() == "":
+                    continue
+                ac_key = str(ac).strip()
+                per = map_pi_to_perioada.get(ac_key)
+                if (pd.isna(ed_df.at[i, "perioada_valabilitate_ani"]) or str(ed_df.at[i, "perioada_valabilitate_ani"]).strip() == "") and (per is not None):
+                    ed_df.at[i, "perioada_valabilitate_ani"] = per
 
     # -------- salvare
     if btn_salvare:
