@@ -1,17 +1,22 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-# DEFINIRE STRUCTURA TABELE (fallback pentru tabele goale)
-STRUCTURA_TABELE = {
-    ...
-}
+
 
 def porneste_motorul(supabase):
+    """
+    Motor Admin (Calea 2)
+    - Afiseaza tabelele base_/com_ chiar daca sunt goale (are cap de tabel / coloane)
+    - Butonul ➕ RAND NOU functioneaza si pe tabele goale (adauga rand sus)
+    - Dropdown-uri pentru campurile cheie (din tabele nom_/det_) unde exista acele coloane
+    """
+
     # ----------------------------
-    # Helpers: optiuni dropdown
+    # Helpers
     # ----------------------------
     @st.cache_data(show_spinner=False, ttl=3600)
     def fetch_opt(table_name: str, col_name: str) -> list[str]:
+        """Ia optiuni distincte dintr-un tabel (nom_... / det_...)."""
         try:
             res = supabase.table(table_name).select(col_name).execute()
             vals = []
@@ -27,6 +32,7 @@ def porneste_motorul(supabase):
             return []
 
     def merge_with_existing(options: list[str], df: pd.DataFrame, col: str) -> list[str]:
+        """Dropdown robust: include si valorile deja existente in tabela (ca sa nu dispara dropdown)."""
         if df is None or df.empty or col not in df.columns:
             return [""] + options
         existing = df[col].dropna().astype(str).map(lambda x: x.strip()).tolist()
@@ -39,7 +45,8 @@ def porneste_motorul(supabase):
 
     def get_table_columns(table_name: str) -> list[str]:
         """
-        Ia coloanele tabelului chiar daca e gol, folosind functia SQL idbdc_get_columns().
+        Ia lista de coloane chiar daca tabela e goala, folosind functia SQL:
+        public.idbdc_get_columns(p_table text)
         """
         try:
             res = supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
@@ -50,7 +57,7 @@ def porneste_motorul(supabase):
 
     def empty_row_from_columns(columns: list[str]) -> dict:
         row = {c: None for c in columns}
-        # Draft implicit pe booleene, daca exista
+        # Draft implicit pentru campurile boolean, daca exista
         if "status_confirmare" in row:
             row["status_confirmare"] = False
         if "validat_idbdc" in row:
@@ -58,7 +65,7 @@ def porneste_motorul(supabase):
         return row
 
     # ----------------------------
-    # OPTIUNI NOMENCLATOARE (din lista ta)
+    # Optiuni dropdown (din tabelele de nomenclatoare)
     # ----------------------------
     opt_categorii = fetch_opt("nom_categorie", "denumire_categorie")
     opt_acronime_cp = fetch_opt("nom_contracte_proiecte", "acronim_contracte_proiecte")
@@ -83,7 +90,7 @@ def porneste_motorul(supabase):
     )
 
     # ----------------------------
-    # CASETELE 1-4 (cascada)
+    # CASETE 1-4 (logica ta in cascada)
     # ----------------------------
     c1, c2, c3, c4 = st.columns([1, 1, 1, 1.2])
 
@@ -114,7 +121,7 @@ def porneste_motorul(supabase):
     st.markdown("---")
 
     # ----------------------------
-    # MAPARE base_ in functie de categorie+tip
+    # Mapare tabele base_
     # ----------------------------
     map_baze_contracte_proiecte = {
         "FDI": "base_proiecte_fdi",
@@ -151,7 +158,7 @@ def porneste_motorul(supabase):
         btn_validare = st.button("✅ VALIDARE")
 
     with col_d:
-        st.button("🗑️ ȘTERGERE")
+        st.button("🗑️ ȘTERGERE")  # se sterge din tabel + SALVARE
 
     with col_a:
         if st.button("❌ ANULARE"):
@@ -164,7 +171,7 @@ def porneste_motorul(supabase):
         return
 
     # ----------------------------
-    # CITIRE TABEL PRINCIPAL
+    # Citire tabela principala
     # ----------------------------
     res_main = supabase.table(nume_tabela).select("*")
     if id_admin:
@@ -173,12 +180,12 @@ def porneste_motorul(supabase):
     data = res_main.execute().data or []
     df_main = pd.DataFrame(data)
 
-    # DACA E GOL -> construim DF cu COLOANE (cap de tabel)
+    # DACA tabela e goala -> construim DF cu coloane
     if df_main.empty:
         cols = get_table_columns(nume_tabela)
         df_main = pd.DataFrame(columns=cols)
 
-    # Rand nou SUS (functioneaza si daca era gol)
+    # Rand nou SUS (functioneaza si pe tabele goale)
     if st.session_state.get("adauga_rand_sus"):
         cols = list(df_main.columns)
         if cols:
@@ -186,11 +193,11 @@ def porneste_motorul(supabase):
         st.session_state["adauga_rand_sus"] = False
 
     # ----------------------------
-    # CONFIG DROPDOWN - in functie de tabela
+    # Dropdown-uri (se activeaza doar daca acea coloana exista in tabela)
     # ----------------------------
     column_config = {}
 
-    # comune pentru base_ contracte/proiecte
+    # Contracte/Proiecte (comune)
     if nume_tabela in [
         "base_contracte_cep", "base_contracte_terti",
         "base_proiecte_fdi", "base_proiecte_internationale",
@@ -199,51 +206,44 @@ def porneste_motorul(supabase):
     ]:
         if "denumire_categorie" in df_main.columns:
             column_config["denumire_categorie"] = st.column_config.SelectboxColumn(
-                "denumire_categorie",
-                options=merge_with_existing(opt_categorii, df_main, "denumire_categorie"),
+                "denumire_categorie", options=merge_with_existing(opt_categorii, df_main, "denumire_categorie")
             )
         if "acronim_contracte_proiecte" in df_main.columns:
             column_config["acronim_contracte_proiecte"] = st.column_config.SelectboxColumn(
-                "acronim_contracte_proiecte",
-                options=merge_with_existing(opt_acronime_cp, df_main, "acronim_contracte_proiecte"),
+                "acronim_contracte_proiecte", options=merge_with_existing(opt_acronime_cp, df_main, "acronim_contracte_proiecte")
             )
         if "status_contract_proiect" in df_main.columns:
             column_config["status_contract_proiect"] = st.column_config.SelectboxColumn(
-                "status_contract_proiect",
-                options=merge_with_existing(opt_status_proiect, df_main, "status_contract_proiect"),
+                "status_contract_proiect", options=merge_with_existing(opt_status_proiect, df_main, "status_contract_proiect")
             )
 
-    # evenimente
+    # Evenimente
     if nume_tabela == "base_evenimente_stiintifice":
         if "natura_eveniment" in df_main.columns:
             column_config["natura_eveniment"] = st.column_config.SelectboxColumn(
-                "natura_eveniment",
-                options=merge_with_existing(opt_natura_eveniment, df_main, "natura_eveniment"),
+                "natura_eveniment", options=merge_with_existing(opt_natura_eveniment, df_main, "natura_eveniment")
             )
         if "format_eveniment" in df_main.columns:
             column_config["format_eveniment"] = st.column_config.SelectboxColumn(
-                "format_eveniment",
-                options=merge_with_existing(opt_format_eveniment, df_main, "format_eveniment"),
+                "format_eveniment", options=merge_with_existing(opt_format_eveniment, df_main, "format_eveniment")
             )
 
-    # proprietate intelectuala
+    # Proprietate intelectuala
     if nume_tabela == "base_prop_intelect":
         if "acronim_prop_intelect" in df_main.columns:
             column_config["acronim_prop_intelect"] = st.column_config.SelectboxColumn(
-                "acronim_prop_intelect",
-                options=merge_with_existing(opt_acronim_pi, df_main, "acronim_prop_intelect"),
+                "acronim_prop_intelect", options=merge_with_existing(opt_acronim_pi, df_main, "acronim_prop_intelect")
             )
 
-    # FDI
+    # FDI (domeniu)
     if nume_tabela == "base_proiecte_fdi":
         if "cod_domeniu_fdi" in df_main.columns:
             column_config["cod_domeniu_fdi"] = st.column_config.SelectboxColumn(
-                "cod_domeniu_fdi",
-                options=merge_with_existing(opt_domenii_fdi, df_main, "cod_domeniu_fdi"),
+                "cod_domeniu_fdi", options=merge_with_existing(opt_domenii_fdi, df_main, "cod_domeniu_fdi")
             )
 
     # ----------------------------
-    # AFISARE/EDITARE TABEL PRINCIPAL
+    # Afisare / editare tabela principala
     # ----------------------------
     st.markdown(f"**📂 Tabel Principal: {nume_tabela}**")
 
@@ -260,14 +260,22 @@ def porneste_motorul(supabase):
     # SALVARE
     # ----------------------------
     if btn_salvare:
-        # nu salvam randuri fara cod_identificare (cheia)
         saved = 0
         for _, r in ed_df.iterrows():
             v = r.to_dict()
+            # nu salvam rand fara cod_identificare
             if "cod_identificare" not in v or v["cod_identificare"] is None or str(v["cod_identificare"]).strip() == "":
                 continue
+
             v["data_ultimei_modificari"] = now_iso()
             v["observatii_idbdc"] = f"Editat de {st.session_state.operator_identificat}"
+
+            # draft implicit booleene
+            if "status_confirmare" in v and v["status_confirmare"] is None:
+                v["status_confirmare"] = False
+            if "validat_idbdc" in v and v["validat_idbdc"] is None:
+                v["validat_idbdc"] = False
+
             supabase.table(nume_tabela).upsert(v).execute()
             saved += 1
 
@@ -275,7 +283,7 @@ def porneste_motorul(supabase):
         st.rerun()
 
     # ----------------------------
-    # VALIDARE (marcheaza validate)
+    # VALIDARE
     # ----------------------------
     if btn_validare:
         q = supabase.table(nume_tabela).update({
@@ -291,8 +299,8 @@ def porneste_motorul(supabase):
         st.rerun()
 
     # ----------------------------
-    # COMPONENTE COM (afisare cu cap de tabel chiar daca sunt goale)
-    # (aici doar afisam + dropdown la echipa; salvarea COM o facem imediat dupa ce confirmi ca vezi capetele)
+    # COMPONENTE COM: doar afisare cu coloane chiar daca sunt goale
+    # (Salvarea COM o activam imediat dupa ce confirmi ca vezi capetele)
     # ----------------------------
     if componente_com:
         map_tabele_com = {
@@ -310,9 +318,7 @@ def porneste_motorul(supabase):
             if id_admin:
                 res_com = res_com.eq("cod_identificare", id_admin)
 
-            data_com = res_com.execute().data or []
-            df_com = pd.DataFrame(data_com)
-
+            df_com = pd.DataFrame(res_com.execute().data or [])
             if df_com.empty:
                 cols = get_table_columns(tcom)
                 df_com = pd.DataFrame(columns=cols)
@@ -321,13 +327,11 @@ def porneste_motorul(supabase):
             if tcom == "com_echipe_proiect":
                 if "nume_prenume" in df_com.columns:
                     cfg_com["nume_prenume"] = st.column_config.SelectboxColumn(
-                        "nume_prenume",
-                        options=merge_with_existing(opt_nume_prenume, df_com, "nume_prenume"),
+                        "nume_prenume", options=merge_with_existing(opt_nume_prenume, df_com, "nume_prenume")
                     )
                 if "status_personal" in df_com.columns:
                     cfg_com["status_personal"] = st.column_config.SelectboxColumn(
-                        "status_personal",
-                        options=merge_with_existing(opt_status_personal, df_com, "status_personal"),
+                        "status_personal", options=merge_with_existing(opt_status_personal, df_com, "status_personal")
                     )
 
             st.data_editor(
