@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-
+# DEFINIRE STRUCTURA TABELE (fallback pentru tabele goale)
+STRUCTURA_TABELE = {
+    ...
+}
 
 def porneste_motorul(supabase):
     # ----------------------------
