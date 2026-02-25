@@ -206,20 +206,20 @@ def porneste_motorul(supabase):
         if st.button("❌ ANULARE"):
             st.rerun()
 
-    st.caption("Notă: completările ES/PI se aplică la SALVARE. Validarea se face pe rândurile afișate.")
+    st.caption("Notă: completările ES/PI se aplică la SALVARE. (v12: dropdown stabil din prima selecție)")
 
     if not nume_tabela:
         st.info("Alege Categoria si Tipul de Contracte sau Proiecte pentru incarcare tabel.")
         return
 
     # ----------------------------
-    # Coloane reale (pentru safe-write)
+    # Coloane reale (safe-write)
     # ----------------------------
     cols_real = get_table_columns(nume_tabela)
     cols_set = set(cols_real)
 
     # ----------------------------
-    # Incarcare DF
+    # Incarcare DF (doar la schimbare de tabel / prima intrare)
     # ----------------------------
     res_main = supabase.table(nume_tabela).select("*")
     if id_admin:
@@ -234,6 +234,7 @@ def porneste_motorul(supabase):
         st.session_state["current_table"] = nume_tabela
         st.session_state[df_key] = df_main.copy()
 
+    # Rand nou SUS (modificam doar session_state aici)
     if st.session_state.get("adauga_rand_sus"):
         if cols_real:
             st.session_state[df_key] = pd.concat(
@@ -303,7 +304,7 @@ def porneste_motorul(supabase):
             )
 
     # ----------------------------
-    # Editor
+    # Editor (SINGURA sursa de adevar in timpul editarii)
     # ----------------------------
     st.markdown(f"**📂 Tabel Principal: {nume_tabela}**")
 
@@ -316,15 +317,12 @@ def porneste_motorul(supabase):
         column_config=column_config if column_config else None,
     )
 
-    st.session_state[df_key] = ed_df.copy()
-
     # ----------------------------
-    # Functie: aplicam completarile ES/PI pe DF (inainte de salvare/validare)
+    # Completari ES/PI (aplicate doar la butoane)
     # ----------------------------
     def aplica_completari(df_in: pd.DataFrame) -> pd.DataFrame:
         df_out = df_in.copy()
 
-        # ES: natura -> clasificare
         if nume_tabela == "base_evenimente_stiintifice":
             if "natura_eveniment" in df_out.columns and "clasificare_eveniment" in df_out.columns:
                 for i in range(len(df_out)):
@@ -338,7 +336,6 @@ def porneste_motorul(supabase):
                     val_i = to_int_or_none(val)
                     df_out.at[i, "clasificare_eveniment"] = val_i if val_i is not None else val
 
-        # PI: acronim -> perioada_valabilitate
         if nume_tabela == "base_prop_intelect":
             if "acronim_prop_intelect" in df_out.columns and "perioada_valabilitate" in df_out.columns:
                 for i in range(len(df_out)):
@@ -354,23 +351,20 @@ def porneste_motorul(supabase):
 
         return df_out
 
-    # ----------------------------
     # SALVARE
-    # ----------------------------
     if btn_salvare:
-        df_to_save = aplica_completari(st.session_state[df_key])
+        df_to_save = aplica_completari(ed_df)
 
-        # ca sa se si VADA dupa salvare
+        # ca sa ramana in grila dupa rerun
         st.session_state[df_key] = df_to_save.copy()
 
         saved = 0
         for _, r in df_to_save.iterrows():
             v = r.to_dict()
-
-            if "cod_identificare" not in v or v["cod_identificare"] is None or str(v["cod_identificare"]).strip() == "":
+            cod = v.get("cod_identificare")
+            if cod is None or str(cod).strip() == "":
                 continue
 
-            # audit doar daca exista
             if "data_ultimei_modificari" in cols_set:
                 v["data_ultimei_modificari"] = now_iso()
             if "observatii_idbdc" in cols_set:
@@ -387,13 +381,10 @@ def porneste_motorul(supabase):
         st.success(f"✅ Salvare reușită. Rânduri salvate: {saved}.")
         st.rerun()
 
-    # ----------------------------
-    # VALIDARE (IMPORTANT: rând cu rând, cu WHERE cod_identificare)
-    # ----------------------------
+    # VALIDARE (rând cu rând, cu WHERE)
     if btn_validare:
-        df_to_val = aplica_completari(st.session_state[df_key])
+        df_to_val = aplica_completari(ed_df)
 
-        # ce coloane de validare exista?
         payload_base = {}
         if "status_confirmare" in cols_set:
             payload_base["status_confirmare"] = True
@@ -409,9 +400,11 @@ def porneste_motorul(supabase):
             cod = r.get("cod_identificare")
             if cod is None or str(cod).strip() == "":
                 continue
-            # update cu WHERE (obligatoriu!)
             supabase.table(nume_tabela).update(payload_base).eq("cod_identificare", cod).execute()
             count += 1
+
+        # pastram ce e in grila
+        st.session_state[df_key] = df_to_val.copy()
 
         st.success(f"✅ Validare efectuată pentru {count} rând(uri).")
         st.rerun()
