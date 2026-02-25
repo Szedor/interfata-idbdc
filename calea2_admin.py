@@ -2,12 +2,13 @@ import streamlit as st
 from supabase import create_client, Client
 from motor_admin import porneste_motorul
 
+
 def run():
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    # Stil (păstrat)
+    # Stil (ca in varianta ta)
     st.markdown("""
     <style>
         .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
@@ -28,7 +29,7 @@ def run():
     if "operator_identificat" not in st.session_state:
         st.session_state.operator_identificat = None
 
-    # 1) Parolă
+    # 1) Parola (păstrat)
     if not st.session_state.autorizat_p1:
         st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
@@ -40,7 +41,7 @@ def run():
                     st.rerun()
         st.stop()
 
-    # 2) Operator
+    # 2) Operator (păstrat)
     if not st.session_state.operator_identificat:
         st.sidebar.markdown("### 👤 Identificare Operator")
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
@@ -56,8 +57,9 @@ def run():
             st.session_state.clear()
             st.rerun()
 
-    # Pornește interfața Admin (motorul)
+    # Pornește motorul Admin
     porneste_motorul(supabase)
+
 
 if __name__ == "__main__":
     run()
