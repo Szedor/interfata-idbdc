@@ -97,7 +97,6 @@ def porneste_motorul(supabase):
     opt_format_eveniment = fetch_opt("nom_format_evenimente", "format_eveniment")
 
     opt_acronim_pi = fetch_opt("nom_prop_intelect", "acronim_prop_intelect")
-
     opt_domenii_fdi = fetch_opt("nom_domenii_fdi", "cod_domeniu_fdi")
 
     # ----------------------------
@@ -124,7 +123,7 @@ def porneste_motorul(supabase):
     )
 
     # ----------------------------
-    # Casete 1-4 (denumiri finale)
+    # Casete 1-4
     # ----------------------------
     c1, c2, c3, c4 = st.columns([1, 1.25, 1.25, 1.25])
 
@@ -156,7 +155,7 @@ def porneste_motorul(supabase):
         id_admin = st.text_input("3. ID Proiect / Numar contract:", key="admin_id")
 
     with c4:
-        componente_com = st.multiselect(
+        st.multiselect(
             "4. Componente:",
             ["Date financiare", "Resurse umane", "Aspecte tehnice"],
             key="admin_com"
@@ -209,15 +208,20 @@ def porneste_motorul(supabase):
         if st.button("❌ ANULARE"):
             st.rerun()
 
-    st.write("")
-    st.caption("Notă: completările automate se aplică la apăsarea butonului SALVARE.")
+    st.caption("Notă: completările automate (ES/PI) se aplică la SALVARE.")
 
     if not nume_tabela:
         st.info("Alege Categoria si Tipul de Contracte sau Proiecte pentru incarcare tabel.")
         return
 
     # ----------------------------
-    # Incarcare DF (si coloane daca tabela e goala)
+    # Citim coloanele reale ale tabelului (important pentru a evita PGRST204)
+    # ----------------------------
+    cols_real = get_table_columns(nume_tabela)
+    cols_set = set(cols_real)
+
+    # ----------------------------
+    # Incarcare DF
     # ----------------------------
     res_main = supabase.table(nume_tabela).select("*")
     if id_admin:
@@ -225,10 +229,9 @@ def porneste_motorul(supabase):
 
     df_main = pd.DataFrame(res_main.execute().data or [])
     if df_main.empty:
-        cols = get_table_columns(nume_tabela)
-        df_main = pd.DataFrame(columns=cols)
+        df_main = pd.DataFrame(columns=cols_real)
 
-    # Session-state DF (pentru rand nou sus)
+    # Session-state DF (stabilitate)
     df_key = f"df_{nume_tabela}"
     if st.session_state.get("current_table") != nume_tabela or df_key not in st.session_state:
         st.session_state["current_table"] = nume_tabela
@@ -236,10 +239,9 @@ def porneste_motorul(supabase):
 
     # Rand nou SUS
     if st.session_state.get("adauga_rand_sus"):
-        cols = list(st.session_state[df_key].columns)
-        if cols:
+        if cols_real:
             st.session_state[df_key] = pd.concat(
-                [pd.DataFrame([empty_row_from_columns(cols)]), st.session_state[df_key]],
+                [pd.DataFrame([empty_row_from_columns(cols_real)]), st.session_state[df_key]],
                 ignore_index=True
             )
         st.session_state["adauga_rand_sus"] = False
@@ -318,16 +320,16 @@ def porneste_motorul(supabase):
         column_config=column_config if column_config else None,
     )
 
-    # pastram mereu ce a editat operatorul
+    # pastram ce a editat operatorul (stabil)
     st.session_state[df_key] = ed_df.copy()
 
     # ----------------------------
-    # SALVARE (aici aplicam auto-completarea)
+    # SALVARE (aplicam auto-completarea + audit doar daca exista coloanele)
     # ----------------------------
     if btn_salvare:
         df_to_save = st.session_state[df_key].copy()
 
-        # A) Evenimente: natura_eveniment -> clasificare_eveniment
+        # A) ES: natura_eveniment -> clasificare_eveniment
         if nume_tabela == "base_evenimente_stiintifice":
             if "natura_eveniment" in df_to_save.columns and "clasificare_eveniment" in df_to_save.columns:
                 for i in range(len(df_to_save)):
@@ -338,7 +340,6 @@ def porneste_motorul(supabase):
                     val = map_natura_to_clasificare.get(nk)
                     if val is None:
                         continue
-                    # suprascriem cu valoarea corecta
                     val_i = to_int_or_none(val)
                     df_to_save.at[i, "clasificare_eveniment"] = val_i if val_i is not None else val
 
@@ -350,9 +351,15 @@ def porneste_motorul(supabase):
                     nk = norm_text(ac)
                     if nk == "":
                         continue
+
+                    # fallback: daca nu gaseste, incearca si fara normalizare (rar, dar ajuta)
                     val = map_pi_to_perioada_ani.get(nk)
                     if val is None:
+                        val = map_pi_to_perioada_ani.get(norm_text(str(ac)))
+
+                    if val is None:
                         continue
+
                     val_i = to_int_or_none(val)
                     df_to_save.at[i, "perioada_valabilitate"] = val_i if val_i is not None else val
 
@@ -360,15 +367,19 @@ def porneste_motorul(supabase):
         for _, r in df_to_save.iterrows():
             v = r.to_dict()
 
+            # nu salvam rand fara cheie
             if "cod_identificare" not in v or v["cod_identificare"] is None or str(v["cod_identificare"]).strip() == "":
                 continue
 
-            v["data_ultimei_modificari"] = now_iso()
-            v["observatii_idbdc"] = f"Editat de {st.session_state.operator_identificat}"
+            # audit: doar daca exista coloanele in acest tabel
+            if "data_ultimei_modificari" in cols_set:
+                v["data_ultimei_modificari"] = now_iso()
+            if "observatii_idbdc" in cols_set:
+                v["observatii_idbdc"] = f"Editat de {st.session_state.operator_identificat}"
 
-            if "status_confirmare" in v and v["status_confirmare"] is None:
+            if "status_confirmare" in cols_set and v.get("status_confirmare") is None:
                 v["status_confirmare"] = False
-            if "validat_idbdc" in v and v["validat_idbdc"] is None:
+            if "validat_idbdc" in cols_set and v.get("validat_idbdc") is None:
                 v["validat_idbdc"] = False
 
             supabase.table(nume_tabela).upsert(v).execute()
@@ -378,17 +389,23 @@ def porneste_motorul(supabase):
         st.rerun()
 
     # ----------------------------
-    # VALIDARE
+    # VALIDARE (la fel: doar coloane existente)
     # ----------------------------
     if btn_validare:
-        q = supabase.table(nume_tabela).update({
-            "status_confirmare": True,
-            "validat_idbdc": True,
-            "data_ultimei_modificari": now_iso(),
-            "observatii_idbdc": f"Validat de {st.session_state.operator_identificat}",
-        })
+        payload = {}
+        if "status_confirmare" in cols_set:
+            payload["status_confirmare"] = True
+        if "validat_idbdc" in cols_set:
+            payload["validat_idbdc"] = True
+        if "data_ultimei_modificari" in cols_set:
+            payload["data_ultimei_modificari"] = now_iso()
+        if "observatii_idbdc" in cols_set:
+            payload["observatii_idbdc"] = f"Validat de {st.session_state.operator_identificat}"
+
+        q = supabase.table(nume_tabela).update(payload)
         if id_admin:
             q = q.eq("cod_identificare", id_admin)
         q.execute()
+
         st.success("✅ Validare efectuată (pentru ce este afișat / filtrat).")
         st.rerun()
