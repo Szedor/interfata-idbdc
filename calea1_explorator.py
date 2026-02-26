@@ -77,3 +77,4 @@ def run():
             st.text_input("Număr înregistrare cerere", key="f_pi_nr")
         with p3:
             st.multiselect("Autor", [], placeholder="", key="f_pi_autor")
+        
