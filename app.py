@@ -21,3 +21,4 @@ elif calea_activa == "admin":
         calea2_admin.run()
     except Exception as e:
         st.error(f"Eroare la încărcarea Căii 2: {e}")
+        
