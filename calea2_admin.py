@@ -29,7 +29,7 @@ def run():
     if "operator_identificat" not in st.session_state:
         st.session_state.operator_identificat = None
 
-    # 1) Parola (păstrat)
+    # 1) Parola
     if not st.session_state.autorizat_p1:
         st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
@@ -41,7 +41,7 @@ def run():
                     st.rerun()
         st.stop()
 
-    # 2) Operator (păstrat)
+    # 2) Operator
     if not st.session_state.operator_identificat:
         st.sidebar.markdown("### 👤 Identificare Operator")
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
@@ -57,7 +57,6 @@ def run():
             st.session_state.clear()
             st.rerun()
 
-    # Pornește motorul Admin
     porneste_motorul(supabase)
 
 
