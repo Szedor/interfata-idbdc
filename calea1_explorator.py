@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from supabase import create_client, Client
 
 PASSWORD = "EverDream2SZ"
@@ -27,58 +26,29 @@ def gate():
                 st.rerun()
         st.stop()
 
+def pick_title(r: dict) -> str:
+    for k in ["titlu_proiect", "titlu", "obiect_contract", "denumire_proiect"]:
+        if r.get(k):
+            return str(r.get(k)).strip()
+    return "—"
+
 def run():
-    st.set_page_config(page_title="IDBDC – Explorator (B)", layout="wide")
+    st.set_page_config(page_title="IDBDC – Explorator (C)", layout="wide")
     gate()
 
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    st.title("🧭 Explorator IDBDC — Varianta B (Wizard)")
-    st.caption("3 pași: alegi tipul → introduci indicii → vezi rezultate + detalii.")
+    st.title("🧾 Explorator IDBDC — Varianta C (Carduri)")
+    st.caption("Căutare + rezultate ca listă de carduri cu expandere.")
     st.divider()
 
-    if "step" not in st.session_state:
-        st.session_state.step = 1
+    tipuri = st.multiselect("Tipuri", list(BASE_TABLES.keys()), default=["CEP"])
+    q_text = st.text_input("Căutare text (ID/acronim/titlu)")
 
-    # STEP 1
-    if st.session_state.step == 1:
-        st.subheader("Pas 1/3 — Alege tipurile")
-        tipuri = st.multiselect("Tipuri contract/proiect", list(BASE_TABLES.keys()), default=["CEP"])
-        if st.button("Continuă"):
-            st.session_state.tipuri = tipuri
-            st.session_state.step = 2
-            st.rerun()
+    if not st.button("🔎 Caută", use_container_width=True):
         st.stop()
-
-    # STEP 2
-    if st.session_state.step == 2:
-        st.subheader("Pas 2/3 — Indicii")
-        col1, col2 = st.columns(2)
-        with col1:
-            q_text = st.text_input("Cuvinte cheie (ID / acronim / titlu)")
-        with col2:
-            an = st.number_input("An (opțional)", 2010, 2035, 2024)
-
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Înapoi"):
-                st.session_state.step = 1
-                st.rerun()
-        with c2:
-            if st.button("Caută"):
-                st.session_state.q_text = q_text
-                st.session_state.an = an
-                st.session_state.step = 3
-                st.rerun()
-        st.stop()
-
-    # STEP 3
-    st.subheader("Pas 3/3 — Rezultate")
-    tipuri = st.session_state.get("tipuri", ["CEP"])
-    q_text = (st.session_state.get("q_text") or "").strip()
-    an = st.session_state.get("an")
 
     rows_all = []
     for tip in tipuri:
@@ -94,68 +64,39 @@ def run():
         except Exception as e:
             st.warning(f"Nu pot citi {table_name}: {e}")
 
-    df = pd.DataFrame(rows_all)
-    if df.empty:
-        st.warning("Niciun rezultat.")
-        st.stop()
+    if not rows_all:
+        st.info("Niciun rezultat.")
+        return
 
-    if "cod_identificare" in df.columns:
-        df["cod_identificare"] = df["cod_identificare"].astype(str)
+    # filtrare locală
+    t = q_text.strip().casefold()
+    if t:
+        filtered = []
+        for r in rows_all:
+            blob = " ".join([str(r.get(k, "")) for k in ["cod_identificare","acronim_proiect","titlu_proiect","obiect_contract","denumire_proiect"]]).casefold()
+            if t in blob:
+                filtered.append(r)
+        rows_all = filtered
 
-    if q_text:
-        t = q_text.casefold()
-        masks = []
-        for col in ["cod_identificare", "acronim_proiect", "titlu_proiect", "obiect_contract", "denumire_proiect"]:
-            if col in df.columns:
-                masks.append(df[col].astype(str).str.casefold().str.contains(t, na=False))
-        if masks:
-            m = masks[0]
-            for x in masks[1:]:
-                m = m | x
-            df = df[m]
+    st.subheader(f"Rezultate ({len(rows_all)})")
 
-    # an (best effort)
-    for an_col in ["an_implementare", "an", "an_derulare", "an_inceput"]:
-        if an_col in df.columns and an:
-            df = df[df[an_col].fillna(0).astype(int) == int(an)]
-            break
+    for r in rows_all:
+        cod = str(r.get("cod_identificare", "")).strip() or "(fără cod)"
+        tip = r.get("_tip", "")
+        title = pick_title(r)
+        header = f"🆔 {cod} | {title} ({tip})"
 
-    c1, c2 = st.columns([1.1, 1.2])
-    with c1:
-        show_cols = [c for c in ["cod_identificare", "_tip", "titlu_proiect", "obiect_contract", "acronim_proiect"] if c in df.columns]
-        st.dataframe(df[show_cols], use_container_width=True, height=520)
-        selected_id = st.text_input("ID pentru detalii:", value="")
+        with st.expander(header, expanded=False):
+            st.caption(f"Sursă: {r.get('_table','')}")
+            for k, v in sorted(r.items()):
+                if k.startswith("_"):
+                    continue
+                if v is None or str(v).strip() == "":
+                    continue
+                st.write(f"**{k}**: {v}")
 
-        b1, b2 = st.columns(2)
-        with b1:
-            if st.button("Înapoi la indicii"):
-                st.session_state.step = 2
-                st.rerun()
-        with b2:
-            if st.button("Reia de la început"):
-                st.session_state.step = 1
-                st.rerun()
-
-    with c2:
-        st.subheader("Detalii")
-        if not selected_id.strip():
-            st.info("Introdu un ID din listă.")
-            st.stop()
-        if "cod_identificare" not in df.columns:
-            st.error("Lipsește cod_identificare.")
-            st.stop()
-        match = df[df["cod_identificare"] == selected_id.strip()]
-        if match.empty:
-            st.warning("ID-ul nu există.")
-            st.stop()
-        r = match.iloc[0].to_dict()
-        st.caption(f"Sursă: {r.get('_table','')} ({r.get('_tip','')})")
-        for k, v in sorted(r.items()):
-            if k.startswith("_"):
-                continue
-            if v is None or str(v).strip() == "":
-                continue
-            st.write(f"**{k}**: {v}")
+            st.divider()
+            st.info("Atașamentele le conectăm după ce confirmi tabelele exacte ale componentelor.")
 
 if __name__ == "__main__":
     run()
