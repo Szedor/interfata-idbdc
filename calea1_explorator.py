@@ -27,65 +27,66 @@ def gate():
                 st.rerun()
         st.stop()
 
-@st.cache_data(show_spinner=False, ttl=600)
-def fetch_categories(_url: str, _key: str) -> list[str]:
-    supabase = create_client(_url, _key)
-    try:
-        res = supabase.table("nom_categorie").select("denumire_categorie").execute()
-        return sorted({r["denumire_categorie"] for r in (res.data or []) if r.get("denumire_categorie")})
-    except Exception:
-        return ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
-
 def run():
-    st.set_page_config(page_title="IDBDC – Explorator (A)", layout="wide")
+    st.set_page_config(page_title="IDBDC – Explorator (B)", layout="wide")
     gate()
 
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    st.title("🔎 Explorator IDBDC — Varianta A")
-    st.caption("Căutare rapidă + selecție rezultat + detalii în dreapta.")
+    st.title("🧭 Explorator IDBDC — Varianta B (Wizard)")
+    st.caption("3 pași: alegi tipul → introduci indicii → vezi rezultate + detalii.")
     st.divider()
 
-    left, right = st.columns([1.1, 1.2], gap="large")
+    if "step" not in st.session_state:
+        st.session_state.step = 1
 
-    with left:
-        st.subheader("Filtre rapide")
-        categorii = fetch_categories(url, key)
-        cat = st.selectbox("Categoria", ["Contracte & Proiecte"] + [c for c in categorii if c != "Contracte & Proiecte"])
-        tipuri = st.multiselect("Tip (Contracte & Proiecte)", list(BASE_TABLES.keys()), default=["CEP"])
-
-        q_text = st.text_input("Căutare text (ID / acronim / titlu)")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            an_min = st.number_input("An minim", 2010, 2035, 2010)
-        with col2:
-            an_max = st.number_input("An maxim", 2010, 2035, 2035)
-
-        do_search = st.button("🔎 Caută", use_container_width=True)
-
-    if not do_search:
-        st.info("Setează filtrele și apasă Caută.")
+    # STEP 1
+    if st.session_state.step == 1:
+        st.subheader("Pas 1/3 — Alege tipurile")
+        tipuri = st.multiselect("Tipuri contract/proiect", list(BASE_TABLES.keys()), default=["CEP"])
+        if st.button("Continuă"):
+            st.session_state.tipuri = tipuri
+            st.session_state.step = 2
+            st.rerun()
         st.stop()
 
-    # 1) Căutare în tabelele selectate
+    # STEP 2
+    if st.session_state.step == 2:
+        st.subheader("Pas 2/3 — Indicii")
+        col1, col2 = st.columns(2)
+        with col1:
+            q_text = st.text_input("Cuvinte cheie (ID / acronim / titlu)")
+        with col2:
+            an = st.number_input("An (opțional)", 2010, 2035, 2024)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Înapoi"):
+                st.session_state.step = 1
+                st.rerun()
+        with c2:
+            if st.button("Caută"):
+                st.session_state.q_text = q_text
+                st.session_state.an = an
+                st.session_state.step = 3
+                st.rerun()
+        st.stop()
+
+    # STEP 3
+    st.subheader("Pas 3/3 — Rezultate")
+    tipuri = st.session_state.get("tipuri", ["CEP"])
+    q_text = (st.session_state.get("q_text") or "").strip()
+    an = st.session_state.get("an")
+
     rows_all = []
     for tip in tipuri:
         table_name = BASE_TABLES.get(tip)
         if not table_name:
             continue
-        q = supabase.table(table_name).select("*")
-
-        # filtre simple (best-effort)
-        if q_text.strip():
-            # încercăm pe câteva câmpuri uzuale
-            # Supabase nu suportă OR ușor fără view/rpc; facem fallback: luăm mai multe și filtrăm local
-            pass
-
         try:
-            res = q.execute()
+            res = supabase.table(table_name).select("*").execute()
             for r in (res.data or []):
                 r["_tip"] = tip
                 r["_table"] = table_name
@@ -93,77 +94,68 @@ def run():
         except Exception as e:
             st.warning(f"Nu pot citi {table_name}: {e}")
 
-    if not rows_all:
+    df = pd.DataFrame(rows_all)
+    if df.empty:
         st.warning("Niciun rezultat.")
         st.stop()
 
-    df = pd.DataFrame(rows_all)
-
-    # 2) Filtrare locală pe text + an
     if "cod_identificare" in df.columns:
         df["cod_identificare"] = df["cod_identificare"].astype(str)
 
-    if q_text.strip():
-        t = q_text.strip().casefold()
-        candidates = []
+    if q_text:
+        t = q_text.casefold()
+        masks = []
         for col in ["cod_identificare", "acronim_proiect", "titlu_proiect", "obiect_contract", "denumire_proiect"]:
             if col in df.columns:
-                candidates.append(df[col].astype(str).str.casefold().str.contains(t, na=False))
-        if candidates:
-            mask = candidates[0]
-            for m in candidates[1:]:
-                mask = mask | m
-            df = df[mask]
+                masks.append(df[col].astype(str).str.casefold().str.contains(t, na=False))
+        if masks:
+            m = masks[0]
+            for x in masks[1:]:
+                m = m | x
+            df = df[m]
 
+    # an (best effort)
     for an_col in ["an_implementare", "an", "an_derulare", "an_inceput"]:
-        if an_col in df.columns:
-            df = df[(df[an_col].fillna(0).astype(int) >= int(an_min)) & (df[an_col].fillna(9999).astype(int) <= int(an_max))]
+        if an_col in df.columns and an:
+            df = df[df[an_col].fillna(0).astype(int) == int(an)]
             break
 
-    if df.empty:
-        st.warning("Niciun rezultat după filtre.")
-        st.stop()
-
-    # 3) Tabel rezultate + selecție
-    show_cols = [c for c in ["cod_identificare", "_tip", "titlu_proiect", "obiect_contract", "denumire_proiect", "acronim_proiect"] if c in df.columns]
-    if "_tip" in df.columns and "_tip" not in show_cols:
-        show_cols.insert(1, "_tip")
-
-    with left:
-        st.subheader(f"Rezultate ({len(df)})")
+    c1, c2 = st.columns([1.1, 1.2])
+    with c1:
+        show_cols = [c for c in ["cod_identificare", "_tip", "titlu_proiect", "obiect_contract", "acronim_proiect"] if c in df.columns]
         st.dataframe(df[show_cols], use_container_width=True, height=520)
+        selected_id = st.text_input("ID pentru detalii:", value="")
 
-        selected_id = st.text_input("Deschide detalii pentru ID (copie din tabel):", value="")
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("Înapoi la indicii"):
+                st.session_state.step = 2
+                st.rerun()
+        with b2:
+            if st.button("Reia de la început"):
+                st.session_state.step = 1
+                st.rerun()
 
-    with right:
+    with c2:
         st.subheader("Detalii")
         if not selected_id.strip():
-            st.info("Copiază un ID din tabel și pune-l aici.")
+            st.info("Introdu un ID din listă.")
             st.stop()
-
-        # găsește primul rând cu cod_identificare
         if "cod_identificare" not in df.columns:
-            st.error("Lipsește coloana cod_identificare în rezultate.")
+            st.error("Lipsește cod_identificare.")
             st.stop()
-
-        match = df[df["cod_identificare"].astype(str) == selected_id.strip()]
+        match = df[df["cod_identificare"] == selected_id.strip()]
         if match.empty:
-            st.warning("ID-ul nu există în rezultate.")
+            st.warning("ID-ul nu există.")
             st.stop()
-
         r = match.iloc[0].to_dict()
         st.caption(f"Sursă: {r.get('_table','')} ({r.get('_tip','')})")
-
         for k, v in sorted(r.items()):
             if k.startswith("_"):
                 continue
             if v is None or str(v).strip() == "":
                 continue
             st.write(f"**{k}**: {v}")
-
-        st.divider()
-        st.subheader("Atașamente (placeholder)")
-        st.info("Atașamentele le conectăm după ce confirmi numele tabelelor de componente. (nu schimbăm acum baza).")
 
 if __name__ == "__main__":
     run()
