@@ -1,45 +1,26 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
+import io
 
-# --- CONFIGURARE STIL VIZUAL ---
+# --- STIL VIZUAL ---
 def apply_card_style():
     st.markdown("""
         <style>
-            .stApp {
-                background-color: #f0f2f6;
-            }
-            
-            /* Stil pentru expandere (carduri) */
+            .stApp { background-color: #f8f9fa; }
             .stExpander {
-                border: none !important;
                 background-color: white !important;
-                border-radius: 12px !important;
-                margin-bottom: 15px !important;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
-                transition: transform 0.2s ease;
+                border-radius: 10px !important;
+                border: 1px solid #dee2e6 !important;
+                margin-bottom: 10px;
             }
-            .stExpander:hover {
-                transform: translateY(-3px);
-                box-shadow: 0 6px 15px rgba(0,0,0,0.1) !important;
+            .download-section {
+                background-color: #ffffff;
+                padding: 15px;
+                border-radius: 10px;
+                border: 1px dashed #28a745;
+                margin-bottom: 20px;
             }
-
-            /* Badge-uri colorate pentru tipul de proiect */
-            .badge {
-                padding: 4px 12px;
-                border-radius: 20px;
-                font-size: 12px;
-                font-weight: bold;
-                color: white;
-                margin-left: 10px;
-            }
-            .bg-fdi { background-color: #e67e22; }
-            .bg-pnrr { background-color: #9b59b6; }
-            .bg-cep { background-color: #3498db; }
-            .bg-default { background-color: #7f8c8d; }
-
-            /* Titluri secțiuni */
-            h1, h2 { color: #2c3e50 !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -56,24 +37,18 @@ BASE_TABLES = {
     "PNCDI": "base_proiecte_pncdi",
 }
 
-def get_badge_class(tip):
-    mapping = {"FDI": "bg-fdi", "PNRR": "bg-pnrr", "CEP": "bg-cep"}
-    return mapping.get(tip, "bg-default")
-
 def gate():
     if "auth_explorator" not in st.session_state:
         st.session_state.auth_explorator = False
     if not st.session_state.auth_explorator:
         _, col_mid, _ = st.columns([1, 1.5, 1])
         with col_mid:
-            st.markdown("<h2 style='text-align: center;'>🗂️ Arhivă Proiecte IDBDC</h2>", unsafe_allow_html=True)
-            p = st.text_input("Parola de acces:", type="password")
-            if st.button("Accesează Cardurile"):
+            st.subheader("🔑 Acces Securizat")
+            p = st.text_input("Parola:", type="password")
+            if st.button("Intră în Arhivă"):
                 if p == PASSWORD:
                     st.session_state.auth_explorator = True
                     st.rerun()
-                else:
-                    st.error("Acces neautorizat.")
         st.stop()
 
 def run():
@@ -84,56 +59,70 @@ def run():
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    st.title("🗂️ Explorator tip Carduri (Varianta C)")
+    st.title("🗂️ Explorator Proiecte cu Export Excel")
 
-    # --- FILTRARE RAPIDĂ ---
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        q_text = st.text_input("Caută după acronim, titlu sau cod:", placeholder="Ex: UPT-2024...")
-    with col2:
-        selected_types = st.multiselect("Filtru Tip:", list(BASE_TABLES.keys()), default=["FDI", "PNRR", "CEP"])
+    # --- ZONA DE FILTRARE ---
+    with st.container():
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            q_text = st.text_input("Căutare (Acronim/Titlu/Cod):", placeholder="Scrie aici pentru filtrare...")
+        with col2:
+            selected_types = st.multiselect("Tipuri:", list(BASE_TABLES.keys()), default=["FDI", "PNRR"])
 
-    # --- FETCH ȘI AFIȘARE ---
+    # --- COLECTARE DATE ---
     rows_all = []
     for t_key in selected_types:
         try:
             res = supabase.table(BASE_TABLES[t_key]).select("*").execute()
             for r in (res.data or []):
-                r["_tip"] = t_key
+                r["Sursa_Tabel"] = t_key
                 rows_all.append(r)
         except: continue
 
+    if not rows_all:
+        st.info("Selectează tipurile de proiecte pentru a afișa datele.")
+        return
+
+    # Transformăm în DataFrame pentru filtrare și download
+    df_final = pd.DataFrame(rows_all)
+
+    # Filtrare text
     if q_text:
-        rows_all = [r for r in rows_all if q_text.lower() in str(list(r.values())).lower()]
+        mask = df_final.apply(lambda row: q_text.lower() in str(row.values).lower(), axis=1)
+        df_final = df_final[mask]
 
-    st.write(f"S-au găsit **{len(rows_all)}** înregistrări.")
+    # --- BUTON DOWNLOAD (Apare doar dacă avem rezultate) ---
+    if not df_final.empty:
+        st.markdown('<div class="download-section">', unsafe_allow_html=True)
+        col_txt, col_btn = st.columns([3, 1])
+        with col_txt:
+            st.write(f"✅ Am găsit **{len(df_final)}** rezultate. Poți descărca tabelul filtrat în format Excel:")
+        
+        with col_btn:
+            # Generare Excel în memorie
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_final.to_excel(writer, index=False, sheet_name='Rezultate_IDBDC')
+            
+            st.download_button(
+                label="📥 Descarcă Excel",
+                data=output.getvalue(),
+                file_name="extras_proiecte_idbdc.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    for r in rows_all:
+    # --- AFIȘARE CARDURI ---
+    for _, r in df_final.iterrows():
         cod = r.get("cod_identificare", "N/A")
-        tip = r.get("_tip", "ALT")
-        # Alegem un titlu reprezentativ
-        titlu = r.get("acronim_proiect") or r.get("titlu_proiect") or r.get("obiect_contract") or "Fără titlu"
+        acronim = r.get("acronim_proiect") or r.get("titlu_proiect") or "Proiect"
+        sursa = r.get("Sursa_Tabel")
         
-        badge_cls = get_badge_class(tip)
-        
-        # Header personalizat pentru fiecare card
-        header_html = f"🆔 {cod} | {titlu}"
-        
-        with st.expander(header_html):
-            st.markdown(f"**Tip Proiect:** <span class='badge {badge_cls}'>{tip}</span>", unsafe_allow_html=True)
-            st.markdown("---")
-            
-            # Afișare date în coloane pentru claritate
-            c1, c2 = st.columns(2)
-            cols = [k for k in r.keys() if not k.startswith("_")]
-            mid = len(cols) // 2
-            
-            with c1:
-                for k in cols[:mid]:
-                    if r[k]: st.write(f"**{k}:** {r[k]}")
-            with c2:
-                for k in cols[mid:]:
-                    if r[k]: st.write(f"**{k}:** {r[k]}")
+        with st.expander(f"🆔 {cod} | {acronim} ({sursa})"):
+            # Afișăm toate câmpurile care nu sunt goale
+            for col_name, value in r.items():
+                if pd.notnull(value) and str(value).strip() != "":
+                    st.write(f"**{col_name}:** {value}")
 
 if __name__ == "__main__":
     run()
