@@ -2,44 +2,44 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 
-# --- CONFIGURARE STIL VIZU ---
-def apply_wizard_style():
+# --- CONFIGURARE STIL VIZUAL ---
+def apply_card_style():
     st.markdown("""
         <style>
-            /* Fundal cu gradient de calmare */
             .stApp {
-                background: linear-gradient(to right, #ece9e6, #ffffff);
+                background-color: #f0f2f6;
             }
             
-            /* Stil pentru pașii procesului */
-            .step-header {
-                padding: 15px;
-                border-radius: 50px;
-                text-align: center;
-                font-weight: bold;
-                margin-bottom: 20px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            }
-            .step-1 { background-color: #3498db; color: white; }
-            .step-2 { background-color: #f39c12; color: white; }
-            .step-3 { background-color: #27ae60; color: white; }
-
-            /* Carduri pentru input */
-            .stTextInput, .stMultiSelect, .stSelectbox {
-                background-color: white;
-                padding: 10px;
-                border-radius: 15px;
-            }
-
-            /* Butoane de navigare */
-            .stButton>button {
-                width: 100%;
+            /* Stil pentru expandere (carduri) */
+            .stExpander {
+                border: none !important;
+                background-color: white !important;
                 border-radius: 12px !important;
-                height: 3em;
-                font-size: 18px !important;
-                text-transform: uppercase;
-                letter-spacing: 1px;
+                margin-bottom: 15px !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+                transition: transform 0.2s ease;
             }
+            .stExpander:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 6px 15px rgba(0,0,0,0.1) !important;
+            }
+
+            /* Badge-uri colorate pentru tipul de proiect */
+            .badge {
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: bold;
+                color: white;
+                margin-left: 10px;
+            }
+            .bg-fdi { background-color: #e67e22; }
+            .bg-pnrr { background-color: #9b59b6; }
+            .bg-cep { background-color: #3498db; }
+            .bg-default { background-color: #7f8c8d; }
+
+            /* Titluri secțiuni */
+            h1, h2 { color: #2c3e50 !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -56,112 +56,84 @@ BASE_TABLES = {
     "PNCDI": "base_proiecte_pncdi",
 }
 
+def get_badge_class(tip):
+    mapping = {"FDI": "bg-fdi", "PNRR": "bg-pnrr", "CEP": "bg-cep"}
+    return mapping.get(tip, "bg-default")
+
 def gate():
     if "auth_explorator" not in st.session_state:
         st.session_state.auth_explorator = False
     if not st.session_state.auth_explorator:
         _, col_mid, _ = st.columns([1, 1.5, 1])
         with col_mid:
-            st.markdown("<h2 style='text-align: center; color: #2c3e50;'>🔑 Autentificare Asistent</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center;'>🗂️ Arhivă Proiecte IDBDC</h2>", unsafe_allow_html=True)
             p = st.text_input("Parola de acces:", type="password")
-            if st.button("Lansează Asistentul"):
+            if st.button("Accesează Cardurile"):
                 if p == PASSWORD:
                     st.session_state.auth_explorator = True
                     st.rerun()
                 else:
-                    st.error("Acces refuzat.")
+                    st.error("Acces neautorizat.")
         st.stop()
 
 def run():
-    apply_wizard_style()
+    apply_card_style()
     gate()
-
-    # Inițializare pas
-    if "step" not in st.session_state:
-        st.session_state.step = 1
 
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    st.title("🧙‍♂️ Asistent Căutare Proiecte")
+    st.title("🗂️ Explorator tip Carduri (Varianta C)")
 
-    # --- PASUL 1: SELECȚIE CATEGORII ---
-    if st.session_state.step == 1:
-        st.markdown('<div class="step-header step-1">PASUL 1: Ce tip de proiecte cauți?</div>', unsafe_allow_html=True)
+    # --- FILTRARE RAPIDĂ ---
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        q_text = st.text_input("Caută după acronim, titlu sau cod:", placeholder="Ex: UPT-2024...")
+    with col2:
+        selected_types = st.multiselect("Filtru Tip:", list(BASE_TABLES.keys()), default=["FDI", "PNRR", "CEP"])
+
+    # --- FETCH ȘI AFIȘARE ---
+    rows_all = []
+    for t_key in selected_types:
+        try:
+            res = supabase.table(BASE_TABLES[t_key]).select("*").execute()
+            for r in (res.data or []):
+                r["_tip"] = t_key
+                rows_all.append(r)
+        except: continue
+
+    if q_text:
+        rows_all = [r for r in rows_all if q_text.lower() in str(list(r.values())).lower()]
+
+    st.write(f"S-au găsit **{len(rows_all)}** înregistrări.")
+
+    for r in rows_all:
+        cod = r.get("cod_identificare", "N/A")
+        tip = r.get("_tip", "ALT")
+        # Alegem un titlu reprezentativ
+        titlu = r.get("acronim_proiect") or r.get("titlu_proiect") or r.get("obiect_contract") or "Fără titlu"
         
-        st.info("Alege una sau mai multe categorii de proiecte pentru a începe scanarea bazei de date.")
-        selected = st.multiselect("Categorii disponibile:", list(BASE_TABLES.keys()), default=["FDI", "PNRR"])
+        badge_cls = get_badge_class(tip)
         
-        st.markdown("---")
-        if st.button("Continuă spre Filtre ➡️"):
-            if not selected:
-                st.warning("Te rog selectează cel puțin o categorie.")
-            else:
-                st.session_state.selected_types = selected
-                st.session_state.step = 2
-                st.rerun()
-
-    # --- PASUL 2: FILTRE ȘI INDICII ---
-    elif st.session_state.step == 2:
-        st.markdown('<div class="step-header step-2">PASUL 2: Definește indicii de căutare</div>', unsafe_allow_html=True)
+        # Header personalizat pentru fiecare card
+        header_html = f"🆔 {cod} | {titlu}"
         
-        col1, col2 = st.columns(2)
-        with col1:
-            q_id = st.text_input("Cod Identificare (exact):", help="Ex: UPT-2024-XXX")
-            q_acro = st.text_input("Acronim sau Cuvânt cheie titlu:")
-        with col2:
-            q_an = st.number_input("An implementare (0 pentru toți):", min_value=0, max_value=2030, value=0)
-            q_status = st.selectbox("Status proiect:", ["Toate", "In derulare", "Finalizat", "In evaluare"])
-
-        st.markdown("---")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("⬅️ Înapoi la Categorii"):
-                st.session_state.step = 1
-                st.rerun()
-        with c2:
-            if st.button("Vezi Rezultatele 🔍"):
-                st.session_state.filters = {"id": q_id, "text": q_acro, "an": q_an, "status": q_status}
-                st.session_state.step = 3
-                st.rerun()
-
-    # --- PASUL 3: REZULTATE ȘI DETALII ---
-    elif st.session_state.step == 3:
-        st.markdown('<div class="step-header step-3">PASUL 3: Rezultate Găsite</div>', unsafe_allow_html=True)
-        
-        # Logica de fetch bazată pe pașii anteriori
-        all_data = []
-        for t_key in st.session_state.selected_types:
-            t_name = BASE_TABLES[t_key]
-            res = supabase.table(t_name).select("*").execute()
-            temp_df = pd.DataFrame(res.data)
-            if not temp_df.empty:
-                temp_df["_tip"] = t_key
-                all_data.append(temp_df)
-
-        if not all_data:
-            st.error("Nu am găsit date conform selecției.")
-            if st.button("Resetează"): st.session_state.step = 1; st.rerun()
-            return
-
-        df = pd.concat(all_data, ignore_index=True)
-        
-        # Aplicare filtre din pasul 2
-        f = st.session_state.filters
-        if f["id"]:
-            df = df[df["cod_identificare"].astype(str).str.contains(f["id"], case=False)]
-        if f["text"]:
-            df = df[df.apply(lambda r: f["text"].lower() in str(r.values).lower(), axis=1)]
-
-        st.success(f"Am găsit {len(df)} proiecte care corespund criteriilor tale.")
-        
-        # Afișare rezultate sub formă de tabel curat
-        st.dataframe(df[["cod_identificare", "_tip", "acronim_proiect", "titlu_proiect"]], use_container_width=True)
-
-        if st.button("🔄 Începe o căutare nouă"):
-            st.session_state.step = 1
-            st.rerun()
+        with st.expander(header_html):
+            st.markdown(f"**Tip Proiect:** <span class='badge {badge_cls}'>{tip}</span>", unsafe_allow_html=True)
+            st.markdown("---")
+            
+            # Afișare date în coloane pentru claritate
+            c1, c2 = st.columns(2)
+            cols = [k for k in r.keys() if not k.startswith("_")]
+            mid = len(cols) // 2
+            
+            with c1:
+                for k in cols[:mid]:
+                    if r[k]: st.write(f"**{k}:** {r[k]}")
+            with c2:
+                for k in cols[mid:]:
+                    if r[k]: st.write(f"**{k}:** {r[k]}")
 
 if __name__ == "__main__":
     run()
