@@ -1,155 +1,23 @@
 import streamlit as st
-import pandas as pd
 from supabase import create_client, Client
-import html as _html
 
 
-# =========================================================
+# ----------------------------
 # Helpers
-# =========================================================
-PASSWORD_CONSULTARE = "EverDream2SZ"
-
-BASE_TABLES = {
-    "CEP": "base_contracte_cep",
-    "TERTI": "base_contracte_terti",
-    "FDI": "base_proiecte_fdi",
-    "PNRR": "base_proiecte_pnrr",
-    "INTERNATIONALE": "base_proiecte_internationale",
-    "INTERREG": "base_proiecte_interreg",
-    "NONEU": "base_proiecte_noneu",
-    "PNCDI": "base_proiecte_pncdi",
-}
-
-# coloane candidate (căutare text best-effort)
-TEXT_COL_CANDIDATES = [
-    "cod_identificare",
-    "acronim_proiect", "acronim", "acronim_contract", "acronim_contract_proiect",
-    "titlu_proiect", "titlu", "denumire_proiect", "obiect_contract",
-]
-
-# coloane candidate (an)
-YEAR_COL_CANDIDATES = ["an_implementare", "an", "an_derulare", "an_inceput"]
-
-
-def apply_brand_css():
-    # Paletă “mai caldă”, inspirată ca vibe de UPT:
-    # - fundal foarte deschis
-    # - header albastru UPT
-    # - accent albastru mai “friendly”
-    st.markdown(
-        """
-        <style>
-            .stApp {
-                background: #f4f6fb;
-                color: #1f2937;
-            }
-
-            /* Sidebar discret */
-            [data-testid="stSidebar"] {
-                background: #ffffff !important;
-                border-right: 1px solid #e5e7eb;
-            }
-
-            /* Titluri */
-            .upt-header {
-                background: linear-gradient(90deg, #003366, #0b4b8a);
-                padding: 14px 18px;
-                border-radius: 14px;
-                color: white;
-                margin-bottom: 12px;
-            }
-            .upt-header h1 {
-                margin: 0;
-                font-size: 26px;
-                font-weight: 800;
-                letter-spacing: 0.2px;
-            }
-            .upt-sub {
-                margin-top: 6px;
-                opacity: 0.92;
-                font-size: 13px;
-            }
-
-            /* Card */
-            .upt-card {
-                background: #ffffff;
-                border: 1px solid #e5e7eb;
-                border-radius: 16px;
-                padding: 14px 14px 8px 14px;
-                box-shadow: 0 8px 22px rgba(17, 24, 39, 0.06);
-            }
-
-            /* Butoane */
-            div.stButton > button {
-                border-radius: 12px !important;
-                border: 1px solid #0b4b8a !important;
-                color: white !important;
-                background: #0b4b8a !important;
-                font-weight: 700 !important;
-                height: 44px !important;
-            }
-            div.stButton > button:hover {
-                background: #003366 !important;
-                border-color: #003366 !important;
-            }
-
-            /* Inputs */
-            input, textarea {
-                border-radius: 10px !important;
-            }
-            [data-baseweb="select"] > div {
-                border-radius: 10px !important;
-            }
-
-            /* Dataframe container */
-            .stDataFrame {
-                background: #ffffff;
-                border-radius: 14px;
-                border: 1px solid #e5e7eb;
-                overflow: hidden;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-def gate():
-    if "autorizat_consultare" not in st.session_state:
-        st.session_state.autorizat_consultare = False
-
-    if not st.session_state.autorizat_consultare:
-        apply_brand_css()
-        st.markdown(
-            """
-            <div class="upt-card" style="max-width:520px;margin: 40px auto;">
-              <div class="upt-header">
-                <h1>🛡️ Acces securizat</h1>
-                <div class="upt-sub">IDBDC – Interogare și Dezvoltare Baze de Date (UPT)</div>
-              </div>
-            """,
-            unsafe_allow_html=True
-        )
-        p = st.text_input("Parola:", type="password")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Autorizare acces", use_container_width=True):
-                if p == PASSWORD_CONSULTARE:
-                    st.session_state.autorizat_consultare = True
-                    st.rerun()
-                else:
-                    st.error("Parolă greșită.")
-        with col2:
-            st.caption("Te rog folosește parola comunicată.")
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.stop()
+# ----------------------------
+def norm_text(x) -> str:
+    if x is None:
+        return ""
+    s = str(x).strip()
+    s = " ".join(s.split())
+    return s.casefold()
 
 
 @st.cache_data(show_spinner=False, ttl=600)
 def get_table_columns(supabase: Client, table_name: str) -> list[str]:
     """
-    Folosește RPC idbdc_get_columns(p_table) dacă există.
-    Fallback: [] (în acest caz aplicăm filtre doar local, minim).
+    Folosește aceeași funcție RPC ca în Admin: idbdc_get_columns(p_table).
+    Dacă RPC nu există / nu e disponibil, întoarce [] și lucrăm în mod fallback.
     """
     try:
         res = supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
@@ -158,163 +26,303 @@ def get_table_columns(supabase: Client, table_name: str) -> list[str]:
         return []
 
 
-def safe_apply_filters(q, cols: set, keyword: str, an_min: int | None, an_max: int | None):
-    # keyword: aplicăm ILIKE pe prima coloană utilă găsită (sau pe mai multe, dar fără OR nativ e greu)
-    # ca să rămânem stabili, aplicăm ILIKE pe cod_identificare dacă există, altfel pe prima coloană text relevantă.
-    if keyword:
-        chosen = None
-        for c in TEXT_COL_CANDIDATES:
-            if c in cols:
-                chosen = c
-                break
-        if chosen:
-            q = q.ilike(chosen, f"%{keyword}%")
+def safe_apply_filters(q, cols: set, filters: dict):
+    """
+    Aplică filtre Supabase doar dacă coloana există.
+    filters = {
+      "eq": [(col, value), ...],
+      "ilike": [(col, pattern), ...],
+      "gte": [(col, value), ...],
+      "lte": [(col, value), ...],
+      "in": [(col, list_values), ...],
+    }
+    """
+    for col, val in filters.get("eq", []):
+        if col in cols and val not in (None, "", []):
+            q = q.eq(col, val)
 
-    # an_min/an_max: aplicăm pe prima coloană an găsită
-    year_col = None
-    for c in YEAR_COL_CANDIDATES:
-        if c in cols:
-            year_col = c
-            break
-    if year_col:
-        if an_min is not None:
-            q = q.gte(year_col, int(an_min))
-        if an_max is not None:
-            q = q.lte(year_col, int(an_max))
+    for col, pat in filters.get("ilike", []):
+        if col in cols and pat not in (None, "", []):
+            q = q.ilike(col, pat)
+
+    for col, val in filters.get("gte", []):
+        if col in cols and val not in (None, "", []):
+            q = q.gte(col, val)
+
+    for col, val in filters.get("lte", []):
+        if col in cols and val not in (None, "", []):
+            q = q.lte(col, val)
+
+    for col, vals in filters.get("in", []):
+        if col in cols and isinstance(vals, list) and len(vals) > 0:
+            q = q.in_(col, vals)
 
     return q
 
 
-def pick_title_col(df: pd.DataFrame) -> str | None:
-    for c in ["titlu_proiect", "titlu", "denumire_proiect", "obiect_contract"]:
-        if c in df.columns:
-            return c
-    return None
-
-
-def make_printable_html(df: pd.DataFrame, title: str) -> str:
-    # HTML simplu + buton “Print” (deschide dialogul de print)
-    # Notă: Streamlit permite HTML via components.
-    safe_title = _html.escape(title)
-
-    # Convertim df în tabel HTML (cu escaping)
-    table_html = df.to_html(index=False, escape=True)
-
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <title>{safe_title}</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; padding: 16px; }}
-            h2 {{ margin: 0 0 10px 0; }}
-            .meta {{ color: #374151; margin-bottom: 12px; font-size: 12px; }}
-            table {{ border-collapse: collapse; width: 100%; }}
-            th, td {{ border: 1px solid #d1d5db; padding: 6px 8px; font-size: 12px; }}
-            th {{ background: #f3f4f6; text-align: left; }}
-            @media print {{
-                button {{ display: none; }}
-                body {{ padding: 0; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <button onclick="window.print()">Print</button>
-        <h2>{safe_title}</h2>
-        <div class="meta">Generat din IDBDC (Calea 1 – Consultare)</div>
-        {table_html}
-    </body>
-    </html>
+def try_fetch_related_table(supabase: Client, table_name: str, cod_identificare: str):
     """
+    Încearcă să încarce atașamentele dintr-o tabelă “related”, filtrat după cod_identificare.
+    Dacă tabela nu există / nu ai drepturi / altă problemă, returnează (None, mesaj).
+    """
+    try:
+        res = supabase.table(table_name).select("*").eq("cod_identificare", cod_identificare).execute()
+        data = res.data or []
+        return data, None
+    except Exception as e:
+        return None, str(e)
 
 
-# =========================================================
+# ----------------------------
 # Main
-# =========================================================
+# ----------------------------
 def run():
-    st.set_page_config(page_title="IDBDC – Calea 1 (Consultare)", layout="wide")
-    gate()
-    apply_brand_css()
-
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    st.markdown(
-        """
-        <div class="upt-header">
-            <h1>🔎 IDBDC – Calea 1 (Consultare)</h1>
-            <div class="upt-sub">Maxim 5 criterii • Rezultate doar din base_* + com_echipe_proiect (reprezinta_idbdc)</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    # --- Stil (păstrăm look-ul tău) ---
+    st.markdown("""
+    <style>
+    .stApp { background-color: #003366; }
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown { color: white !important; }
+    [data-testid="stSidebar"] { background-color: #f8f9fa !important; border-right: 1px solid #ddd; }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #003366 !important; }
+    [data-testid="stSidebar"] input { color: #31333F !important; background-color: white !important; }
 
-    # -----------------------------------------------------
-    # 1) Criterii de căutare (MAX 5)
-    # -----------------------------------------------------
-    st.markdown('<div class="upt-card">', unsafe_allow_html=True)
-    st.subheader("Căutare (max 5 criterii)")
+    div.stButton > button {
+        border: 1px solid white !important; color: white !important;
+        background-color: rgba(255,255,255,0.1) !important;
+        width: 100%; font-size: 14px !important; font-weight: bold !important; height: 42px !important;
+    }
+    div.stButton > button:hover { background-color: white !important; color: #003366 !important; }
 
-    c1, c2, c3, c4, c5 = st.columns([1.1, 1.4, 0.8, 0.8, 1.1])
+    label { font-size: 14px !important; font-weight: 400 !important; }
+    .stMultiSelect [data-baseweb="select"] div[aria-live="polite"] { display: none; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ----------------------------
+    # 0) Poartă acces (parolă)
+    # ----------------------------
+    if "autorizat_consultare" not in st.session_state:
+        st.session_state.autorizat_consultare = False
+
+    if not st.session_state.autorizat_consultare:
+        st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat – Consultare IDBDC</h2>", unsafe_allow_html=True)
+        _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
+        with col_ce:
+            parola_m = st.text_input("Parola:", type="password", key="p_cons_pass")
+            if st.button("Autorizare acces"):
+                if parola_m == "EverDream2SZ":
+                    st.session_state.autorizat_consultare = True
+                    st.rerun()
+        st.stop()
+
+    # ----------------------------
+    # Header
+    # ----------------------------
+    st.markdown("<h1 style='text-align: center;'> 🔎 Consultare / Explorator IDBDC</h1>", unsafe_allow_html=True)
+    st.caption("Căutare pe baza indiciilor introduse, apoi deschizi fiecare rezultat pentru detalii + atașamente.")
+    st.write("---")
+
+    # ----------------------------
+    # 1) Selectoare principale
+    # ----------------------------
+    c1, c2 = st.columns(2)
 
     with c1:
-        # 1) TIP (criteriu 1)
-        tipuri = st.multiselect("1) Tip", list(BASE_TABLES.keys()), default=["INTERNATIONALE"])
+        try:
+            res_cat = supabase.table("nom_categorie").select("denumire_categorie").execute()
+            list_cat = sorted(list({i["denumire_categorie"] for i in (res_cat.data or []) if i.get("denumire_categorie")}))
+        except Exception:
+            list_cat = ["Contracte & Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
+
+        categorii_sel = st.multiselect(
+            "1. Categoria de informații:",
+            list_cat,
+            placeholder="",
+            key="c_cons_cat"
+        )
 
     with c2:
-        # 2) TEXT (criteriu 2)
-        keyword = st.text_input("2) Cuvânt cheie (ID / acronim / titlu)", value="").strip()
+        tipuri_sel = []
+        if "Contracte & Proiecte" in categorii_sel:
+            try:
+                res_tip = supabase.table("nom_contracte_proiecte").select("acronim_contracte_proiecte").execute()
+                list_tip = sorted(list({i["acronim_contracte_proiecte"] for i in (res_tip.data or []) if i.get("acronim_contracte_proiecte")}))
+            except Exception:
+                list_tip = ["CEP", "TERTI", "FDI", "PNRR", "INTERNATIONALE", "INTERREG", "NONEU", "PNCDI"]
 
-    with c3:
-        # 3) an_min (criteriu 3)
-        an_min = st.number_input("3) An minim", min_value=2010, max_value=2035, value=2010, step=1)
+            tipuri_sel = st.multiselect(
+                "2. Tipul de contract / proiect:",
+                list_tip,
+                placeholder="",
+                key="c_cons_tip"
+            )
 
-    with c4:
-        # 4) an_max (criteriu 4)
-        an_max = st.number_input("4) An maxim", min_value=2010, max_value=2035, value=2035, step=1)
+    # ----------------------------
+    # 2) Filtre (Contracte & Proiecte)
+    # ----------------------------
+    f_id = f_acro = f_titlu = ""
+    f_an = None
+    f_rol = []
+    f_status = []
+    f_dep = []
+    f_dir = []
 
-    with c5:
-        # 5) Limită rezultate (criteriu 5) – util ca “control”, fără să încărcăm
-        limit = st.number_input("5) Limită rezultate", min_value=10, max_value=2000, value=300, step=10)
+    if "Contracte & Proiecte" in categorii_sel and tipuri_sel:
+        st.write("---")
+        st.markdown("#####  📂  Contracte & Proiecte – Indicii de căutare")
 
-    colb1, colb2 = st.columns([1, 2])
-    with colb1:
-        do_search = st.button("🔎 Caută", use_container_width=True)
-    with colb2:
-        st.caption("Sugestie: pentru test, lasă Tip=INTERNATIONALE. Date oficiale sunt doar acolo acum (cum ai spus).")
+        st.text_input("Titlul proiectului / Obiectul contractului (conține):", key="c_f_titlu")
+        f1, f2, f3 = st.columns(3)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        with f1:
+            st.text_input("ID proiect / Nr. contract (exact sau conține):", key="c_f_id")
+            st.text_input("Acronim proiect (exact sau conține):", key="c_f_acro")
 
+        with f2:
+            st.number_input("Anul de implementare (>=):", 2010, 2035, 2024, key="c_f_an_min")
+            st.number_input("Anul de implementare (<=):", 2010, 2035, 2024, key="c_f_an_max")
+            st.multiselect("Director / Responsabil (text – fallback conține):", [], placeholder="", key="c_f_dir")
+
+        with f3:
+            st.multiselect("Rol UPT:", ["Lider", "Coordonator", "Partener"], placeholder="", key="c_f_rol")
+            st.multiselect("Status proiect (select – dacă există):", [], placeholder="", key="c_f_status")
+            st.multiselect("Departament (select – dacă există):", [], placeholder="", key="c_f_dep")
+
+        f_id = st.session_state.get("c_f_id", "")
+        f_acro = st.session_state.get("c_f_acro", "")
+        f_titlu = st.session_state.get("c_f_titlu", "")
+        an_min = st.session_state.get("c_f_an_min", None)
+        an_max = st.session_state.get("c_f_an_max", None)
+        f_rol = st.session_state.get("c_f_rol", [])
+        f_status = st.session_state.get("c_f_status", [])
+        f_dep = st.session_state.get("c_f_dep", [])
+        f_dir = st.session_state.get("c_f_dir", [])
+
+        st.write("---")
+        colb1, colb2, colb3 = st.columns([1, 1, 1])
+        with colb1:
+            do_search = st.button("🔎 CĂUTARE")
+        with colb2:
+            if st.button("🧹 Reset filtre"):
+                for k in [
+                    "c_cons_cat", "c_cons_tip",
+                    "c_f_titlu", "c_f_id", "c_f_acro",
+                    "c_f_an_min", "c_f_an_max",
+                    "c_f_rol", "c_f_status", "c_f_dep", "c_f_dir"
+                ]:
+                    if k in st.session_state:
+                        del st.session_state[k]
+                st.rerun()
+        with colb3:
+            st.caption("Rezultatele apar mai jos (deschizi fiecare ID).")
+
+    else:
+        st.info("Selectează cel puțin o categorie. Pentru Contracte & Proiecte alege și Tipul, apoi folosește CĂUTARE.")
+        return
+
+    # ----------------------------
+    # 3) Execuție căutare (doar la click)
+    # ----------------------------
     if not do_search:
-        st.info("Setează criteriile și apasă **Caută**.")
-        return
+        st.stop()
 
-    if not tipuri:
-        st.warning("Selectează cel puțin un Tip.")
-        return
+    map_baze_contracte_proiecte = {
+        "CEP": "base_contracte_cep",
+        "TERTI": "base_contracte_terti",
+        "FDI": "base_proiecte_fdi",
+        "PNRR": "base_proiecte_pnrr",
+        "INTERNATIONALE": "base_proiecte_internationale",
+        "INTERREG": "base_proiecte_interreg",
+        "NONEU": "base_proiecte_noneu",
+        "PNCDI": "base_proiecte_pncdi",
+    }
 
-    # -----------------------------------------------------
-    # 2) Interogare base_* (doar tabele base)
-    # -----------------------------------------------------
+    related_tables_guess = {
+        "Financiar": [
+            "comp_financiar", "comp_date_financiare", "base_financiar", "base_date_financiare"
+        ],
+        "Resurse umane": [
+            "comp_resurse_umane", "comp_ru", "base_resurse_umane", "base_ru"
+        ],
+        "Tehnic": [
+            "comp_aspecte_tehnice", "comp_tehnic", "base_aspecte_tehnice", "base_tehnic"
+        ],
+    }
+
     all_rows = []
-    for tip in tipuri:
-        table_name = BASE_TABLES.get(tip)
+
+    for tip in tipuri_sel:
+        table_name = map_baze_contracte_proiecte.get(tip)
         if not table_name:
             continue
 
         cols = set(get_table_columns(supabase, table_name))
-        q = supabase.table(table_name).select("*").limit(int(limit))
 
-        # filtrare best-effort server-side
-        q = safe_apply_filters(
-            q=q,
-            cols=cols,
-            keyword=keyword,
-            an_min=int(an_min) if an_min else None,
-            an_max=int(an_max) if an_max else None
-        )
+        q = supabase.table(table_name).select("*")
+
+        filters = {"eq": [], "ilike": [], "gte": [], "lte": [], "in": []}
+
+        if f_id and str(f_id).strip():
+            fid = str(f_id).strip()
+            if "cod_identificare" in cols:
+                filters["ilike"].append(("cod_identificare", f"%{fid}%"))
+
+        if f_acro and str(f_acro).strip():
+            fac = str(f_acro).strip()
+            for cand in ["acronim_proiect", "acronim", "acronim_contract", "acronim_contract_proiect"]:
+                if cand in cols:
+                    filters["ilike"].append((cand, f"%{fac}%"))
+                    break
+
+        if f_titlu and str(f_titlu).strip():
+            ft = str(f_titlu).strip()
+            for cand in ["titlu_proiect", "titlu", "obiect_contract", "denumire_proiect"]:
+                if cand in cols:
+                    filters["ilike"].append((cand, f"%{ft}%"))
+                    break
+
+        an_min = st.session_state.get("c_f_an_min", None)
+        an_max = st.session_state.get("c_f_an_max", None)
+        for cand in ["an_implementare", "an", "an_derulare", "an_inceput"]:
+            if cand in cols:
+                if an_min:
+                    filters["gte"].append((cand, int(an_min)))
+                if an_max:
+                    filters["lte"].append((cand, int(an_max)))
+                break
+
+        if f_rol:
+            for cand in ["rol_upt", "rol", "rol_in_proiect"]:
+                if cand in cols:
+                    filters["in"].append((cand, list(f_rol)))
+                    break
+
+        if f_status:
+            for cand in ["status_contract_proiect", "status_proiect", "status"]:
+                if cand in cols:
+                    filters["in"].append((cand, list(f_status)))
+                    break
+
+        if f_dep:
+            for cand in ["departament", "departament_upt", "departament_coord", "dep"]:
+                if cand in cols:
+                    filters["in"].append((cand, list(f_dep)))
+                    break
+
+        dir_text = ""
+        if isinstance(f_dir, list) and len(f_dir) == 1:
+            dir_text = str(f_dir[0]).strip()
+        if dir_text:
+            for cand in ["director", "responsabil", "director_proiect", "responsabil_proiect", "nume_responsabil"]:
+                if cand in cols:
+                    filters["ilike"].append((cand, f"%{dir_text}%"))
+                    break
+
+        q = safe_apply_filters(q, cols, filters)
 
         try:
             res = q.execute()
@@ -326,134 +334,72 @@ def run():
         except Exception as e:
             st.warning(f"Nu am putut interoga {table_name} ({tip}): {e}")
 
+    # ----------------------------
+    # 4) Afișare rezultate + expandere “derulator”
+    # ----------------------------
+    st.write("---")
+    st.markdown("### ✅ Rezultate căutare")
+
     if not all_rows:
-        st.info("Niciun rezultat.")
+        st.info("Nu există rezultate pentru criteriile selectate.")
         return
 
-    df = pd.DataFrame(all_rows)
+    st.caption(f"Total rezultate: {len(all_rows)} (din tipurile: {', '.join(tipuri_sel)})")
 
-    # -----------------------------------------------------
-    # 3) com_echipe_proiect: doar nume_prenume cu reprezinta_idbdc = true
-    #    (legare după cod_identificare)
-    # -----------------------------------------------------
-    reprezentanti = {}
-    if "cod_identificare" in df.columns:
-        ids = sorted({str(x).strip() for x in df["cod_identificare"].dropna().astype(str).tolist() if str(x).strip()})
-        if ids:
-            try:
-                res_team = (
-                    supabase.table("com_echipe_proiect")
-                    .select("cod_identificare,nume_prenume,reprezinta_idbdc")
-                    .eq("reprezinta_idbdc", True)
-                    .in_("cod_identificare", ids)
-                    .execute()
-                )
-                team_rows = res_team.data or []
-                for r in team_rows:
-                    cid = str(r.get("cod_identificare", "")).strip()
-                    nume = str(r.get("nume_prenume", "")).strip()
-                    if not cid or not nume:
-                        continue
-                    reprezentanti.setdefault(cid, [])
-                    if nume not in reprezentanti[cid]:
-                        reprezentanti[cid].append(nume)
-            except Exception as e:
-                st.warning(f"Nu pot citi com_echipe_proiect (reprezinta_idbdc): {e}")
+    def sort_key(r):
+        return str(r.get("cod_identificare", "")).strip()
 
-        df["reprezentant_idbdc"] = df["cod_identificare"].astype(str).map(
-            lambda x: ", ".join(reprezentanti.get(str(x).strip(), []))
-        )
-    else:
-        df["reprezentant_idbdc"] = ""
+    all_rows = sorted(all_rows, key=sort_key)
 
-    # curățare coloane interne
-    # păstrăm _tip pentru context, dar nu obligăm în tabelul final
-    # -----------------------------------------------------
-    st.divider()
-    st.subheader("Rezultate")
+    for r in all_rows:
+        cod = str(r.get("cod_identificare", "")).strip() or "(fără cod_identificare)"
+        tip = r.get("_tip", "")
+        tabela = r.get("_tabela", "")
 
-    # -----------------------------------------------------
-    # 4) Selector de coloane (bifare câmpuri pentru tabel final)
-    # -----------------------------------------------------
-    # “toate câmpurile atribuite fiecărui proiect” = toate coloanele din df (minus cele interne)
-    internal_cols = {"_tabela"}  # nu vrem sursa în tabelul oficial
-    available_cols = [c for c in df.columns if c not in internal_cols]
+        titlu = ""
+        for cand in ["titlu_proiect", "titlu", "obiect_contract", "denumire_proiect"]:
+            if r.get(cand):
+                titlu = str(r.get(cand)).strip()
+                break
 
-    # default: cod_identificare + tip + titlu + reprezentant
-    defaults = []
-    for c in ["cod_identificare", "_tip", "reprezentant_idbdc"]:
-        if c in available_cols:
-            defaults.append(c)
-    title_col = pick_title_col(df)
-    if title_col and title_col in available_cols and title_col not in defaults:
-        defaults.append(title_col)
+        header = f"🆔 {cod}  |  {titlu if titlu else '—'}  ({tip})"
 
-    with st.container():
-        st.markdown('<div class="upt-card">', unsafe_allow_html=True)
-        sel_cols = st.multiselect(
-            "Alege câmpurile care apar în tabelul final (bifezi ce vrei):",
-            options=available_cols,
-            default=defaults
-        )
-        if not sel_cols:
-            st.warning("Bifează cel puțin un câmp.")
-            st.stop()
+        with st.expander(header, expanded=False):
+            st.caption(f"Sursă: {tabela}")
 
-        df_final = df[sel_cols].copy()
+            st.markdown("#### 📌 Detalii (toate câmpurile)")
+            for k in sorted([k for k in r.keys() if not k.startswith("_")]):
+                v = r.get(k)
+                if v is None or str(v).strip() == "":
+                    continue
+                st.write(f"**{k}**: {v}")
 
-        st.dataframe(df_final, use_container_width=True, height=560)
-        st.caption(f"Total rezultate: {len(df_final)}")
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.write("---")
 
-    # -----------------------------------------------------
-    # 5) Download + Print
-    # -----------------------------------------------------
-    st.markdown('<div class="upt-card">', unsafe_allow_html=True)
-    st.subheader("Export")
+            st.markdown("#### 📎 Atașamente")
+            tabs = st.tabs(list(related_tables_guess.keys()))
 
-    cdl1, cdl2, cdl3 = st.columns([1, 1, 1])
+            for tab, (comp_name, candidates) in zip(tabs, related_tables_guess.items()):
+                with tab:
+                    found_any = False
+                    for tname in candidates:
+                        data, err = try_fetch_related_table(supabase, tname, cod)
+                        if data is None:
+                            continue
+                        found_any = True
+                        st.markdown(f"**Tabel:** `{tname}`")
+                        if len(data) == 0:
+                            st.info("Nu există înregistrări atașate pentru acest ID.")
+                        else:
+                            st.dataframe(data, use_container_width=True, height=260)
+                        st.write("---")
 
-    csv_bytes = df_final.to_csv(index=False).encode("utf-8-sig")
-    with cdl1:
-        st.download_button(
-            "⬇️ Download CSV",
-            data=csv_bytes,
-            file_name="idbdc_rezultate.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-
-    # Excel (fără dependințe extra)
-    with cdl2:
-        xlsx_buffer = None
-        try:
-            import io
-            xlsx_buffer = io.BytesIO()
-            with pd.ExcelWriter(xlsx_buffer, engine="openpyxl") as writer:
-                df_final.to_excel(writer, index=False, sheet_name="Rezultate")
-            xlsx_buffer.seek(0)
-        except Exception as e:
-            st.warning(f"Nu pot genera Excel: {e}")
-
-        if xlsx_buffer:
-            st.download_button(
-                "⬇️ Download Excel",
-                data=xlsx_buffer,
-                file_name="idbdc_rezultate.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-        else:
-            st.button("⬇️ Download Excel", disabled=True, use_container_width=True)
-
-    with cdl3:
-        # Print: afișăm într-un iframe HTML cu buton Print
-        import streamlit.components.v1 as components
-        if st.button("🖨️ Print (previzualizare)", use_container_width=True):
-            html_doc = make_printable_html(df_final, title="IDBDC – Rezultate (Calea 1)")
-            components.html(html_doc, height=720, scrolling=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
+                    if not found_any:
+                        st.warning(
+                            "Nu am găsit încă o tabelă de atașamente disponibilă pentru această componentă "
+                            "(sau nu există permisiuni / nu e creată). "
+                            "După ce îmi spui exact numele tabelelor de componente, le fixăm în 2 minute."
+                        )
 
 
 if __name__ == "__main__":
