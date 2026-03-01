@@ -57,6 +57,7 @@ TEXT_COL_CANDIDATES = [
 # an candidates for Contracte/Proiecte (conform doc)
 YEAR_COL_CANDIDATES_CP = ["an_referinta", "an_derulare", "data_incepere", "data_start"]
 
+
 # =========================================================
 # Helpers
 # =========================================================
@@ -82,8 +83,34 @@ def fetch_distinct_values(_supabase: Client, table: str, column: str, limit: int
             s = str(v).strip()
             if s and s not in vals:
                 vals.append(s)
-        vals = sorted(vals)
-        return vals
+        return sorted(vals)
+    except Exception:
+        return []
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def fetch_idbdc_people(_supabase: Client, limit: int = 2000) -> list[str]:
+    """
+    Dropdown persoane: DOAR nume_prenume din com_echipe_proiect
+    unde reprezinta_idbdc = True.
+    """
+    try:
+        res = (
+            _supabase.table("com_echipe_proiect")
+            .select("nume_prenume")
+            .eq("reprezinta_idbdc", True)
+            .limit(limit)
+            .execute()
+        )
+        vals = []
+        for r in (res.data or []):
+            v = r.get("nume_prenume")
+            if v is None:
+                continue
+            s = str(v).strip()
+            if s and s not in vals:
+                vals.append(s)
+        return sorted(vals)
     except Exception:
         return []
 
@@ -109,8 +136,7 @@ def apply_date_equals_filter(q, col: str, date_value: dt.date):
     """
     start = dt.datetime.combine(date_value, dt.time.min)
     end = start + dt.timedelta(days=1)
-    # folosim gte/lt: Supabase are gte/lte; lt nu e mereu disponibil în lib,
-    # deci folosim lte(end-1sec) ca workaround.
+    # workaround lte(end-1sec) ca să simulăm < end
     end_adj = end - dt.timedelta(seconds=1)
     return q.gte(col, start.isoformat()).lte(col, end_adj.isoformat())
 
@@ -195,7 +221,6 @@ def enrich_reprezentant_idbdc(supabase: Client, df: pd.DataFrame) -> pd.DataFram
             lambda x: ", ".join(rep.get(str(x).strip(), []))
         )
     except Exception:
-        # dacă nu avem permisiuni / altă eroare, lăsăm gol
         pass
 
     return df
@@ -204,18 +229,23 @@ def enrich_reprezentant_idbdc(supabase: Client, df: pd.DataFrame) -> pd.DataFram
 def ids_for_person(supabase: Client, person_name: str) -> list[str]:
     """
     Găsește cod_identificare pentru persoană (nume_prenume),
-    folosind com_echipe_proiect (legat de base_* prin cod_identificare).
+    folosind com_echipe_proiect DOAR unde reprezinta_idbdc = True.
     """
     if not person_name:
         return []
     try:
         res = (
             supabase.table("com_echipe_proiect")
-            .select("cod_identificare,nume_prenume")
+            .select("cod_identificare,nume_prenume,reprezinta_idbdc")
+            .eq("reprezinta_idbdc", True)
             .eq("nume_prenume", person_name)
             .execute()
         )
-        ids = sorted({str(r.get("cod_identificare", "")).strip() for r in (res.data or []) if str(r.get("cod_identificare", "")).strip()})
+        ids = sorted({
+            str(r.get("cod_identificare", "")).strip()
+            for r in (res.data or [])
+            if str(r.get("cod_identificare", "")).strip()
+        })
         return ids
     except Exception:
         return []
@@ -257,15 +287,13 @@ def run():
     st.divider()
 
     # ----------------------------
+    # Persoane (DOAR reprezinta_idbdc=True din com_echipe_proiect)
+    # ----------------------------
+    persoane = fetch_idbdc_people(supabase)
+
+    # ----------------------------
     # CRITERII DE CĂUTARE (5) — etichete EXACT ca în doc
     # ----------------------------
-    # Dropdown sources:
-    # - Persoana: det_resurse_umane.nume_prenume
-    # - Evenimente: natura, format
-    # - PI: tip PI, departament
-    # - CP: status, departament, responsabil (din det_resurse_umane)
-    persoane = fetch_distinct_values(supabase, "det_resurse_umane", "nume_prenume")
-
     if categorie == "Evenimente stiintifice":
         natura_list = fetch_distinct_values(supabase, "nom_evenimente_stiintifice", "natura_eveniment")
         format_list = fetch_distinct_values(supabase, "nom_format_evenimente", "format_eveniment")
@@ -285,7 +313,7 @@ def run():
             data_ev = st.date_input("Data evenimentului", value=None)
 
         with c5:
-            persoana = st.selectbox("Persoana de contact", [""] + persoane)
+            persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     elif categorie == "Proprietate intelectuala":
         tip_pi_list = fetch_distinct_values(supabase, "nom_prop_intelect", "acronym_prop_intelect")
@@ -306,7 +334,7 @@ def run():
             dep = st.selectbox("Departament", [""] + dep_list)
 
         with c5:
-            persoana = st.selectbox("Persoana de contact", [""] + persoane)
+            persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     else:
         # Contracte & Proiecte
@@ -328,7 +356,11 @@ def run():
             dep = st.selectbox("Departament", [""] + dep_list)
 
         with c5:
-            persoana = st.selectbox("Responsabil contract / Director proiect", [""] + persoane)
+            persoana = st.selectbox(
+                "Responsabil contract / Director proiect",
+                [""] + persoane,
+                help="Lista include doar persoanele cu reprezinta_idbdc = true."
+            )
 
     # Buton search
     if not st.button("🔎 Caută"):
@@ -353,7 +385,7 @@ def run():
         if data_ev and "data_inceput" in cols:
             q = apply_date_equals_filter(q, "data_inceput", data_ev)
 
-        # persoana -> filtrare prin com_echipe_proiect pe cod_identificare
+        # persoana -> filtrare prin com_echipe_proiect pe cod_identificare (doar reprezinta_idbdc=True)
         if persoana:
             ids = ids_for_person(supabase, persoana)
             if not ids:
@@ -364,21 +396,16 @@ def run():
 
     elif categorie == "Proprietate intelectuala":
         if "tip_pi" in locals() and tip_pi:
-            # coloana din base poate fi alta; aici aplicăm doar dacă există aceeași denumire
             if "acronym_prop_intelect" in cols:
                 q = q.eq("acronym_prop_intelect", tip_pi)
 
-        # anul acordării: data_oficiala_acordare (extragem anul best-effort)
+        # anul acordării: data_oficiala_acordare
         if "data_oficiala_acordare" in cols and "an_acord" in locals() and an_acord:
-            # Nu avem funcții SQL aici; facem best-effort:
-            # - dacă în DB este doar anul, eq
-            # - dacă e dată, filtrăm între 1 ian și 31 dec.
             start = dt.datetime(int(an_acord), 1, 1)
             end = dt.datetime(int(an_acord) + 1, 1, 1) - dt.timedelta(seconds=1)
             q = q.gte("data_oficiala_acordare", start.isoformat()).lte("data_oficiala_acordare", end.isoformat())
 
         if "dep" in locals() and dep:
-            # presupunem coloană acronim_departament în base; aplicăm doar dacă există
             if "acronym_departament" in cols:
                 q = q.eq("acronym_departament", dep)
 
@@ -392,7 +419,6 @@ def run():
 
     else:
         # Contracte & Proiecte
-        # an implementare: pe prima coloană disponibilă din lista din doc
         if "an_impl" in locals() and an_impl:
             for c in YEAR_COL_CANDIDATES_CP:
                 if c in cols:
@@ -405,7 +431,6 @@ def run():
                     break
 
         if "status" in locals() and status:
-            # coloană în base poate fi status_contract_proiect / status etc.; aplicăm best-effort
             for c in ["status_contract_proiect", "status_proiect", "status"]:
                 if c in cols:
                     q = q.eq(c, status)
@@ -425,7 +450,6 @@ def run():
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
 
-    # limit intern (nu îl afișăm ca să nu depășim cele 5 criterii)
     q = q.limit(800)
 
     try:
@@ -453,7 +477,6 @@ def run():
     available_cols = list(df.columns)
 
     defaults = [c for c in ["cod_identificare", "reprezentant_idbdc"] if c in available_cols]
-    # păstrăm încă o coloană "titlu" dacă există
     for c in ["titlu", "titlu_proiect", "titlu_eveniment", "denumire", "denumire_proiect", "denumire_eveniment"]:
         if c in available_cols:
             defaults.append(c)
