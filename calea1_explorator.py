@@ -45,7 +45,7 @@ YEAR_COL_CANDIDATES = [
 # =========================================================
 
 @st.cache_data(show_spinner=False, ttl=600)
-def get_table_columns(supabase: Client, table_name: str) -> list[str]:
+def get_table_columns(_supabase: Client, table_name: str) -> list[str]:
     try:
         res = supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
         return [r["column_name"] for r in (res.data or []) if r.get("column_name")]
