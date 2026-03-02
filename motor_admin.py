@@ -41,11 +41,9 @@ def porneste_motorul(supabase):
         df = pd.DataFrame(data)
 
         if df.empty:
-            # pregătim doar structura, fără a crea rând
             df = pd.DataFrame(columns=cols)
             return df, cols, False
 
-        # asigură toate coloanele și ordinea
         for c in cols:
             if c not in df.columns:
                 df[c] = None
@@ -106,6 +104,130 @@ def porneste_motorul(supabase):
         return count
 
     # ============================
+    # DROPDOWN RELATIONS (st.data_editor)
+    # ============================
+    # Relațiile sunt din documentul tău: coloana-țintă ia valori din coloana-sursă.
+    DROPDOWN_MAP = {
+        # Contracte & Proiecte (base_*)
+        "base_contracte_cep": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+        },
+        "base_contracte_terti": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+        },
+        "base_proiecte_fdi": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            "cod_domeniu_fdi": ("nom_domenii_fdi", "cod_domeniu_fdi"),
+        },
+        "base_proiecte_internationale": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+        },
+        "base_proiecte_interreg": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+        },
+        "base_proiecte_noneu": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+        },
+        "base_proiecte_pncdi": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+        },
+        "base_proiecte_pnrr": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+        },
+
+        # Evenimente
+        "base_evenimente_stiintifice": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "natura_eveniment": ("nom_evenimente_stiintifice", "natura_eveniment"),
+            "format_eveniment": ("nom_format_evenimente", "format_eveniment"),
+        },
+
+        # Proprietate intelectuală
+        "base_prop_intelect": {
+            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+            "acronim_prop_intelect": ("nom_prop_intelect", "acronim_prop_intelect"),
+        },
+
+        # Echipe proiect
+        "com_echipe_proiect": {
+            "nume_prenume": ("det_resurse_umane", "nume_prenume"),
+            "status_personal": ("nom_status_personal", "status_personal"),
+        },
+
+        # (opțional / dacă le editezi în motor_admin cândva)
+        "det_resurse_umane": {
+            "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
+            "acronim_departament": ("nom_departament", "acronim_departament"),
+        },
+        "det_evaluare_fdi": {
+            "cod_universitate": ("nom_universitati", "cod_universitate"),
+        },
+    }
+
+    @st.cache_data(show_spinner=False, ttl=600)
+    def load_dropdown_options(source_table: str, source_col: str):
+        """
+        Încarcă opțiuni distincte pentru dropdown din tabela sursă.
+        Cache 10 minute ca să nu bată DB la fiecare rerun.
+        """
+        try:
+            res = supabase.table(source_table).select(source_col).execute()
+            rows = res.data or []
+            vals = []
+            for r in rows:
+                v = r.get(source_col)
+                if v is None:
+                    continue
+                s = str(v).strip()
+                if s:
+                    vals.append(s)
+            return sorted(list(set(vals)))
+        except Exception:
+            return []
+
+    def build_column_config_for_table(table_name: str, df: pd.DataFrame):
+        """
+        Construiește column_config pentru st.data_editor, pe baza DROPDOWN_MAP,
+        doar pentru coloanele existente în df și doar dacă există opțiuni.
+        """
+        rel = DROPDOWN_MAP.get(table_name, {})
+        cfg = {}
+
+        for target_col, (src_table, src_col) in rel.items():
+            if target_col not in df.columns:
+                continue
+
+            options = load_dropdown_options(src_table, src_col)
+            if not options:
+                continue
+
+            # dacă vrei și "gol" explicit, poți debloca cu o opțiune empty.
+            # însă preferăm să lăsăm None/blank editabil.
+            cfg[target_col] = st.column_config.SelectboxColumn(
+                label=target_col,
+                options=options,
+                required=False
+            )
+
+        return cfg
+
+    # ============================
     # HEADER
     # ============================
 
@@ -141,7 +263,7 @@ def porneste_motorul(supabase):
     st.divider()
 
     # ============================
-    # MAPARE RAND 1
+    # MAPARE TABELA BAZA
     # ============================
 
     map_baze = {
@@ -152,6 +274,8 @@ def porneste_motorul(supabase):
         "INTERNATIONALE": "base_proiecte_internationale",
         "INTERREG": "base_proiecte_interreg",
         "NONEU": "base_proiecte_noneu",
+        "PNCDI": "base_proiecte_pncdi",
+        # dacă există și PNCDI separat în DB, ajustează aici
         "PNCDI": "base_proiecte_pncdi",
     }
 
@@ -175,7 +299,7 @@ def porneste_motorul(supabase):
     cod = str(id_admin).strip()
 
     # ============================
-    # DROPDOWN ACȚIUNE (MODIFICARE / NOUTATE)
+    # DROPDOWN ACȚIUNE
     # ============================
 
     actiune = st.selectbox(
@@ -186,7 +310,7 @@ def porneste_motorul(supabase):
     st.divider()
 
     # ============================
-    # STRUCTURĂ FIȘĂ (TAB-URI FĂRĂ i), ii) etc.)
+    # STRUCTURĂ FIȘĂ (TAB-URI CURATE)
     # ============================
 
     if cat_admin == "Contracte & Proiecte":
@@ -197,26 +321,24 @@ def porneste_motorul(supabase):
             ("Aspecte tehnice", "com_aspecte_tehnice"),
         ]
     else:
-        # Evenimente + PI: doar Bază + Echipa
         tabele = [
             ("Date de bază", tabela_baza),
             ("Echipa", "com_echipe_proiect"),
         ]
 
     # ============================
-    # ÎNCĂRCARE DATE (fără auto-creare implicită)
+    # ÎNCĂRCARE DATE
     # ============================
 
     state_key = lambda t: f"df_admin__{t}"
-    loaded = {}       # table -> (df, cols)
+    loaded = {}       # table -> (df, cols_real)
     exists_map = {}   # table -> bool
 
-    for label, table_name in tabele:
+    for _, table_name in tabele:
         df, cols, exista = load_single_row(table_name, cod)
         loaded[table_name] = (df, cols)
         exists_map[table_name] = exista
 
-    # Există fișa? (criteriu: rând existent în tabela de bază)
     base_exists = exists_map.get(tabela_baza, False)
 
     # ============================
@@ -228,8 +350,6 @@ def porneste_motorul(supabase):
             st.warning("Nu există fișă pentru acest cod în Date de bază. Alege «Introducere noutate» dacă vrei să creezi.")
             return
 
-        # încărcăm exact ce există; pentru tabele lipsă, afișăm rând gol (doar pentru completare),
-        # dar NU îl băgăm automat în DB decât când apasă SALVARE.
         for _, table_name in tabele:
             df, cols = loaded[table_name]
             if df.empty and cols:
@@ -264,7 +384,7 @@ def porneste_motorul(supabase):
     st.divider()
 
     # ============================
-    # TAB-URI + EDITOR
+    # TAB-URI + EDITOR (CU DROPDOWN PE COLOANE)
     # ============================
 
     tabs = st.tabs([label for label, _ in tabele])
@@ -272,11 +392,15 @@ def porneste_motorul(supabase):
 
     for i, (label, table_name) in enumerate(tabele):
         with tabs[i]:
+            df_show = st.session_state[state_key(table_name)]
+            col_cfg = build_column_config_for_table(table_name, df_show)
+
             edited = st.data_editor(
-                st.session_state[state_key(table_name)],
+                df_show,
                 use_container_width=True,
                 hide_index=True,
-                num_rows="fixed"
+                num_rows="fixed",
+                column_config=col_cfg
             )
             edited_data[table_name] = edited
 
