@@ -27,27 +27,39 @@ def porneste_motorul(supabase):
             row["validat_idbdc"] = False
         return row
 
-    def load_or_prepare_single_row(table_name: str, cod: str):
+    def load_single_row(table_name: str, cod: str):
+        """
+        Încarcă rândul pentru cod_identificare.
+        Returnează (df, cols_real, exista_bool).
+        """
         cols = get_table_columns(table_name)
         if not cols:
-            return pd.DataFrame(), []
+            return pd.DataFrame(), [], False
 
         res = supabase.table(table_name).select("*").eq("cod_identificare", cod).execute()
         data = res.data or []
         df = pd.DataFrame(data)
 
         if df.empty:
-            r = empty_row(cols)
-            if "cod_identificare" in r:
-                r["cod_identificare"] = cod
-            df = pd.DataFrame([r], columns=cols)
-        else:
-            for c in cols:
-                if c not in df.columns:
-                    df[c] = None
-            df = df[cols]
+            # pregătim doar structura, fără a crea rând
+            df = pd.DataFrame(columns=cols)
+            return df, cols, False
 
-        return df, cols
+        # asigură toate coloanele și ordinea
+        for c in cols:
+            if c not in df.columns:
+                df[c] = None
+        df = df[cols]
+
+        return df, cols, True
+
+    def prepare_empty_single_row(cols: list, cod: str):
+        if not cols:
+            return pd.DataFrame()
+        r = empty_row(cols)
+        if "cod_identificare" in r:
+            r["cod_identificare"] = cod
+        return pd.DataFrame([r], columns=cols)
 
     def safe_upsert(table_name: str, df: pd.DataFrame, cols_real: list):
         saved = 0
@@ -163,35 +175,78 @@ def porneste_motorul(supabase):
     cod = str(id_admin).strip()
 
     # ============================
-    # DETERMINARE STRUCTURĂ FIȘĂ
+    # DROPDOWN ACȚIUNE (MODIFICARE / NOUTATE)
+    # ============================
+
+    actiune = st.selectbox(
+        "Acțiune",
+        ["Modificare date existente", "Introducere noutate"],
+    )
+
+    st.divider()
+
+    # ============================
+    # STRUCTURĂ FIȘĂ (TAB-URI FĂRĂ i), ii) etc.)
     # ============================
 
     if cat_admin == "Contracte & Proiecte":
         tabele = [
-            ("i) Date de bază", tabela_baza),
-            ("ii) Date financiare", "com_date_financiare"),
-            ("iii) Echipa", "com_echipe_proiect"),
-            ("iv) Aspecte tehnice", "com_aspecte_tehnice"),
+            ("Date de bază", tabela_baza),
+            ("Date financiare", "com_date_financiare"),
+            ("Echipa", "com_echipe_proiect"),
+            ("Aspecte tehnice", "com_aspecte_tehnice"),
         ]
     else:
+        # Evenimente + PI: doar Bază + Echipa
         tabele = [
-            ("i) Date de bază", tabela_baza),
-            ("iii) Echipa", "com_echipe_proiect"),
+            ("Date de bază", tabela_baza),
+            ("Echipa", "com_echipe_proiect"),
         ]
 
     # ============================
-    # ÎNCĂRCARE / PREGĂTIRE DATE
+    # ÎNCĂRCARE DATE (fără auto-creare implicită)
     # ============================
 
     state_key = lambda t: f"df_admin__{t}"
-    loaded_data = {}
+    loaded = {}       # table -> (df, cols)
+    exists_map = {}   # table -> bool
 
     for label, table_name in tabele:
-        df, cols = load_or_prepare_single_row(table_name, cod)
-        loaded_data[table_name] = (df, cols)
+        df, cols, exista = load_single_row(table_name, cod)
+        loaded[table_name] = (df, cols)
+        exists_map[table_name] = exista
 
-        if state_key(table_name) not in st.session_state:
-            st.session_state[state_key(table_name)] = df.copy()
+    # Există fișa? (criteriu: rând existent în tabela de bază)
+    base_exists = exists_map.get(tabela_baza, False)
+
+    # ============================
+    # REGULI PE ACȚIUNE
+    # ============================
+
+    if actiune == "Modificare date existente":
+        if not base_exists:
+            st.warning("Nu există fișă pentru acest cod în Date de bază. Alege «Introducere noutate» dacă vrei să creezi.")
+            return
+
+        # încărcăm exact ce există; pentru tabele lipsă, afișăm rând gol (doar pentru completare),
+        # dar NU îl băgăm automat în DB decât când apasă SALVARE.
+        for _, table_name in tabele:
+            df, cols = loaded[table_name]
+            if df.empty and cols:
+                st.session_state[state_key(table_name)] = prepare_empty_single_row(cols, cod)
+            else:
+                st.session_state[state_key(table_name)] = df.copy()
+
+    else:  # Introducere noutate
+        if base_exists:
+            st.warning("Fișa există deja pentru acest cod. Se încarcă datele existente (nu se creează dubluri).")
+
+        for _, table_name in tabele:
+            df, cols = loaded[table_name]
+            if df.empty and cols:
+                st.session_state[state_key(table_name)] = prepare_empty_single_row(cols, cod)
+            else:
+                st.session_state[state_key(table_name)] = df.copy()
 
     # ============================
     # BUTOANE FIȘĂ
@@ -209,7 +264,7 @@ def porneste_motorul(supabase):
     st.divider()
 
     # ============================
-    # TAB-URI DINAMICE
+    # TAB-URI + EDITOR
     # ============================
 
     tabs = st.tabs([label for label, _ in tabele])
@@ -231,9 +286,9 @@ def porneste_motorul(supabase):
 
     if btn_save:
         total = 0
-        for table_name in edited_data:
+        for _, table_name in tabele:
             df_edit = edited_data[table_name]
-            _, cols_real = loaded_data[table_name]
+            _, cols_real = loaded[table_name]
             total += safe_upsert(table_name, df_edit, cols_real)
             st.session_state[state_key(table_name)] = df_edit.copy()
 
@@ -246,16 +301,16 @@ def porneste_motorul(supabase):
 
     if btn_validate:
         total = 0
-        for table_name in edited_data:
+        for _, table_name in tabele:
             df_edit = edited_data[table_name]
-            _, cols_real = loaded_data[table_name]
+            _, cols_real = loaded[table_name]
             total += safe_validate(table_name, df_edit, cols_real)
 
         st.success(f"Validare realizată ({total} rânduri actualizate).")
         st.rerun()
 
     # ============================
-    # ȘTERGERE FIȘĂ COMPLETĂ
+    # ȘTERGERE FIȘĂ
     # ============================
 
     if btn_delete:
