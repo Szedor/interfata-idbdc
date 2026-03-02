@@ -44,6 +44,7 @@ def porneste_motorul(supabase):
             df = pd.DataFrame(columns=cols)
             return df, cols, False
 
+        # asigură toate coloanele și ordinea
         for c in cols:
             if c not in df.columns:
                 df[c] = None
@@ -106,7 +107,10 @@ def porneste_motorul(supabase):
     # ============================
     # DROPDOWN RELATIONS (st.data_editor)
     # ============================
-    # Relațiile sunt din documentul tău: coloana-țintă ia valori din coloana-sursă.
+
+    # Relațiile conform documentului tău + o regulă STATIC pentru valuta din com_date_financiare.
+    # Format: target_table -> { target_column: (source_table, source_column) }
+    # Pentru opțiuni fixe: ("__STATIC__", "<key>")
     DROPDOWN_MAP = {
         # Contracte & Proiecte (base_*)
         "base_contracte_cep": {
@@ -170,7 +174,12 @@ def porneste_motorul(supabase):
             "status_personal": ("nom_status_personal", "status_personal"),
         },
 
-        # (opțional / dacă le editezi în motor_admin cândva)
+        # Financiar: valuta dropdown fix (LEI/EUR/USD)
+        "com_date_financiare": {
+            "valuta": ("__STATIC__", "VALUTA_3"),
+        },
+
+        # Dacă vei edita vreodată aceste tabele în motor_admin:
         "det_resurse_umane": {
             "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
             "acronim_departament": ("nom_departament", "acronim_departament"),
@@ -178,6 +187,10 @@ def porneste_motorul(supabase):
         "det_evaluare_fdi": {
             "cod_universitate": ("nom_universitati", "cod_universitate"),
         },
+    }
+
+    STATIC_OPTIONS = {
+        "VALUTA_3": ["LEI", "EUR", "USD"],
     }
 
     @st.cache_data(show_spinner=False, ttl=600)
@@ -213,12 +226,14 @@ def porneste_motorul(supabase):
             if target_col not in df.columns:
                 continue
 
-            options = load_dropdown_options(src_table, src_col)
+            if src_table == "__STATIC__":
+                options = STATIC_OPTIONS.get(src_col, [])
+            else:
+                options = load_dropdown_options(src_table, src_col)
+
             if not options:
                 continue
 
-            # dacă vrei și "gol" explicit, poți debloca cu o opțiune empty.
-            # însă preferăm să lăsăm None/blank editabil.
             cfg[target_col] = st.column_config.SelectboxColumn(
                 label=target_col,
                 options=options,
@@ -274,8 +289,6 @@ def porneste_motorul(supabase):
         "INTERNATIONALE": "base_proiecte_internationale",
         "INTERREG": "base_proiecte_interreg",
         "NONEU": "base_proiecte_noneu",
-        "PNCDI": "base_proiecte_pncdi",
-        # dacă există și PNCDI separat în DB, ajustează aici
         "PNCDI": "base_proiecte_pncdi",
     }
 
@@ -339,6 +352,7 @@ def porneste_motorul(supabase):
         loaded[table_name] = (df, cols)
         exists_map[table_name] = exista
 
+    # Există fișa? (criteriu: rând existent în tabela de bază)
     base_exists = exists_map.get(tabela_baza, False)
 
     # ============================
