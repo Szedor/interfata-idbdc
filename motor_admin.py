@@ -6,7 +6,7 @@ from datetime import datetime
 def porneste_motorul(supabase):
 
     # ============================
-    # CONFIG (coloane de control)
+    # CONFIG
     # ============================
     CONTROL_COLS = [
         "responsabil_idbdc",
@@ -72,16 +72,10 @@ def porneste_motorul(supabase):
         return base + "\n" + msg
 
     def hide_control_cols(df: pd.DataFrame) -> pd.DataFrame:
-        # păstrăm ordinea, dar scoatem coloanele de control din editor
         cols = [c for c in df.columns if c not in CONTROL_COLS]
         return df[cols] if cols else df
 
     def merge_back_control_cols(df_edited: pd.DataFrame, df_original: pd.DataFrame) -> pd.DataFrame:
-        """
-        Recompune DF-ul pentru salvare:
-        - coloanele editabile vin din df_edited
-        - coloanele de control (dacă existau) vin din df_original (read-only)
-        """
         out = df_edited.copy()
 
         for c in CONTROL_COLS:
@@ -91,21 +85,45 @@ def porneste_motorul(supabase):
                 try:
                     out[c] = list(df_original[c]) + [None] * max(0, (len(out) - len(df_original)))
                 except Exception:
-                    # fallback simplu
                     out[c] = df_original[c].iloc[0] if len(df_original) else None
 
-        # dacă originalul avea coloane extra (rar), le păstrăm
         for c in df_original.columns:
             if c not in out.columns:
                 out[c] = df_original[c]
 
-        # dacă avem ordine cunoscută (din original), o respectăm
         try:
             out = out[df_original.columns]
         except Exception:
             pass
 
         return out
+
+    def fmt_bool(v):
+        return "DA" if bool(v) else "NU"
+
+    # ============================
+    # SIDEBAR STYLE (diferențiere)
+    # ============================
+
+    st.markdown(
+        """
+        <style>
+          [data-testid="stSidebar"] {
+            background: #0b2a52 !important;   /* mai închis decât fundalul principal */
+            border-right: 2px solid rgba(255,255,255,0.20);
+          }
+          [data-testid="stSidebar"] .stMarkdown, 
+          [data-testid="stSidebar"] label, 
+          [data-testid="stSidebar"] p,
+          [data-testid="stSidebar"] h1,
+          [data-testid="stSidebar"] h2,
+          [data-testid="stSidebar"] h3 {
+            color: #ffffff !important;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # ============================
     # DROPDOWN MAP
@@ -200,25 +218,20 @@ def porneste_motorul(supabase):
     def build_column_config_for_table(table_name: str, df: pd.DataFrame):
         rel = DROPDOWN_MAP.get(table_name, {})
         cfg = {}
-
         for target_col, (src_table, src_col) in rel.items():
             if target_col not in df.columns:
                 continue
-
             if src_table == "__STATIC__":
                 options = STATIC_OPTIONS.get(src_col, [])
             else:
                 options = load_dropdown_options(src_table, src_col)
-
             if not options:
                 continue
-
             cfg[target_col] = st.column_config.SelectboxColumn(
                 label=target_col,
                 options=options,
                 required=False,
             )
-
         return cfg
 
     # ============================
@@ -283,8 +296,23 @@ def porneste_motorul(supabase):
 
     cod = str(id_admin).strip()
 
-    actiune = st.selectbox("Acțiune", ["Modificare date existente", "Introducere noutate"])
+    # ============================
+    # ACȚIUNE (radio, opțiuni vizibile)
+    # ============================
+
+    st.markdown("**Acțiune**")
+    actiune = st.radio(
+        label="",
+        options=["Modificare date existente", "Introducere noutate"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
     st.divider()
+
+    # ============================
+    # STRUCTURĂ TAB-URI
+    # ============================
 
     if cat_admin == "Contracte & Proiecte":
         tabele = [
@@ -328,41 +356,17 @@ def porneste_motorul(supabase):
         else:
             df_full = df.copy()
 
-        # păstrăm copia completă (cu coloane de control) pentru salvare/afișare status
         st.session_state[state_key_raw(table_name)] = df_full.copy()
-        # pentru editor, ascundem coloanele de control
         st.session_state[state_key(table_name)] = hide_control_cols(df_full)
 
-    # ============================
-    # STATUS FIȘĂ (READ-ONLY)
-    # ============================
-
     base_full = st.session_state[state_key_raw(tabela_baza)]
-    if len(base_full) > 0:
-        r = base_full.iloc[0].to_dict()
-        with st.expander("📌 Status fișă (read-only)", expanded=True):
-            cA, cB, cC = st.columns(3)
-            with cA:
-                st.text("Responsabil IDBDC")
-                st.write(r.get("responsabil_idbdc", ""))
-            with cB:
-                st.text("Confirmare")
-                st.write("DA" if bool(r.get("status_confirmare", False)) else "NU")
-            with cC:
-                st.text("Validat IDBDC")
-                st.write("DA" if bool(r.get("validat_idbdc", False)) else "NU")
-
-            st.text("Ultima modificare")
-            st.write(r.get("data_ultimei_modificari", ""))
-
-            st.text("Observații IDBDC")
-            st.code(r.get("observatii_idbdc", "") or "", language="text")
 
     # ============================
-    # BLOCARE DUPĂ VALIDARE (opțional)
+    # BLOCARE DUPĂ VALIDARE
     # ============================
 
     lock_after_validate = st.toggle("🔒 Blochează editarea după validare", value=True)
+
     already_valid = False
     if len(base_full) > 0 and "validat_idbdc" in base_full.columns:
         try:
@@ -371,7 +375,7 @@ def porneste_motorul(supabase):
             already_valid = False
 
     if lock_after_validate and already_valid:
-        st.warning("Fișa este deja validată. Editarea este blocată (dezactivează toggle dacă vrei override).")
+        st.warning("Fișa este deja validată iar editarea este blocată. Deblochează dacă vrei modificare.")
 
     # ============================
     # BUTOANE
@@ -388,7 +392,7 @@ def porneste_motorul(supabase):
     st.divider()
 
     # ============================
-    # TAB-URI + EDITOR (fără coloane de control)
+    # TAB-URI + EDITOR
     # ============================
 
     tabs = st.tabs([label for label, _ in tabele])
@@ -398,7 +402,6 @@ def porneste_motorul(supabase):
         with tabs[i]:
             df_show = st.session_state[state_key(table_name)]
             col_cfg = build_column_config_for_table(table_name, df_show)
-
             num_rows_mode = "dynamic" if table_name == "com_echipe_proiect" else "fixed"
 
             edited = st.data_editor(
@@ -410,6 +413,32 @@ def porneste_motorul(supabase):
                 disabled=(lock_after_validate and already_valid and table_name != tabela_baza),
             )
             edited_data[table_name] = edited
+
+    # ============================
+    # STATUS FIȘĂ (read-only) – SUB FIȘĂ, PE UN SINGUR RÂND
+    # ============================
+
+    if len(base_full) > 0:
+        r = base_full.iloc[0].to_dict()
+        st.divider()
+
+        s1, s2, s3, s4, s5 = st.columns([1.2, 2.2, 1.0, 1.6, 1.0])
+        with s1:
+            st.caption("Responsabil")
+            st.write(r.get("responsabil_idbdc", "") or "")
+        with s2:
+            st.caption("Observații")
+            obs = (r.get("observatii_idbdc", "") or "").strip()
+            st.write(obs if obs else "-")
+        with s3:
+            st.caption("Confirmare")
+            st.write(fmt_bool(r.get("status_confirmare", False)))
+        with s4:
+            st.caption("Ultima modificare")
+            st.write(r.get("data_ultimei_modificari", "") or "-")
+        with s5:
+            st.caption("Validat")
+            st.write(fmt_bool(r.get("validat_idbdc", False)))
 
     # ============================
     # SALVARE TRANZACȚIONALĂ (RPC)
@@ -428,7 +457,6 @@ def porneste_motorul(supabase):
                 if not cols_real or df_edit_visible.empty:
                     continue
 
-                # recompunem DF complet (cu coloane de control read-only din original)
                 df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
 
                 for _, row in df_for_save.iterrows():
@@ -448,7 +476,6 @@ def porneste_motorul(supabase):
                     items.append({"table": table_name, "payload": payload})
 
             supabase.rpc("idbdc_save_fisa", {"p_items": items}).execute()
-
             st.success("Salvare completă (tranzacțional).")
             st.rerun()
         except Exception as e:
