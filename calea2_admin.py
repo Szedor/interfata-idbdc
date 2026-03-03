@@ -44,7 +44,7 @@ def run():
     if "operator_rol" not in st.session_state:
         st.session_state.operator_rol = None
 
-    # 1) Parola (din PostgreSQL)
+    # 1) Parola (poarta admin)
     if not st.session_state.autorizat_p1:
         st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
         _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
@@ -58,7 +58,7 @@ def run():
                     st.error("Parolă greșită sau poarta este dezactivată.")
         st.stop()
 
-    # 2) Operator
+    # 2) Operator + rol
     if not st.session_state.operator_identificat:
         st.sidebar.markdown("### 👤 Identificare Operator")
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
@@ -72,7 +72,7 @@ def run():
                 )
                 if res_op.data:
                     st.session_state.operator_identificat = res_op.data[0].get("nume_prenume")
-                    st.session_state.operator_rol = res_op.data[0].get("rol") or "OPERATOR"
+                    st.session_state.operator_rol = (res_op.data[0].get("rol") or "OPERATOR").strip()
                     st.rerun()
                 else:
                     st.sidebar.error("Cod operator invalid.")
