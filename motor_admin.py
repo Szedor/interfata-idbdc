@@ -103,7 +103,7 @@ def porneste_motorul(supabase):
 
     def is_row_effectively_empty(d: dict) -> bool:
         for k, v in d.items():
-            if k == "cod_identificare":
+            if k in ("cod_identificare", "id_tehnic"):
                 continue
             if v is None:
                 continue
@@ -112,13 +112,39 @@ def porneste_motorul(supabase):
             return False
         return True
 
+    def cleanup_payload(payload: dict) -> dict:
+        """
+        - nu trimite None / "" (ca să nu forțeze NULL în DB)
+        - nu trimite id_tehnic dacă e gol/None (DB îl generează)
+        """
+        out = {}
+        for k, v in (payload or {}).items():
+            if k == "id_tehnic":
+                if v is None:
+                    continue
+                if isinstance(v, str) and v.strip() == "":
+                    continue
+                # dacă vine completat (rar), îl păstrăm
+                out[k] = v
+                continue
+
+            if v is None:
+                continue
+            if isinstance(v, str) and v.strip() == "":
+                continue
+
+            out[k] = v
+        return out
+
     def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
+        # încercăm upsert
         try:
             supabase.table(table_name).upsert(payload, on_conflict="cod_identificare").execute()
             return
         except Exception:
             pass
 
+        # fallback: update
         try:
             upd = supabase.table(table_name).update(payload).eq("cod_identificare", cod).execute()
             if upd.data:
@@ -126,6 +152,7 @@ def porneste_motorul(supabase):
         except Exception:
             pass
 
+        # fallback: insert
         supabase.table(table_name).insert(payload).execute()
 
     def direct_save_all_tables(items: list, operator: str) -> tuple[bool, str]:
@@ -157,14 +184,17 @@ def porneste_motorul(supabase):
                     if not cod:
                         continue
 
+                    # doar coloane reale
                     cp = {k: p.get(k) for k in cols_real if k in p}
                     cp["cod_identificare"] = cod
 
+                    # meta
                     if "data_ultimei_modificari" in cols_real:
                         cp["data_ultimei_modificari"] = now_iso()
-
                     if "observatii_idbdc" in cols_real:
                         cp["observatii_idbdc"] = append_observatii(cp.get("observatii_idbdc"), edit_msg)
+
+                    cp = cleanup_payload(cp)
 
                     if is_row_effectively_empty(cp):
                         continue
@@ -176,6 +206,7 @@ def porneste_motorul(supabase):
 
                 cod0 = str(clean_payloads[0].get("cod_identificare", "")).strip()
 
+                # multi-row (ex: com_echipe_proiect)
                 if len(clean_payloads) > 1:
                     try:
                         supabase.table(table_name).delete().eq("cod_identificare", cod0).execute()
@@ -185,6 +216,7 @@ def porneste_motorul(supabase):
                     ok_any = True
                     continue
 
+                # single-row
                 direct_upsert_single_row(table_name, clean_payloads[0], cod0)
                 ok_any = True
 
@@ -233,6 +265,8 @@ def porneste_motorul(supabase):
                         payload["observatii_idbdc"] = append_observatii(existing, msg)
                     except Exception:
                         payload["observatii_idbdc"] = msg
+
+                payload = cleanup_payload(payload)
 
                 if not payload:
                     continue
@@ -613,7 +647,7 @@ def porneste_motorul(supabase):
             st.write(fmt_bool(r.get("validat_idbdc", False)))
 
     # ============================
-    # SALVARE (DOAR DIRECT)
+    # SALVARE (DIRECT)
     # ============================
 
     if btn_save:
@@ -628,13 +662,11 @@ def porneste_motorul(supabase):
                 _, cols_real = loaded[table_name]
                 if not cols_real:
                     continue
-
                 if df_edit_visible is None or len(df_edit_visible) == 0:
                     continue
 
                 df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
 
-                # pentru tabelele dinamice, ne asigurăm că există cod_identificare pe fiecare rând
                 if "cod_identificare" in df_for_save.columns:
                     df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
                     df_for_save["cod_identificare"] = df_for_save["cod_identificare"].astype(str).replace("nan", cod)
@@ -667,7 +699,7 @@ def porneste_motorul(supabase):
             st.error(f"Eroare la salvare: {e}")
 
     # ============================
-    # VALIDARE (DOAR DIRECT)
+    # VALIDARE (DIRECT)
     # ============================
 
     if btn_validate:
@@ -683,7 +715,7 @@ def porneste_motorul(supabase):
             st.error(f"Eroare la validare: {e}")
 
     # ============================
-    # ȘTERGERE (DOAR DIRECT) + CONFIRMARE
+    # ȘTERGERE (DIRECT) + CONFIRMARE
     # ============================
 
     if btn_delete:
