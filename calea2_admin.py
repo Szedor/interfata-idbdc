@@ -19,19 +19,47 @@ def run():
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
+    # === STYLE (inclusiv sidebar de autentificare) ===
     st.markdown(
         """
         <style>
-            .stApp, [data-testid="stSidebar"] { background-color: #003366 !important; }
-            .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp p, .stApp label, .stApp .stMarkdown,
-            [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: white !important; }
-            input { color: #000000 !important; background-color: #ffffff !important; }
-            div.stButton > button {
-                border: 1px solid white !important; color: white !important;
-                background-color: rgba(255,255,255,0.1) !important;
-                width: 100%; font-size: 14px !important; font-weight: bold !important; height: 45px !important;
+            /* Fundal aplicație */
+            .stApp { background-color: #003366 !important; }
+
+            /* Sidebar: schimbare culoare (mai distinctă) */
+            [data-testid="stSidebar"] {
+                background-color: #0b2a52 !important;   /* nou */
+                border-right: 2px solid rgba(255,255,255,0.20);
             }
-            div.stButton > button:hover { background-color: white !important; color: #003366 !important; }
+
+            /* Text alb în aplicație + sidebar */
+            .stApp h1, .stApp h2, .stApp h3, .stApp h4,
+            .stApp p, .stApp label, .stApp .stMarkdown,
+            [data-testid="stSidebar"] p, [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+                color: white !important;
+            }
+
+            /* Input-uri clare */
+            input {
+                color: #000000 !important;
+                background-color: #ffffff !important;
+            }
+
+            /* Butoane */
+            div.stButton > button {
+                border: 1px solid white !important;
+                color: white !important;
+                background-color: rgba(255,255,255,0.10) !important;
+                width: 100%;
+                font-size: 14px !important;
+                font-weight: bold !important;
+                height: 45px !important;
+            }
+            div.stButton > button:hover {
+                background-color: white !important;
+                color: #003366 !important;
+            }
         </style>
         """,
         unsafe_allow_html=True,
@@ -58,10 +86,11 @@ def run():
                     st.error("Parolă greșită sau poarta este dezactivată.")
         st.stop()
 
-    # 2) Operator + rol
+    # 2) Operator + rol (în sidebar)
     if not st.session_state.operator_identificat:
         st.sidebar.markdown("### 👤 Identificare Operator")
         cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
+
         if cod_in:
             try:
                 res_op = (
@@ -78,12 +107,14 @@ def run():
                     st.sidebar.error("Cod operator invalid.")
             except Exception as e:
                 st.sidebar.error(f"Eroare la verificarea operatorului: {e}")
+
         st.stop()
-    else:
-        st.sidebar.success(f"Operator: {st.session_state.operator_identificat} ({st.session_state.operator_rol})")
-        if st.sidebar.button("Ieșire / Resetare"):
-            st.session_state.clear()
-            st.rerun()
+
+    # Operator deja logat
+    st.sidebar.success(f"Operator: {st.session_state.operator_identificat} ({st.session_state.operator_rol})")
+    if st.sidebar.button("Ieșire / Resetare"):
+        st.session_state.clear()
+        st.rerun()
 
     porneste_motorul(supabase)
 
