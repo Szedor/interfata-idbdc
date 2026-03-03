@@ -16,6 +16,28 @@ def porneste_motorul(supabase):
         "validat_idbdc",
     ]
 
+    # NOM/DET whitelist (gard de siguranță)
+    NOMDET_WHITELIST = [
+        "nom_categorie",
+        "nom_status_proiect",
+        "nom_contracte_proiecte",
+        "nom_departament",
+        "nom_functie_upt",
+        "nom_domenii_fdi",
+        "nom_universitati",
+        "det_resurse_umane",
+    ]
+
+    # pentru det_resurse_umane (dropdown-uri)
+    NOMDET_DROPDOWN_MAP = {
+        "det_resurse_umane": {
+            "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
+            "acronim_departament": ("nom_departament", "acronim_departament"),
+        }
+    }
+
+    STATIC_OPTIONS = {"VALUTA_3": ["LEI", "EUR", "USD"]}
+
     # ============================
     # HELPERS
     # ============================
@@ -318,6 +340,279 @@ def porneste_motorul(supabase):
         c = (col or "").lower()
         return c == "an" or c.startswith("an_")
 
+    @st.cache_data(show_spinner=False, ttl=600)
+    def load_dropdown_options(source_table: str, source_col: str):
+        try:
+            res = supabase.table(source_table).select(source_col).execute()
+            rows = res.data or []
+            vals = []
+            for r in rows:
+                v = r.get(source_col)
+                if v is None:
+                    continue
+                s = str(v).strip()
+                if s:
+                    vals.append(s)
+            return sorted(list(set(vals)))
+        except Exception:
+            return []
+
+    def build_column_config_for_table(table_name: str, df: pd.DataFrame):
+        # dropdowns existente din Admin
+        DROPDOWN_MAP = {
+            "base_contracte_cep": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_contracte_terti": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_fdi": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+                "cod_domeniu_fdi": ("nom_domenii_fdi", "cod_domeniu_fdi"),
+            },
+            "base_proiecte_internationale": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_interreg": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_noneu": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_pncdi": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_pnrr": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_evenimente_stiintifice": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "natura_eveniment": ("nom_evenimente_stiintifice", "natura_eveniment"),
+                "format_eveniment": ("nom_format_evenimente", "format_eveniment"),
+            },
+            "base_prop_intelect": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_prop_intelect": ("nom_prop_intelect", "acronim_prop_intelect"),
+            },
+            "com_echipe_proiect": {
+                "nume_prenume": ("det_resurse_umane", "nume_prenume"),
+                "status_personal": ("nom_status_personal", "status_personal"),
+            },
+            "com_date_financiare": {
+                "valuta": ("__STATIC__", "VALUTA_3"),
+            },
+            "det_resurse_umane": {
+                "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
+                "acronim_departament": ("nom_departament", "acronim_departament"),
+            },
+            "det_evaluare_fdi": {
+                "cod_universitate": ("nom_universitati", "cod_universitate"),
+            },
+        }
+
+        rel = DROPDOWN_MAP.get(table_name, {})
+        cfg = {}
+
+        for target_col, (src_table, src_col) in rel.items():
+            if target_col not in df.columns:
+                continue
+            if src_table == "__STATIC__":
+                options = STATIC_OPTIONS.get(src_col, [])
+            else:
+                options = load_dropdown_options(src_table, src_col)
+            if not options:
+                continue
+            cfg[target_col] = st.column_config.SelectboxColumn(
+                label=target_col,
+                options=options,
+                required=False,
+            )
+
+        if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
+            cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
+                label="reprezinta_idbdc",
+                help="DA/NU",
+                default=False,
+            )
+
+        # ISO 8601 date: YYYY-MM-DD
+        for c in df.columns:
+            if c in CONTROL_COLS:
+                continue
+            if is_date_col(c):
+                cfg[c] = st.column_config.DateColumn(
+                    label=c,
+                    format="YYYY-MM-DD",
+                    step=1,
+                    help="Format obligatoriu: YYYY-MM-DD (ISO 8601)",
+                )
+
+        # ani cu +/- (step 1)
+        for c in df.columns:
+            if c in CONTROL_COLS:
+                continue
+            if is_year_col(c):
+                cfg[c] = st.column_config.NumberColumn(
+                    label=c,
+                    min_value=1900,
+                    max_value=2100,
+                    step=1,
+                    format="%d",
+                )
+
+        return cfg
+
+    # ============================
+    # NOMENCLATOARE & DETALII (ADMIN ONLY)
+    # ============================
+
+    def _nomdet_detect_pk(cols: list[str]) -> str:
+        if "id_tehnic" in cols:
+            return "id_tehnic"
+        return cols[0] if cols else ""
+
+    def _nomdet_clean_payload(d: dict):
+        out = {}
+        for k, v in (d or {}).items():
+            if k == "__STERGE__":
+                continue
+            if v is None:
+                continue
+            if isinstance(v, str) and v.strip() == "":
+                continue
+            out[k] = v
+        return out
+
+    def _nomdet_build_column_config(table_name: str, df: pd.DataFrame):
+        cfg = {}
+
+        rel = NOMDET_DROPDOWN_MAP.get(table_name, {})
+        for target_col, (src_table, src_col) in rel.items():
+            if target_col not in df.columns:
+                continue
+            options = load_dropdown_options(src_table, src_col)
+            if not options:
+                continue
+            cfg[target_col] = st.column_config.SelectboxColumn(
+                label=target_col,
+                options=options,
+                required=False,
+            )
+
+        if "__STERGE__" in df.columns:
+            cfg["__STERGE__"] = st.column_config.CheckboxColumn(
+                label="Șterge",
+                default=False,
+            )
+
+        # ISO 8601 date, dacă apar
+        for c in df.columns:
+            if c == "__STERGE__":
+                continue
+            if is_date_col(c):
+                cfg[c] = st.column_config.DateColumn(label=c, format="YYYY-MM-DD", step=1)
+
+        # ani, dacă apar
+        for c in df.columns:
+            if c == "__STERGE__":
+                continue
+            if is_year_col(c):
+                cfg[c] = st.column_config.NumberColumn(label=c, min_value=1900, max_value=2100, step=1, format="%d")
+
+        return cfg
+
+    def render_nomenclatoare_admin_box():
+        rol = (st.session_state.get("operator_rol") or "").strip().upper()
+        if rol != "ADMIN":
+            return
+
+        with st.expander("🧩 Nomenclatoare & Detalii", expanded=False):
+            st.caption("Alege tabela, editează în grid și apasă SALVARE.")
+
+            tabela = st.selectbox("Tabelă", NOMDET_WHITELIST, index=0, key="nomdet_table")
+
+            cols = get_table_columns(tabela)
+            if not cols:
+                st.error("Nu pot citi coloanele tablei (idbdc_get_columns nu a returnat nimic).")
+                return
+
+            pk = _nomdet_detect_pk(cols)
+
+            try:
+                res = supabase.table(tabela).select("*").execute()
+                data = res.data or []
+                df = pd.DataFrame(data)
+            except Exception as e:
+                st.error(f"Eroare la încărcare: {e}")
+                return
+
+            if df.empty:
+                df = pd.DataFrame(columns=cols)
+
+            # asigurăm coloanele
+            for c in cols:
+                if c not in df.columns:
+                    df[c] = None
+
+            df = df[cols].copy()
+            if "__STERGE__" not in df.columns:
+                df["__STERGE__"] = False
+
+            cfg = _nomdet_build_column_config(tabela, df)
+
+            edited = st.data_editor(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="dynamic",
+                column_config=cfg,
+                key="nomdet_editor",
+            )
+
+            if st.button("💾 SALVARE", key="nomdet_save"):
+                try:
+                    # Ștergeri
+                    to_delete = edited[edited["__STERGE__"] == True]  # noqa: E712
+                    for _, row in to_delete.iterrows():
+                        key_val = row.get(pk)
+                        if key_val is None or str(key_val).strip() == "":
+                            continue
+                        supabase.table(tabela).delete().eq(pk, key_val).execute()
+
+                    # Upsert rest
+                    to_upsert = edited[edited["__STERGE__"] != True].copy()  # noqa: E712
+                    payloads = []
+                    for _, row in to_upsert.iterrows():
+                        d = _nomdet_clean_payload(row.to_dict())
+                        key_val = d.get(pk)
+                        if key_val is None or str(key_val).strip() == "":
+                            continue
+                        payloads.append(d)
+
+                    if payloads:
+                        supabase.table(tabela).upsert(payloads, on_conflict=pk).execute()
+
+                    st.success("Salvare realizată.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Eroare la salvare: {e}")
+
     # ============================
     # STYLE
     # ============================
@@ -345,149 +640,6 @@ def porneste_motorul(supabase):
         """,
         unsafe_allow_html=True,
     )
-
-    # ============================
-    # DROPDOWN MAP
-    # ============================
-
-    DROPDOWN_MAP = {
-        "base_contracte_cep": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-        },
-        "base_contracte_terti": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-        },
-        "base_proiecte_fdi": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            "cod_domeniu_fdi": ("nom_domenii_fdi", "cod_domeniu_fdi"),
-        },
-        "base_proiecte_internationale": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-        },
-        "base_proiecte_interreg": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-        },
-        "base_proiecte_noneu": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-        },
-        "base_proiecte_pncdi": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-        },
-        "base_proiecte_pnrr": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_contracte_proiecte": ("nom_contracte_proiecte", "acronim_contracte_proiecte"),
-            "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-        },
-        "base_evenimente_stiintifice": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "natura_eveniment": ("nom_evenimente_stiintifice", "natura_eveniment"),
-            "format_eveniment": ("nom_format_evenimente", "format_eveniment"),
-        },
-        "base_prop_intelect": {
-            "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-            "acronim_prop_intelect": ("nom_prop_intelect", "acronim_prop_intelect"),
-        },
-        "com_echipe_proiect": {
-            "nume_prenume": ("det_resurse_umane", "nume_prenume"),
-            "status_personal": ("nom_status_personal", "status_personal"),
-        },
-        "com_date_financiare": {
-            "valuta": ("__STATIC__", "VALUTA_3"),
-        },
-        "det_resurse_umane": {
-            "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
-            "acronim_departament": ("nom_departament", "acronim_departament"),
-        },
-        "det_evaluare_fdi": {
-            "cod_universitate": ("nom_universitati", "cod_universitate"),
-        },
-    }
-
-    STATIC_OPTIONS = {"VALUTA_3": ["LEI", "EUR", "USD"]}
-
-    @st.cache_data(show_spinner=False, ttl=600)
-    def load_dropdown_options(source_table: str, source_col: str):
-        try:
-            res = supabase.table(source_table).select(source_col).execute()
-            rows = res.data or []
-            vals = []
-            for r in rows:
-                v = r.get(source_col)
-                if v is None:
-                    continue
-                s = str(v).strip()
-                if s:
-                    vals.append(s)
-            return sorted(list(set(vals)))
-        except Exception:
-            return []
-
-    def build_column_config_for_table(table_name: str, df: pd.DataFrame):
-        rel = DROPDOWN_MAP.get(table_name, {})
-        cfg = {}
-
-        for target_col, (src_table, src_col) in rel.items():
-            if target_col not in df.columns:
-                continue
-            if src_table == "__STATIC__":
-                options = STATIC_OPTIONS.get(src_col, [])
-            else:
-                options = load_dropdown_options(src_table, src_col)
-            if not options:
-                continue
-            cfg[target_col] = st.column_config.SelectboxColumn(
-                label=target_col,
-                options=options,
-                required=False,
-            )
-
-        if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
-            cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
-                label="reprezinta_idbdc",
-                help="DA/NU",
-                default=False,
-            )
-
-        # ISO 8601: YYYY-MM-DD (obligatoriu)
-        for c in df.columns:
-            if c in CONTROL_COLS:
-                continue
-            if is_date_col(c):
-                cfg[c] = st.column_config.DateColumn(
-                    label=c,
-                    format="YYYY-MM-DD",  # ISO 8601 (date)
-                    step=1,
-                    help="Format obligatoriu: YYYY-MM-DD (ISO 8601)",
-                )
-
-        y = current_year()
-        for c in df.columns:
-            if c in CONTROL_COLS:
-                continue
-            if is_year_col(c):
-                cfg[c] = st.column_config.NumberColumn(
-                    label=c,
-                    min_value=1900,
-                    max_value=2100,
-                    step=1,  # +/- 1
-                    format="%d",
-                )
-
-        return cfg
 
     # ============================
     # HEADER
@@ -543,10 +695,13 @@ def porneste_motorul(supabase):
 
     if not tabela_baza:
         st.info("Selectează categoria și (dacă este cazul) tipul.")
+        # chiar și fără fișe, admin poate gestiona nomenclatoare:
+        render_nomenclatoare_admin_box()
         return
 
     if not id_admin or str(id_admin).strip() == "":
         st.info("Introdu «Filtru numar contract sau id proiect» pentru a deschide fișa.")
+        render_nomenclatoare_admin_box()
         return
 
     cod = str(id_admin).strip()
@@ -602,6 +757,7 @@ def porneste_motorul(supabase):
     base_exists = exists_map.get(tabela_baza, False)
     if actiune == "Modificare date existente" and not base_exists:
         st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Introducere noutate» dacă vrei să creezi.")
+        render_nomenclatoare_admin_box()
         return
 
     for _, table_name in tabele:
@@ -657,6 +813,7 @@ def porneste_motorul(supabase):
         with tabs[i]:
             df_show = st.session_state[state_key(table_name)].copy()
 
+            # la Date financiare: "valuta" după "an_referinta"
             if table_name == "com_date_financiare" and "an_referinta" in df_show.columns and "valuta" in df_show.columns:
                 cols = list(df_show.columns)
                 cols.remove("valuta")
@@ -788,3 +945,10 @@ def porneste_motorul(supabase):
                 st.error(f"Eroare la ștergere: {e}")
         else:
             st.info("Bifează confirmarea și tastează exact codul pentru a executa ștergerea.")
+
+    # ============================
+    # BOX NOM/DET (ADMIN only)
+    # ============================
+
+    st.divider()
+    render_nomenclatoare_admin_box()
