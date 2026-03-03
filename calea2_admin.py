@@ -19,20 +19,20 @@ def run():
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 
-    # === STYLE (inclusiv sidebar de autentificare) ===
+    # === STYLE (sidebar + ascundere toolbar Streamlit) ===
     st.markdown(
         """
         <style>
             /* Fundal aplicație */
             .stApp { background-color: #003366 !important; }
 
-            /* Sidebar: schimbare culoare (mai distinctă) */
+            /* Sidebar: culoare constantă */
             [data-testid="stSidebar"] {
-                background-color: #0b2a52 !important;   /* nou */
+                background-color: #0b2a52 !important;
                 border-right: 2px solid rgba(255,255,255,0.20);
             }
 
-            /* Text alb în aplicație + sidebar */
+            /* Text alb */
             .stApp h1, .stApp h2, .stApp h3, .stApp h4,
             .stApp p, .stApp label, .stApp .stMarkdown,
             [data-testid="stSidebar"] p, [data-testid="stSidebar"] label,
@@ -54,17 +54,26 @@ def run():
                 width: 100%;
                 font-size: 14px !important;
                 font-weight: bold !important;
-                height: 45px !important;
+                height: 42px !important;
             }
             div.stButton > button:hover {
                 background-color: white !important;
                 color: #003366 !important;
             }
+
+            /* ASCUNDE bara Streamlit (Share / GitHub / etc.) */
+            [data-testid="stToolbar"] { visibility: hidden !important; height: 0px !important; }
+            [data-testid="stHeader"]  { visibility: hidden !important; height: 0px !important; }
+            [data-testid="stDecoration"] { visibility: hidden !important; height: 0px !important; }
+
+            /* (opțional) ascunde meniul din dreapta sus, dacă apare */
+            #MainMenu { visibility: hidden !important; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
+    # === SESSION ===
     if "autorizat_p1" not in st.session_state:
         st.session_state.autorizat_p1 = False
     if "operator_identificat" not in st.session_state:
@@ -72,24 +81,31 @@ def run():
     if "operator_rol" not in st.session_state:
         st.session_state.operator_rol = None
 
-    # 1) Parola (poarta admin)
+    # === UI principal (titlu) ===
+    st.markdown("<h2 style='text-align:center;'>🛠️ Consola de administrare IDBDC</h2>", unsafe_allow_html=True)
+
+    # === Sidebar: autentificare completă (de la început) ===
+    st.sidebar.markdown("## 🔐 Autentificare")
+
+    # 1) Poarta
     if not st.session_state.autorizat_p1:
-        st.markdown("<h2 style='text-align: center;'> 🛡️ Acces Securizat IDBDC</h2>", unsafe_allow_html=True)
-        _, col_ce, _ = st.columns([1.3, 0.6, 1.3])
-        with col_ce:
-            parola_m = st.text_input("Parola:", type="password", key="p1_pass")
-            if st.button("Autorizare acces"):
-                if _check_gate_password(supabase, "admin", parola_m):
-                    st.session_state.autorizat_p1 = True
-                    st.rerun()
-                else:
-                    st.error("Parolă greșită sau poarta este dezactivată.")
+        st.sidebar.markdown("### Pas 1 — Parolă acces modul")
+        parola_m = st.sidebar.text_input("Parola:", type="password", key="p1_pass")
+
+        if st.sidebar.button("Autorizare acces"):
+            if _check_gate_password(supabase, "admin", parola_m):
+                st.session_state.autorizat_p1 = True
+                st.rerun()
+            else:
+                st.sidebar.error("Parolă greșită sau poarta este dezactivată.")
+
+        st.info("Introduceți parola în bara din stânga pentru a continua.")
         st.stop()
 
-    # 2) Operator + rol (în sidebar)
+    # 2) Operator
     if not st.session_state.operator_identificat:
-        st.sidebar.markdown("### 👤 Identificare Operator")
-        cod_in = st.sidebar.text_input("Cod Identificare", type="password", key="p2_cod_input")
+        st.sidebar.markdown("### Pas 2 — Cod operator")
+        cod_in = st.sidebar.text_input("Cod Identificare:", type="password", key="p2_cod_input")
 
         if cod_in:
             try:
@@ -108,14 +124,16 @@ def run():
             except Exception as e:
                 st.sidebar.error(f"Eroare la verificarea operatorului: {e}")
 
+        st.info("Introduceți codul de operator în bara din stânga pentru a intra în modul.")
         st.stop()
 
-    # Operator deja logat
+    # Operator logat
     st.sidebar.success(f"Operator: {st.session_state.operator_identificat} ({st.session_state.operator_rol})")
     if st.sidebar.button("Ieșire / Resetare"):
         st.session_state.clear()
         st.rerun()
 
+    # pornește motorul Admin
     porneste_motorul(supabase)
 
 
