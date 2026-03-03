@@ -30,6 +30,10 @@ def porneste_motorul(supabase):
         except Exception:
             return []
 
+    def has_col(table_name: str, col: str) -> bool:
+        cols = get_table_columns(table_name)
+        return col in set(cols)
+
     def empty_row(columns):
         row = {c: None for c in columns}
         if "status_confirmare" in row:
@@ -101,6 +105,65 @@ def porneste_motorul(supabase):
     def fmt_bool(v):
         return "DA" if bool(v) else "NU"
 
+    def fallback_validate_fisa(cod: str, table_names: list[str], operator: str) -> tuple[bool, str]:
+        """
+        Fallback când RPC idbdc_validate_fisa lipsește.
+        Marchează validat_idbdc=True acolo unde există coloana.
+        """
+        ok_any = False
+        errors = []
+
+        msg = f"Validat de {operator} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+        for t in table_names:
+            try:
+                cols = set(get_table_columns(t))
+                if "cod_identificare" not in cols:
+                    continue
+
+                payload = {}
+
+                if "validat_idbdc" in cols:
+                    payload["validat_idbdc"] = True
+
+                # opțional, dacă există:
+                if "data_ultimei_modificari" in cols:
+                    payload["data_ultimei_modificari"] = now_iso()
+
+                if "observatii_idbdc" in cols:
+                    # citim observațiile curente ca să le concatenăm (best-effort)
+                    try:
+                        cur = (
+                            supabase.table(t)
+                            .select("observatii_idbdc")
+                            .eq("cod_identificare", cod)
+                            .limit(1)
+                            .execute()
+                        )
+                        existing = ""
+                        if cur.data and isinstance(cur.data, list) and len(cur.data) > 0:
+                            existing = cur.data[0].get("observatii_idbdc") or ""
+                        payload["observatii_idbdc"] = append_observatii(existing, msg)
+                    except Exception:
+                        payload["observatii_idbdc"] = msg
+
+                if not payload:
+                    continue
+
+                supabase.table(t).update(payload).eq("cod_identificare", cod).execute()
+                ok_any = True
+
+            except Exception as e:
+                errors.append(f"{t}: {e}")
+
+        if not ok_any and errors:
+            return False, " | ".join(errors)
+        if not ok_any:
+            return False, "Nu s-a putut valida (nu există coloane compatibile în tabelele selectate)."
+        if errors:
+            return True, "Validare parțială (cu unele avertismente)."
+        return True, "Validare realizată."
+
     # ============================
     # SIDEBAR STYLE (diferențiere)
     # ============================
@@ -109,11 +172,11 @@ def porneste_motorul(supabase):
         """
         <style>
           [data-testid="stSidebar"] {
-            background: #0b2a52 !important;   /* mai închis decât fundalul principal */
+            background: #0b2a52 !important;
             border-right: 2px solid rgba(255,255,255,0.20);
           }
-          [data-testid="stSidebar"] .stMarkdown, 
-          [data-testid="stSidebar"] label, 
+          [data-testid="stSidebar"] .stMarkdown,
+          [data-testid="stSidebar"] label,
           [data-testid="stSidebar"] p,
           [data-testid="stSidebar"] h1,
           [data-testid="stSidebar"] h2,
@@ -415,7 +478,7 @@ def porneste_motorul(supabase):
             edited_data[table_name] = edited
 
     # ============================
-    # STATUS FIȘĂ (read-only) – SUB FIȘĂ, PE UN SINGUR RÂND
+    # STATUS FIȘĂ (read-only)
     # ============================
 
     if len(base_full) > 0:
@@ -482,16 +545,22 @@ def porneste_motorul(supabase):
             st.error(f"Eroare la salvare: {e}")
 
     # ============================
-    # VALIDARE (RPC)
+    # VALIDARE (RPC + FALLBACK)
     # ============================
 
     if btn_validate:
+        operator = st.session_state.operator_identificat
         try:
             supabase.rpc("idbdc_validate_fisa", {"p_cod": cod, "p_tables": table_names}).execute()
             st.success("Validare realizată (tranzacțional).")
             st.rerun()
-        except Exception as e:
-            st.error(f"Eroare la validare: {e}")
+        except Exception:
+            ok, msg = fallback_validate_fisa(cod, table_names, operator)
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(f"Eroare la validare: {msg}")
 
     # ============================
     # ȘTERGERE (RPC) + CONFIRMARE
