@@ -113,10 +113,6 @@ def porneste_motorul(supabase):
         return True
 
     def cleanup_payload(payload: dict) -> dict:
-        """
-        - nu trimite None / "" (ca să nu forțeze NULL în DB)
-        - nu trimite id_tehnic dacă e gol/None (DB îl generează)
-        """
         out = {}
         for k, v in (payload or {}).items():
             if k == "id_tehnic":
@@ -124,7 +120,6 @@ def porneste_motorul(supabase):
                     continue
                 if isinstance(v, str) and v.strip() == "":
                     continue
-                # dacă vine completat (rar), îl păstrăm
                 out[k] = v
                 continue
 
@@ -137,14 +132,12 @@ def porneste_motorul(supabase):
         return out
 
     def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
-        # încercăm upsert
         try:
             supabase.table(table_name).upsert(payload, on_conflict="cod_identificare").execute()
             return
         except Exception:
             pass
 
-        # fallback: update
         try:
             upd = supabase.table(table_name).update(payload).eq("cod_identificare", cod).execute()
             if upd.data:
@@ -152,7 +145,6 @@ def porneste_motorul(supabase):
         except Exception:
             pass
 
-        # fallback: insert
         supabase.table(table_name).insert(payload).execute()
 
     def direct_save_all_tables(items: list, operator: str) -> tuple[bool, str]:
@@ -184,14 +176,14 @@ def porneste_motorul(supabase):
                     if not cod:
                         continue
 
-                    # doar coloane reale
                     cp = {k: p.get(k) for k in cols_real if k in p}
                     cp["cod_identificare"] = cod
 
-                    # meta
                     if "data_ultimei_modificari" in cols_real:
                         cp["data_ultimei_modificari"] = now_iso()
+
                     if "observatii_idbdc" in cols_real:
+                        # adăugăm o singură dată, aici (nu și în build items)
                         cp["observatii_idbdc"] = append_observatii(cp.get("observatii_idbdc"), edit_msg)
 
                     cp = cleanup_payload(cp)
@@ -206,7 +198,6 @@ def porneste_motorul(supabase):
 
                 cod0 = str(clean_payloads[0].get("cod_identificare", "")).strip()
 
-                # multi-row (ex: com_echipe_proiect)
                 if len(clean_payloads) > 1:
                     try:
                         supabase.table(table_name).delete().eq("cod_identificare", cod0).execute()
@@ -216,7 +207,6 @@ def porneste_motorul(supabase):
                     ok_any = True
                     continue
 
-                # single-row
                 direct_upsert_single_row(table_name, clean_payloads[0], cod0)
                 ok_any = True
 
@@ -308,7 +298,7 @@ def porneste_motorul(supabase):
         return True, "Fișa a fost ștearsă."
 
     # ============================
-    # SIDEBAR STYLE
+    # STYLE (spațieri)
     # ============================
 
     st.markdown(
@@ -326,6 +316,11 @@ def porneste_motorul(supabase):
           [data-testid="stSidebar"] h3 {
             color: #ffffff !important;
           }
+
+          /* micșorare spații între blocuri */
+          div.block-container { padding-top: 1.0rem; padding-bottom: 1.0rem; }
+          .stRadio, .stToggle { margin-bottom: 0.2rem; }
+          .stButton { margin-top: 0.2rem; margin-bottom: 0.2rem; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -514,7 +509,8 @@ def porneste_motorul(supabase):
         label_visibility="collapsed",
     )
 
-    st.divider()
+    # micșorăm spațiul până la toggle
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     # ============================
     # STRUCTURĂ TAB-URI
@@ -552,7 +548,7 @@ def porneste_motorul(supabase):
 
     base_exists = exists_map.get(tabela_baza, False)
     if actiune == "Modificare date existente" and not base_exists:
-        st.warning("Nu există fișă pentru acest cod în Date de bază. Alege «Introducere noutate» dacă vrei să creezi.")
+        st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Introducere noutate» dacă vrei să creezi.")
         return
 
     for _, table_name in tabele:
@@ -595,7 +591,8 @@ def porneste_motorul(supabase):
     with b3:
         btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
-    st.divider()
+    # micșorăm spațiul până la tab-uri
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     # ============================
     # TAB-URI + EDITOR
@@ -621,30 +618,30 @@ def porneste_motorul(supabase):
             edited_data[table_name] = edited
 
     # ============================
-    # STATUS FIȘĂ (read-only)
+    # STATUS FIȘĂ (în expander)
     # ============================
 
     if len(base_full) > 0:
-        r = base_full.iloc[0].to_dict()
-        st.divider()
+        with st.expander("Status fișă (Responsabil / Observații / Confirmare / Ultima modificare / Validat)", expanded=False):
+            r = base_full.iloc[0].to_dict()
 
-        s1, s2, s3, s4, s5 = st.columns([1.2, 2.2, 1.0, 1.6, 1.0])
-        with s1:
-            st.caption("Responsabil")
-            st.write(r.get("responsabil_idbdc", "") or "")
-        with s2:
-            st.caption("Observații")
-            obs = (r.get("observatii_idbdc", "") or "").strip()
-            st.write(obs if obs else "-")
-        with s3:
-            st.caption("Confirmare")
-            st.write(fmt_bool(r.get("status_confirmare", False)))
-        with s4:
-            st.caption("Ultima modificare")
-            st.write(r.get("data_ultimei_modificari", "") or "-")
-        with s5:
-            st.caption("Validat")
-            st.write(fmt_bool(r.get("validat_idbdc", False)))
+            s1, s2, s3, s4, s5 = st.columns([1.2, 2.2, 1.0, 1.6, 1.0])
+            with s1:
+                st.caption("Responsabil")
+                st.write(r.get("responsabil_idbdc", "") or "")
+            with s2:
+                st.caption("Observații")
+                obs = (r.get("observatii_idbdc", "") or "").strip()
+                st.write(obs if obs else "-")
+            with s3:
+                st.caption("Confirmare")
+                st.write(fmt_bool(r.get("status_confirmare", False)))
+            with s4:
+                st.caption("Ultima modificare")
+                st.write(r.get("data_ultimei_modificari", "") or "-")
+            with s5:
+                st.caption("Validat")
+                st.write(fmt_bool(r.get("validat_idbdc", False)))
 
     # ============================
     # SALVARE (DIRECT)
@@ -654,7 +651,6 @@ def porneste_motorul(supabase):
         operator = st.session_state.operator_identificat
         try:
             items = []
-            edit_msg = f"Editat de {operator} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
             for _, table_name in tabele:
                 df_edit_visible = edited_data[table_name]
@@ -680,11 +676,8 @@ def porneste_motorul(supabase):
                     payload = {k: data.get(k) for k in cols_real if k in data}
                     payload["cod_identificare"] = str(cod_row).strip()
 
-                    if "data_ultimei_modificari" in cols_real:
-                        payload["data_ultimei_modificari"] = now_iso()
-
-                    if "observatii_idbdc" in cols_real:
-                        payload["observatii_idbdc"] = append_observatii(payload.get("observatii_idbdc"), edit_msg)
+                    # IMPORTANT: nu mai adăugăm aici observatii/data_ultimei_modificari
+                    # ca să nu se dubleze; se face o singură dată în direct_save_all_tables().
 
                     items.append({"table": table_name, "payload": payload})
 
