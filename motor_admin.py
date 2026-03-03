@@ -23,6 +23,9 @@ def porneste_motorul(supabase):
     def now_iso():
         return datetime.now().isoformat()
 
+    def current_year():
+        return datetime.now().year
+
     def get_table_columns(table_name: str):
         try:
             res = supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
@@ -32,10 +35,21 @@ def porneste_motorul(supabase):
 
     def empty_row(columns):
         row = {c: None for c in columns}
+
+        # defaults booleene
         if "status_confirmare" in row:
             row["status_confirmare"] = False
         if "validat_idbdc" in row:
             row["validat_idbdc"] = False
+        if "reprezinta_idbdc" in row:
+            row["reprezinta_idbdc"] = False
+
+        # defaults ani (acolo unde se cere doar anul)
+        y = current_year()
+        for c in columns:
+            if c == "an" or c.startswith("an_"):
+                row[c] = y
+
         return row
 
     def load_single_row(table_name: str, cod: str):
@@ -183,7 +197,6 @@ def porneste_motorul(supabase):
                         cp["data_ultimei_modificari"] = now_iso()
 
                     if "observatii_idbdc" in cols_real:
-                        # adăugăm o singură dată, aici (nu și în build items)
                         cp["observatii_idbdc"] = append_observatii(cp.get("observatii_idbdc"), edit_msg)
 
                     cp = cleanup_payload(cp)
@@ -297,8 +310,18 @@ def porneste_motorul(supabase):
             return True, "Ștergere parțială (cu unele avertismente)."
         return True, "Fișa a fost ștearsă."
 
+    def is_date_col(col: str) -> bool:
+        c = (col or "").lower()
+        if c in ("data_ultimei_modificari",):
+            return False
+        return c.startswith("data_") or c.endswith("_data") or (c.startswith("dt_"))
+
+    def is_year_col(col: str) -> bool:
+        c = (col or "").lower()
+        return c == "an" or c.startswith("an_")
+
     # ============================
-    # STYLE (spațieri)
+    # STYLE
     # ============================
 
     st.markdown(
@@ -317,7 +340,6 @@ def porneste_motorul(supabase):
             color: #ffffff !important;
           }
 
-          /* micșorare spații între blocuri */
           div.block-container { padding-top: 1.0rem; padding-bottom: 1.0rem; }
           .stRadio, .stToggle { margin-bottom: 0.2rem; }
           .stButton { margin-top: 0.2rem; margin-bottom: 0.2rem; }
@@ -419,6 +441,8 @@ def porneste_motorul(supabase):
     def build_column_config_for_table(table_name: str, df: pd.DataFrame):
         rel = DROPDOWN_MAP.get(table_name, {})
         cfg = {}
+
+        # selectbox-uri (nomenc.)
         for target_col, (src_table, src_col) in rel.items():
             if target_col not in df.columns:
                 continue
@@ -433,6 +457,41 @@ def porneste_motorul(supabase):
                 options=options,
                 required=False,
             )
+
+        # bifa DA/NU pentru reprezinta_idbdc
+        if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
+            cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
+                label="reprezinta_idbdc",
+                help="DA/NU",
+                default=False,
+            )
+
+        # date ISO (aaaa-ll-zz) cu selector
+        for c in df.columns:
+            if c in CONTROL_COLS:
+                continue
+            if is_date_col(c):
+                cfg[c] = st.column_config.DateColumn(
+                    label=c,
+                    format="YYYY-MM-DD",
+                    step=1,
+                )
+
+        # ani (cu +/-)
+        y = current_year()
+        for c in df.columns:
+            if c in CONTROL_COLS:
+                continue
+            if is_year_col(c):
+                cfg[c] = st.column_config.NumberColumn(
+                    label=c,
+                    min_value=1900,
+                    max_value=2100,
+                    step=1,
+                    format="%d",
+                    help=f"Implicit: {y}",
+                )
+
         return cfg
 
     # ============================
@@ -509,7 +568,6 @@ def porneste_motorul(supabase):
         label_visibility="collapsed",
     )
 
-    # micșorăm spațiul până la toggle
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     # ============================
@@ -591,7 +649,6 @@ def porneste_motorul(supabase):
     with b3:
         btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
-    # micșorăm spațiul până la tab-uri
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     # ============================
@@ -603,7 +660,16 @@ def porneste_motorul(supabase):
 
     for i, (label, table_name) in enumerate(tabele):
         with tabs[i]:
-            df_show = st.session_state[state_key(table_name)]
+            df_show = st.session_state[state_key(table_name)].copy()
+
+            # (ii) la Date financiare: "valuta" după "an_referinta"
+            if table_name == "com_date_financiare" and "an_referinta" in df_show.columns and "valuta" in df_show.columns:
+                cols = list(df_show.columns)
+                cols.remove("valuta")
+                idx = cols.index("an_referinta") + 1
+                cols.insert(idx, "valuta")
+                df_show = df_show[cols]
+
             col_cfg = build_column_config_for_table(table_name, df_show)
             num_rows_mode = "dynamic" if table_name == "com_echipe_proiect" else "fixed"
 
@@ -618,11 +684,11 @@ def porneste_motorul(supabase):
             edited_data[table_name] = edited
 
     # ============================
-    # STATUS FIȘĂ (în expander)
+    # STATUS FIȘĂ
     # ============================
 
     if len(base_full) > 0:
-        with st.expander("Status fișă (Responsabil / Observații / Confirmare / Ultima modificare / Validat)", expanded=False):
+        with st.expander("Status fișă", expanded=False):
             r = base_full.iloc[0].to_dict()
 
             s1, s2, s3, s4, s5 = st.columns([1.2, 2.2, 1.0, 1.6, 1.0])
@@ -675,9 +741,6 @@ def porneste_motorul(supabase):
 
                     payload = {k: data.get(k) for k in cols_real if k in data}
                     payload["cod_identificare"] = str(cod_row).strip()
-
-                    # IMPORTANT: nu mai adăugăm aici observatii/data_ultimei_modificari
-                    # ca să nu se dubleze; se face o singură dată în direct_save_all_tables().
 
                     items.append({"table": table_name, "payload": payload})
 
