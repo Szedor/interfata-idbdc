@@ -36,7 +36,6 @@ def porneste_motorul(supabase):
     def empty_row(columns):
         row = {c: None for c in columns}
 
-        # defaults booleene
         if "status_confirmare" in row:
             row["status_confirmare"] = False
         if "validat_idbdc" in row:
@@ -44,7 +43,6 @@ def porneste_motorul(supabase):
         if "reprezinta_idbdc" in row:
             row["reprezinta_idbdc"] = False
 
-        # defaults ani (acolo unde se cere doar anul)
         y = current_year()
         for c in columns:
             if c == "an" or c.startswith("an_"):
@@ -442,7 +440,6 @@ def porneste_motorul(supabase):
         rel = DROPDOWN_MAP.get(table_name, {})
         cfg = {}
 
-        # selectbox-uri (nomenc.)
         for target_col, (src_table, src_col) in rel.items():
             if target_col not in df.columns:
                 continue
@@ -458,7 +455,6 @@ def porneste_motorul(supabase):
                 required=False,
             )
 
-        # bifa DA/NU pentru reprezinta_idbdc
         if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
             cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
                 label="reprezinta_idbdc",
@@ -466,18 +462,18 @@ def porneste_motorul(supabase):
                 default=False,
             )
 
-        # date ISO (aaaa-ll-zz) cu selector
+        # ISO 8601: YYYY-MM-DD (obligatoriu)
         for c in df.columns:
             if c in CONTROL_COLS:
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(
                     label=c,
-                    format="YYYY-MM-DD",
+                    format="YYYY-MM-DD",  # ISO 8601 (date)
                     step=1,
+                    help="Format obligatoriu: YYYY-MM-DD (ISO 8601)",
                 )
 
-        # ani (cu +/-)
         y = current_year()
         for c in df.columns:
             if c in CONTROL_COLS:
@@ -487,9 +483,8 @@ def porneste_motorul(supabase):
                     label=c,
                     min_value=1900,
                     max_value=2100,
-                    step=1,
+                    step=1,  # +/- 1
                     format="%d",
-                    help=f"Implicit: {y}",
                 )
 
         return cfg
@@ -662,7 +657,6 @@ def porneste_motorul(supabase):
         with tabs[i]:
             df_show = st.session_state[state_key(table_name)].copy()
 
-            # (ii) la Date financiare: "valuta" după "an_referinta"
             if table_name == "com_date_financiare" and "an_referinta" in df_show.columns and "valuta" in df_show.columns:
                 cols = list(df_show.columns)
                 cols.remove("valuta")
