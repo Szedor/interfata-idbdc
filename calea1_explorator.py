@@ -522,7 +522,3 @@ def run():
         if st.button("🖨️ Print (previzualizare)"):
             html_doc = make_printable_html(df_final, "IDBDC – Rezultate")
             components.html(html_doc, height=700, scrolling=True)
-
-
-if __name__ == "__main__":
-    run()
