@@ -41,6 +41,8 @@ def run():
         st.session_state.autorizat_p1 = False
     if "operator_identificat" not in st.session_state:
         st.session_state.operator_identificat = None
+    if "operator_rol" not in st.session_state:
+        st.session_state.operator_rol = None
 
     # 1) Parola (din PostgreSQL)
     if not st.session_state.autorizat_p1:
@@ -64,12 +66,13 @@ def run():
             try:
                 res_op = (
                     supabase.table("com_operatori")
-                    .select("nume_prenume")
+                    .select("nume_prenume, rol")
                     .eq("cod_operatori", cod_in)
                     .execute()
                 )
                 if res_op.data:
-                    st.session_state.operator_identificat = res_op.data[0]["nume_prenume"]
+                    st.session_state.operator_identificat = res_op.data[0].get("nume_prenume")
+                    st.session_state.operator_rol = res_op.data[0].get("rol") or "OPERATOR"
                     st.rerun()
                 else:
                     st.sidebar.error("Cod operator invalid.")
@@ -77,7 +80,7 @@ def run():
                 st.sidebar.error(f"Eroare la verificarea operatorului: {e}")
         st.stop()
     else:
-        st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
+        st.sidebar.success(f"Operator: {st.session_state.operator_identificat} ({st.session_state.operator_rol})")
         if st.sidebar.button("Ieșire / Resetare"):
             st.session_state.clear()
             st.rerun()
