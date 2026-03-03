@@ -30,10 +30,6 @@ def porneste_motorul(supabase):
         except Exception:
             return []
 
-    def has_col(table_name: str, col: str) -> bool:
-        cols = get_table_columns(table_name)
-        return col in set(cols)
-
     def empty_row(columns):
         row = {c: None for c in columns}
         if "status_confirmare" in row:
@@ -105,14 +101,107 @@ def porneste_motorul(supabase):
     def fmt_bool(v):
         return "DA" if bool(v) else "NU"
 
-    def fallback_validate_fisa(cod: str, table_names: list[str], operator: str) -> tuple[bool, str]:
-        """
-        Fallback când RPC idbdc_validate_fisa lipsește.
-        Marchează validat_idbdc=True acolo unde există coloana.
-        """
+    def is_row_effectively_empty(d: dict) -> bool:
+        for k, v in d.items():
+            if k == "cod_identificare":
+                continue
+            if v is None:
+                continue
+            if isinstance(v, str) and v.strip() == "":
+                continue
+            return False
+        return True
+
+    def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
+        try:
+            supabase.table(table_name).upsert(payload, on_conflict="cod_identificare").execute()
+            return
+        except Exception:
+            pass
+
+        try:
+            upd = supabase.table(table_name).update(payload).eq("cod_identificare", cod).execute()
+            if upd.data:
+                return
+        except Exception:
+            pass
+
+        supabase.table(table_name).insert(payload).execute()
+
+    def direct_save_all_tables(items: list, operator: str) -> tuple[bool, str]:
+        if not items:
+            return False, "Nu există date de salvat."
+
+        by_table: dict[str, list[dict]] = {}
+        for it in items:
+            t = it.get("table")
+            p = it.get("payload") or {}
+            if not t or not isinstance(p, dict):
+                continue
+            by_table.setdefault(t, [])
+            by_table[t].append(p)
+
+        errors = []
+        ok_any = False
+        edit_msg = f"Editat de {operator} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+        for table_name, payloads in by_table.items():
+            try:
+                cols_real = set(get_table_columns(table_name))
+                if "cod_identificare" not in cols_real:
+                    continue
+
+                clean_payloads = []
+                for p in payloads:
+                    cod = str(p.get("cod_identificare", "")).strip()
+                    if not cod:
+                        continue
+
+                    cp = {k: p.get(k) for k in cols_real if k in p}
+                    cp["cod_identificare"] = cod
+
+                    if "data_ultimei_modificari" in cols_real:
+                        cp["data_ultimei_modificari"] = now_iso()
+
+                    if "observatii_idbdc" in cols_real:
+                        cp["observatii_idbdc"] = append_observatii(cp.get("observatii_idbdc"), edit_msg)
+
+                    if is_row_effectively_empty(cp):
+                        continue
+
+                    clean_payloads.append(cp)
+
+                if not clean_payloads:
+                    continue
+
+                cod0 = str(clean_payloads[0].get("cod_identificare", "")).strip()
+
+                if len(clean_payloads) > 1:
+                    try:
+                        supabase.table(table_name).delete().eq("cod_identificare", cod0).execute()
+                    except Exception:
+                        pass
+                    supabase.table(table_name).insert(clean_payloads).execute()
+                    ok_any = True
+                    continue
+
+                direct_upsert_single_row(table_name, clean_payloads[0], cod0)
+                ok_any = True
+
+            except Exception as e:
+                errors.append(f"{table_name}: {e}")
+
+        if not ok_any and errors:
+            return False, " | ".join(errors)
+        if not ok_any:
+            return False, "Nu s-a putut salva (nicio operație aplicată)."
+        if errors:
+            return True, "Salvare parțială (cu unele avertismente)."
+        return True, "Salvare completă."
+
+    def direct_validate_all_tables(cod: str, table_names: list[str], operator: str) -> tuple[bool, str]:
         ok_any = False
         errors = []
-
         msg = f"Validat de {operator} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
         for t in table_names:
@@ -126,12 +215,10 @@ def porneste_motorul(supabase):
                 if "validat_idbdc" in cols:
                     payload["validat_idbdc"] = True
 
-                # opțional, dacă există:
                 if "data_ultimei_modificari" in cols:
                     payload["data_ultimei_modificari"] = now_iso()
 
                 if "observatii_idbdc" in cols:
-                    # citim observațiile curente ca să le concatenăm (best-effort)
                     try:
                         cur = (
                             supabase.table(t)
@@ -164,8 +251,30 @@ def porneste_motorul(supabase):
             return True, "Validare parțială (cu unele avertismente)."
         return True, "Validare realizată."
 
+    def direct_delete_all_tables(cod: str, table_names: list[str]) -> tuple[bool, str]:
+        ok_any = False
+        errors = []
+
+        for t in table_names:
+            try:
+                cols = set(get_table_columns(t))
+                if "cod_identificare" not in cols:
+                    continue
+                supabase.table(t).delete().eq("cod_identificare", cod).execute()
+                ok_any = True
+            except Exception as e:
+                errors.append(f"{t}: {e}")
+
+        if not ok_any and errors:
+            return False, " | ".join(errors)
+        if not ok_any:
+            return False, "Nu s-a șters nimic."
+        if errors:
+            return True, "Ștergere parțială (cu unele avertismente)."
+        return True, "Fișa a fost ștearsă."
+
     # ============================
-    # SIDEBAR STYLE (diferențiere)
+    # SIDEBAR STYLE
     # ============================
 
     st.markdown(
@@ -360,7 +469,7 @@ def porneste_motorul(supabase):
     cod = str(id_admin).strip()
 
     # ============================
-    # ACȚIUNE (radio, opțiuni vizibile)
+    # ACȚIUNE
     # ============================
 
     st.markdown("**Acțiune**")
@@ -504,23 +613,31 @@ def porneste_motorul(supabase):
             st.write(fmt_bool(r.get("validat_idbdc", False)))
 
     # ============================
-    # SALVARE TRANZACȚIONALĂ (RPC)
+    # SALVARE (DOAR DIRECT)
     # ============================
 
     if btn_save:
+        operator = st.session_state.operator_identificat
         try:
             items = []
-            operator = st.session_state.operator_identificat
             edit_msg = f"Editat de {operator} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
             for _, table_name in tabele:
                 df_edit_visible = edited_data[table_name]
                 df_raw_original = st.session_state[state_key_raw(table_name)]
                 _, cols_real = loaded[table_name]
-                if not cols_real or df_edit_visible.empty:
+                if not cols_real:
+                    continue
+
+                if df_edit_visible is None or len(df_edit_visible) == 0:
                     continue
 
                 df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
+
+                # pentru tabelele dinamice, ne asigurăm că există cod_identificare pe fiecare rând
+                if "cod_identificare" in df_for_save.columns:
+                    df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
+                    df_for_save["cod_identificare"] = df_for_save["cod_identificare"].astype(str).replace("nan", cod)
 
                 for _, row in df_for_save.iterrows():
                     data = row.to_dict()
@@ -529,6 +646,7 @@ def porneste_motorul(supabase):
                         continue
 
                     payload = {k: data.get(k) for k in cols_real if k in data}
+                    payload["cod_identificare"] = str(cod_row).strip()
 
                     if "data_ultimei_modificari" in cols_real:
                         payload["data_ultimei_modificari"] = now_iso()
@@ -538,32 +656,34 @@ def porneste_motorul(supabase):
 
                     items.append({"table": table_name, "payload": payload})
 
-            supabase.rpc("idbdc_save_fisa", {"p_items": items}).execute()
-            st.success("Salvare completă (tranzacțional).")
-            st.rerun()
+            ok, msg = direct_save_all_tables(items, operator)
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(f"Eroare la salvare: {msg}")
+
         except Exception as e:
             st.error(f"Eroare la salvare: {e}")
 
     # ============================
-    # VALIDARE (RPC + FALLBACK)
+    # VALIDARE (DOAR DIRECT)
     # ============================
 
     if btn_validate:
         operator = st.session_state.operator_identificat
         try:
-            supabase.rpc("idbdc_validate_fisa", {"p_cod": cod, "p_tables": table_names}).execute()
-            st.success("Validare realizată (tranzacțional).")
-            st.rerun()
-        except Exception:
-            ok, msg = fallback_validate_fisa(cod, table_names, operator)
+            ok, msg = direct_validate_all_tables(cod, table_names, operator)
             if ok:
                 st.success(msg)
                 st.rerun()
             else:
                 st.error(f"Eroare la validare: {msg}")
+        except Exception as e:
+            st.error(f"Eroare la validare: {e}")
 
     # ============================
-    # ȘTERGERE (RPC) + CONFIRMARE
+    # ȘTERGERE (DOAR DIRECT) + CONFIRMARE
     # ============================
 
     if btn_delete:
@@ -572,13 +692,16 @@ def porneste_motorul(supabase):
         typed = st.text_input("Reintrodu cod_identificare pentru confirmare:", value="")
         if confirm and typed.strip() == cod:
             try:
-                supabase.rpc("idbdc_delete_fisa", {"p_cod": cod, "p_tables": table_names}).execute()
-                for _, table_name in tabele:
-                    for k in (state_key(table_name), state_key_raw(table_name)):
-                        if k in st.session_state:
-                            del st.session_state[k]
-                st.success("Fișa a fost ștearsă din toate tabelele aferente (tranzacțional).")
-                st.rerun()
+                ok, msg = direct_delete_all_tables(cod, table_names)
+                if ok:
+                    for _, table_name in tabele:
+                        for k in (state_key(table_name), state_key_raw(table_name)):
+                            if k in st.session_state:
+                                del st.session_state[k]
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(f"Eroare la ștergere: {msg}")
             except Exception as e:
                 st.error(f"Eroare la ștergere: {e}")
         else:
