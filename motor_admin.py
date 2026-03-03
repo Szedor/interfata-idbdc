@@ -252,7 +252,7 @@ def porneste_motorul(supabase):
             return False, "Nu s-a putut salva (nicio operație aplicată)."
         if errors:
             return True, "Salvare parțială (cu unele avertismente)."
-        return True, "Salvare completă."
+        return True, "Salvarea realizată cu succes!"
 
     def direct_validate_all_tables(cod: str, table_names: list[str], operator: str) -> tuple[bool, str]:
         ok_any = False
@@ -358,7 +358,6 @@ def porneste_motorul(supabase):
             return []
 
     def build_column_config_for_table(table_name: str, df: pd.DataFrame):
-        # dropdowns existente din Admin
         DROPDOWN_MAP = {
             "base_contracte_cep": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
@@ -451,7 +450,6 @@ def porneste_motorul(supabase):
                 default=False,
             )
 
-        # ISO 8601 date: YYYY-MM-DD
         for c in df.columns:
             if c in CONTROL_COLS:
                 continue
@@ -463,7 +461,6 @@ def porneste_motorul(supabase):
                     help="Format obligatoriu: YYYY-MM-DD (ISO 8601)",
                 )
 
-        # ani cu +/- (step 1)
         for c in df.columns:
             if c in CONTROL_COLS:
                 continue
@@ -521,14 +518,12 @@ def porneste_motorul(supabase):
                 default=False,
             )
 
-        # ISO 8601 date, dacă apar
         for c in df.columns:
             if c == "__STERGE__":
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(label=c, format="YYYY-MM-DD", step=1)
 
-        # ani, dacă apar
         for c in df.columns:
             if c == "__STERGE__":
                 continue
@@ -541,6 +536,11 @@ def porneste_motorul(supabase):
         rol = (st.session_state.get("operator_rol") or "").strip().upper()
         if rol != "ADMIN":
             return
+
+        # mesaj persistent (după rerun)
+        if st.session_state.get("nomdet_saved_ok", False):
+            st.success("Salvarea realizată cu succes!")
+            st.session_state.nomdet_saved_ok = False
 
         with st.expander("🧩 Nomenclatoare & Detalii", expanded=False):
             st.caption("Alege tabela, editează în grid și apasă SALVARE.")
@@ -565,7 +565,6 @@ def porneste_motorul(supabase):
             if df.empty:
                 df = pd.DataFrame(columns=cols)
 
-            # asigurăm coloanele
             for c in cols:
                 if c not in df.columns:
                     df[c] = None
@@ -587,7 +586,6 @@ def porneste_motorul(supabase):
 
             if st.button("💾 SALVARE", key="nomdet_save"):
                 try:
-                    # Ștergeri
                     to_delete = edited[edited["__STERGE__"] == True]  # noqa: E712
                     for _, row in to_delete.iterrows():
                         key_val = row.get(pk)
@@ -595,7 +593,6 @@ def porneste_motorul(supabase):
                             continue
                         supabase.table(tabela).delete().eq(pk, key_val).execute()
 
-                    # Upsert rest
                     to_upsert = edited[edited["__STERGE__"] != True].copy()  # noqa: E712
                     payloads = []
                     for _, row in to_upsert.iterrows():
@@ -608,8 +605,10 @@ def porneste_motorul(supabase):
                     if payloads:
                         supabase.table(tabela).upsert(payloads, on_conflict=pk).execute()
 
-                    st.success("Salvare realizată.")
+                    # setăm mesajul persistent și rerun
+                    st.session_state.nomdet_saved_ok = True
                     st.rerun()
+
                 except Exception as e:
                     st.error(f"Eroare la salvare: {e}")
 
@@ -649,6 +648,11 @@ def porneste_motorul(supabase):
         f"<h3 style='text-align: center;'> 🛠️ Administrare IDBDC: {st.session_state.operator_identificat}</h3>",
         unsafe_allow_html=True,
     )
+
+    # (IMPORTANT) Expanderul ADMIN apare SUS, înainte de Categoria de date
+    render_nomenclatoare_admin_box()
+
+    st.divider()
 
     # ============================
     # SELECTOARE
@@ -695,13 +699,10 @@ def porneste_motorul(supabase):
 
     if not tabela_baza:
         st.info("Selectează categoria și (dacă este cazul) tipul.")
-        # chiar și fără fișe, admin poate gestiona nomenclatoare:
-        render_nomenclatoare_admin_box()
         return
 
     if not id_admin or str(id_admin).strip() == "":
         st.info("Introdu «Filtru numar contract sau id proiect» pentru a deschide fișa.")
-        render_nomenclatoare_admin_box()
         return
 
     cod = str(id_admin).strip()
@@ -757,7 +758,6 @@ def porneste_motorul(supabase):
     base_exists = exists_map.get(tabela_baza, False)
     if actiune == "Modificare date existente" and not base_exists:
         st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Introducere noutate» dacă vrei să creezi.")
-        render_nomenclatoare_admin_box()
         return
 
     for _, table_name in tabele:
@@ -945,10 +945,3 @@ def porneste_motorul(supabase):
                 st.error(f"Eroare la ștergere: {e}")
         else:
             st.info("Bifează confirmarea și tastează exact codul pentru a executa ștergerea.")
-
-    # ============================
-    # BOX NOM/DET (ADMIN only)
-    # ============================
-
-    st.divider()
-    render_nomenclatoare_admin_box()
