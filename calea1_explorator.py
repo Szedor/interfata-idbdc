@@ -10,11 +10,9 @@ import streamlit.components.v1 as components
 # CONFIG
 # =========================================================
 
-# Gate config din Secrets (Streamlit Cloud)
 GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
 PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 
-# Titluri (cum ai cerut)
 TITLE_LINE_1 = "🔎 Baze de date - Interogare  | Cautare | Consultare avansata"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
 
@@ -26,7 +24,6 @@ ACADEMIC_BLUE = "#0b2a52"
 # =========================================================
 
 def hide_streamlit_chrome():
-    """Ascunde toolbar/meniuri standard Streamlit (iconițe, GitHub/share etc.)."""
     st.markdown(
         """
         <style>
@@ -42,26 +39,18 @@ def hide_streamlit_chrome():
 
 
 def apply_style_full_blue():
-    """
-    Fundal albastru pe TOT ecranul, ca la pagina operatorilor.
-    Etichete/text alb, controale pe fundal deschis pentru lizibilitate.
-    """
     st.markdown(
         f"""
         <style>
-          /* Fundal pe toată aplicația */
           .stApp {{
             background: {ACADEMIC_BLUE} !important;
           }}
-
-          /* Containerul principal NU mai e card alb - rămâne pe albastru */
           div.block-container {{
             padding-top: 1.1rem;
             padding-bottom: 1.0rem;
             max-width: 1550px;
           }}
 
-          /* Texte albe pentru lizibilitate */
           .idbdc-header {{
             text-align: center;
             margin-top: 0.2rem;
@@ -75,14 +64,13 @@ def apply_style_full_blue():
             margin: 0;
           }}
           .idbdc-title-2 {{
-            font-size: 1.86rem; /* mărit încă un pic, dar sub rândul 1 */
+            font-size: 1.86rem;
             font-weight: 800;
             line-height: 1.2;
             color: rgba(255,255,255,0.95);
             margin: 0.35rem 0 0 0;
           }}
 
-          /* Label-uri albe */
           label, .stMarkdown, .stCaption, .stText {{
             color: #ffffff !important;
           }}
@@ -93,7 +81,6 @@ def apply_style_full_blue():
             color: rgba(255,255,255,0.88) !important;
           }}
 
-          /* Inputurile să fie lizibile (fond alb) */
           .stTextInput input,
           .stSelectbox [data-baseweb="select"] > div,
           .stNumberInput input,
@@ -103,18 +90,14 @@ def apply_style_full_blue():
             border-radius: 10px !important;
           }}
 
-          /* Butoane coerente */
           .stButton > button {{
             border-radius: 10px;
             font-weight: 900;
           }}
 
-          /* Dataframe / table: păstrăm stil Streamlit (de regulă e alb), dar îmbunătățim contrastul titlurilor */
           h1, h2, h3 {{
             color: #ffffff !important;
           }}
-
-          /* Expander, info, etc. - lăsăm default Streamlit (sunt ok pe albastru) */
         </style>
         """,
         unsafe_allow_html=True,
@@ -122,14 +105,12 @@ def apply_style_full_blue():
 
 
 def apply_style_gate():
-    """Ecranul de acces: fundal albastru + text alb + box centrat."""
     st.markdown(
         f"""
         <style>
           .stApp {{
             background: {ACADEMIC_BLUE} !important;
           }}
-
           div.block-container {{
             padding-top: 4.0rem;
             padding-bottom: 2.0rem;
@@ -223,7 +204,14 @@ TEXT_COL_CANDIDATES = [
     "descriere", "observatii", "cuvinte_cheie",
 ]
 
+# Contracte/Proiecte: best effort
 YEAR_COL_CANDIDATES_CP = ["an_referinta", "an_derulare", "data_incepere", "data_start"]
+
+# Evenimente: best effort
+YEAR_COL_CANDIDATES_EV = ["data_inceput", "data_eveniment", "data_start", "data"]
+
+# PI: best effort
+YEAR_COL_CANDIDATES_PI = ["data_oficiala_acordare", "data_acordare", "data"]
 
 
 # =========================================================
@@ -295,6 +283,27 @@ def apply_date_equals_filter(q, col: str, date_value: dt.date):
     end = start + dt.timedelta(days=1)
     end_adj = end - dt.timedelta(seconds=1)
     return q.gte(col, start.isoformat()).lte(col, end_adj.isoformat())
+
+
+def apply_year_range_filter(q, col: str, y_from: int, y_to: int):
+    """
+    - dacă col e an numeric: gte/lte
+    - dacă col e data/timestamp: interval date
+    """
+    c = (col or "").lower()
+    if c.startswith("data_") or c.startswith("dt_") or c.endswith("_data") or c in ("data",):
+        start = dt.datetime(int(y_from), 1, 1)
+        end = dt.datetime(int(y_to) + 1, 1, 1) - dt.timedelta(seconds=1)
+        return q.gte(col, start.isoformat()).lte(col, end.isoformat())
+    return q.gte(col, int(y_from)).lte(col, int(y_to))
+
+
+def apply_year_range_best_effort(q, cols: set, candidates: list[str], y_from: int, y_to: int):
+    """Aplică intervalul de ani pe prima coloană existentă din lista candidates."""
+    for c in candidates:
+        if c in cols:
+            return apply_year_range_filter(q, c, y_from, y_to)
+    return q
 
 
 def make_printable_html(df: pd.DataFrame, title: str) -> str:
@@ -380,19 +389,6 @@ def ids_for_person(supabase: Client, person_name: str) -> list[str]:
         return []
 
 
-def apply_year_range_filter(q, col: str, y_from: int, y_to: int):
-    """
-    Dacă col e an (numeric): aplicăm gte/lte.
-    Dacă col e data_*: construim interval [1 ian y_from .. 31 dec y_to] (ISO).
-    """
-    if col.startswith("data_") or col.startswith("dt_") or col.endswith("_data"):
-        start = dt.datetime(int(y_from), 1, 1)
-        end = dt.datetime(int(y_to) + 1, 1, 1) - dt.timedelta(seconds=1)
-        return q.gte(col, start.isoformat()).lte(col, end.isoformat())
-    else:
-        return q.gte(col, int(y_from)).lte(col, int(y_to))
-
-
 # =========================================================
 # GATE
 # =========================================================
@@ -442,10 +438,7 @@ def gate():
 def run():
     st.set_page_config(page_title="IDBDC – Calea 1", layout="wide")
 
-    # 1) Gate
     gate()
-
-    # 2) Explorator: full-blue everywhere
     hide_streamlit_chrome()
     apply_style_full_blue()
 
@@ -459,7 +452,6 @@ def run():
 
     supabase: Client = create_client(url, key)
 
-    # Header (cerințele tale)
     render_header()
     st.divider()
 
@@ -489,42 +481,58 @@ def run():
     persoane = fetch_idbdc_people(supabase)
 
     # ----------------------------
-    # CRITERII (5 + încă 1 în cazul Contracte&Proiecte)
+    # CRITERII (Anul de la / Anul pana la apare la toate)
     # ----------------------------
+    # 1) Cuvant cheie
+    # 2) Anul de la
+    # 3) Anul pana la
+    # 4) specific categorie
+    # 5) specific categorie
+    # 6) Persoana
+
+    current_year = dt.datetime.now().year
+
     if categorie == "Evenimente stiintifice":
         natura_list = fetch_distinct_values(supabase, "nom_evenimente_stiintifice", "natura_eveniment")
         format_list = fetch_distinct_values(supabase, "nom_format_evenimente", "format_eveniment")
 
-        c1, c2, c3, c4, c5 = st.columns(5)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+
         with c1:
             keyword = st.text_input("Cuvant cheie", value="").strip()
         with c2:
-            natura = st.selectbox("Natura evenimentului", [""] + natura_list)
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1)
         with c3:
-            fmt = st.selectbox("Formatul evenimentului", [""] + format_list)
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1)
         with c4:
-            data_ev = st.date_input("Data evenimentului", value=None)
+            natura = st.selectbox("Natura evenimentului", [""] + natura_list)
         with c5:
+            fmt = st.selectbox("Formatul evenimentului", [""] + format_list)
+        with c6:
             persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
+
+        data_ev = None  # păstrăm variabila pentru compatibilitate (nu mai folosim caseta de dată aici)
 
     elif categorie == "Proprietate intelectuala":
         tip_pi_list = fetch_distinct_values(supabase, "nom_prop_intelect", "acronym_prop_intelect")
         dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
 
-        c1, c2, c3, c4, c5 = st.columns(5)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+
         with c1:
             keyword = st.text_input("Cuvant cheie", value="").strip()
         with c2:
-            tip_pi = st.selectbox("Tip proprietate intelectuala", [""] + tip_pi_list)
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 5, step=1)
         with c3:
-            an_acord = st.number_input("Anul acordarii", min_value=1900, max_value=2100, value=2024, step=1)
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1)
         with c4:
-            dep = st.selectbox("Departament", [""] + dep_list)
+            tip_pi = st.selectbox("Tip proprietate intelectuala", [""] + tip_pi_list)
         with c5:
+            dep = st.selectbox("Departament", [""] + dep_list)
+        with c6:
             persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     else:
-        # Contracte & Proiecte: 6 câmpuri (anul se scindează în 2)
         status_list = fetch_distinct_values(supabase, "nom_status_proiect", "status_contract_proiect")
         dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
 
@@ -532,25 +540,20 @@ def run():
 
         with c1:
             keyword = st.text_input("Cuvant cheie", value="").strip()
-
         with c2:
-            an_from = st.number_input("An implementare de la", min_value=1900, max_value=2100, value=2020, step=1)
-
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1)
         with c3:
-            an_to = st.number_input("An implementare pana la", min_value=1900, max_value=2100, value=2026, step=1)
-
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1)
         with c4:
             status = st.selectbox("Status proiect", [""] + status_list)
-
         with c5:
             dep = st.selectbox("Departament", [""] + dep_list)
-
         with c6:
             persoana = st.selectbox("Responsabil contract / Director proiect", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
-        if int(an_to) < int(an_from):
-            st.error("Interval invalid: «An implementare pana la» trebuie să fie >= «An implementare de la».")
-            return
+    if int(an_to) < int(an_from):
+        st.error("Interval invalid: «Anul pana la» trebuie să fie >= «Anul de la».")
+        return
 
     if not st.button("🔎 Caută"):
         st.info("Completează criteriile și apasă Caută.")
@@ -564,13 +567,20 @@ def run():
 
     q = apply_keyword_filter(q, cols, keyword if "keyword" in locals() else "")
 
+    # Interval ani - pentru toate categoriile (best effort pe coloanele candidate)
+    if categorie == "Evenimente stiintifice":
+        q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_EV, int(an_from), int(an_to))
+    elif categorie == "Proprietate intelectuala":
+        q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_PI, int(an_from), int(an_to))
+    else:
+        q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_CP, int(an_from), int(an_to))
+
+    # filtre specifice
     if categorie == "Evenimente stiintifice":
         if natura and "natura_eveniment" in cols:
             q = q.eq("natura_eveniment", natura)
         if fmt and "format_eveniment" in cols:
             q = q.eq("format_eveniment", fmt)
-        if data_ev and "data_inceput" in cols:
-            q = apply_date_equals_filter(q, "data_inceput", data_ev)
 
         if persoana:
             ids = ids_for_person(supabase, persoana)
@@ -585,11 +595,6 @@ def run():
             if "acronym_prop_intelect" in cols:
                 q = q.eq("acronym_prop_intelect", tip_pi)
 
-        if "data_oficiala_acordare" in cols and "an_acord" in locals() and an_acord:
-            start = dt.datetime(int(an_acord), 1, 1)
-            end = dt.datetime(int(an_acord) + 1, 1, 1) - dt.timedelta(seconds=1)
-            q = q.gte("data_oficiala_acordare", start.isoformat()).lte("data_oficiala_acordare", end.isoformat())
-
         if "dep" in locals() and dep:
             if "acronym_departament" in cols:
                 q = q.eq("acronym_departament", dep)
@@ -603,13 +608,6 @@ def run():
                 q = q.in_("cod_identificare", ids)
 
     else:
-        # Contracte & Proiecte: interval an_from - an_to
-        if "an_from" in locals() and "an_to" in locals():
-            for c in YEAR_COL_CANDIDATES_CP:
-                if c in cols:
-                    q = apply_year_range_filter(q, c, int(an_from), int(an_to))
-                    break
-
         if "status" in locals() and status:
             for c in ["status_contract_proiect", "status_proiect", "status"]:
                 if c in cols:
