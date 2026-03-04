@@ -22,24 +22,17 @@ ACADEMIC_BLUE = "#0b2a52"
 
 
 # =========================================================
-# STYLE
+# UI / STYLE
 # =========================================================
 
 def hide_streamlit_chrome():
-    """
-    Ascunde elementele standard Streamlit (toolbar, meniu, footer).
-    Asta elimină și iconițele de tip GitHub/share din UI-ul standard.
-    """
+    """Ascunde toolbar/meniuri standard Streamlit (iconițe, GitHub/share etc.)."""
     st.markdown(
         """
         <style>
-          /* Ascunde bara de sus (unde apar iconițe/meniuri) */
           header { visibility: hidden; height: 0px; }
-          /* Ascunde meniul din dreapta sus */
           #MainMenu { visibility: hidden; }
-          /* Ascunde footer */
           footer { visibility: hidden; height: 0px; }
-          /* Unele versiuni au și aceste elemente */
           [data-testid="stToolbar"] { display: none !important; }
           [data-testid="stDecoration"] { display: none !important; }
         </style>
@@ -48,13 +41,93 @@ def hide_streamlit_chrome():
     )
 
 
+def apply_style_full_blue():
+    """
+    Fundal albastru pe TOT ecranul, ca la pagina operatorilor.
+    Etichete/text alb, controale pe fundal deschis pentru lizibilitate.
+    """
+    st.markdown(
+        f"""
+        <style>
+          /* Fundal pe toată aplicația */
+          .stApp {{
+            background: {ACADEMIC_BLUE} !important;
+          }}
+
+          /* Containerul principal NU mai e card alb - rămâne pe albastru */
+          div.block-container {{
+            padding-top: 1.1rem;
+            padding-bottom: 1.0rem;
+            max-width: 1550px;
+          }}
+
+          /* Texte albe pentru lizibilitate */
+          .idbdc-header {{
+            text-align: center;
+            margin-top: 0.2rem;
+            margin-bottom: 0.9rem;
+          }}
+          .idbdc-title-1 {{
+            font-size: 2.05rem;
+            font-weight: 900;
+            line-height: 1.15;
+            color: #ffffff;
+            margin: 0;
+          }}
+          .idbdc-title-2 {{
+            font-size: 1.86rem; /* mărit încă un pic, dar sub rândul 1 */
+            font-weight: 800;
+            line-height: 1.2;
+            color: rgba(255,255,255,0.95);
+            margin: 0.35rem 0 0 0;
+          }}
+
+          /* Label-uri albe */
+          label, .stMarkdown, .stCaption, .stText {{
+            color: #ffffff !important;
+          }}
+          [data-testid="stMarkdownContainer"] p {{
+            color: #ffffff !important;
+          }}
+          [data-testid="stCaptionContainer"] {{
+            color: rgba(255,255,255,0.88) !important;
+          }}
+
+          /* Inputurile să fie lizibile (fond alb) */
+          .stTextInput input,
+          .stSelectbox [data-baseweb="select"] > div,
+          .stNumberInput input,
+          .stDateInput input {{
+            background: rgba(255,255,255,0.96) !important;
+            color: #0b1f3a !important;
+            border-radius: 10px !important;
+          }}
+
+          /* Butoane coerente */
+          .stButton > button {{
+            border-radius: 10px;
+            font-weight: 900;
+          }}
+
+          /* Dataframe / table: păstrăm stil Streamlit (de regulă e alb), dar îmbunătățim contrastul titlurilor */
+          h1, h2, h3 {{
+            color: #ffffff !important;
+          }}
+
+          /* Expander, info, etc. - lăsăm default Streamlit (sunt ok pe albastru) */
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def apply_style_gate():
-    """Ecranul de acces: fundal albastru + text alb (vizibil)."""
+    """Ecranul de acces: fundal albastru + text alb + box centrat."""
     st.markdown(
         f"""
         <style>
           .stApp {{
-            background: {ACADEMIC_BLUE};
+            background: {ACADEMIC_BLUE} !important;
           }}
 
           div.block-container {{
@@ -62,7 +135,6 @@ def apply_style_gate():
             padding-bottom: 2.0rem;
           }}
 
-          /* Card central (semi-transparent) */
           .gate-box {{
             background: rgba(255,255,255,0.10);
             border: 1px solid rgba(255,255,255,0.25);
@@ -87,13 +159,11 @@ def apply_style_gate():
             margin: 0 0 1.1rem 0;
           }}
 
-          /* Etichete albe (cerința ta) */
           .stTextInput label {{
             color: #ffffff !important;
             font-weight: 800 !important;
           }}
 
-          /* Input lizibil */
           .stTextInput input {{
             background: rgba(255,255,255,0.96) !important;
             color: #0b1f3a !important;
@@ -104,64 +174,6 @@ def apply_style_gate():
             width: 100%;
             border-radius: 12px;
             font-weight: 900;
-          }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def apply_style_app():
-    """Explorator: fundal albastru academic + conținut pe card alb (nu obosește)."""
-    st.markdown(
-        f"""
-        <style>
-          .stApp {{
-            background: {ACADEMIC_BLUE};
-          }}
-
-          /* Card alb pentru toată zona de conținut */
-          div.block-container {{
-            background: rgba(255,255,255,0.97);
-            border-radius: 18px;
-            padding: 1.2rem 1.2rem 1.0rem 1.2rem;
-            margin-top: 1.0rem;
-            margin-bottom: 1.2rem;
-            max-width: 1550px;
-          }}
-
-          /* Header custom */
-          .idbdc-header {{
-            text-align: center;
-            margin-top: 0.2rem;
-            margin-bottom: 0.9rem;
-          }}
-
-          .idbdc-title-1 {{
-            font-size: 2.05rem;
-            font-weight: 900;
-            line-height: 1.15;
-            color: #0b1f3a;
-            margin: 0;
-          }}
-
-          /* Cerință: rândul 2 mărit (dar puțin sub rândul 1) */
-          .idbdc-title-2 {{
-            font-size: 1.78rem;
-            font-weight: 800;
-            line-height: 1.2;
-            color: #0b1f3a;
-            margin: 0.35rem 0 0 0;
-            opacity: 0.95;
-          }}
-
-          /* Mică armonizare vizuală */
-          .stButton > button {{
-            border-radius: 10px;
-            font-weight: 800;
-          }}
-          .stTextInput input {{
-            border-radius: 10px;
           }}
         </style>
         """,
@@ -186,14 +198,8 @@ def render_header():
 # =========================================================
 
 CATEGORII = {
-    "Evenimente stiintifice": {
-        "base_table": "base_evenimente_stiintifice",
-        "tipuri": None,
-    },
-    "Proprietate intelectuala": {
-        "base_table": "base_prop_intelect",
-        "tipuri": None,
-    },
+    "Evenimente stiintifice": {"base_table": "base_evenimente_stiintifice", "tipuri": None},
+    "Proprietate intelectuala": {"base_table": "base_prop_intelect", "tipuri": None},
     "Contracte & Proiecte": {
         "tipuri": {
             "TERTI": "base_contracte_terti",
@@ -205,7 +211,7 @@ CATEGORII = {
             "INTERREG": "base_proiecte_interreg",
             "NONEU": "base_proiecte_noneu",
         }
-    }
+    },
 }
 
 TEXT_COL_CANDIDATES = [
@@ -214,7 +220,7 @@ TEXT_COL_CANDIDATES = [
     "denumire", "denumire_proiect", "denumire_eveniment",
     "acronim", "acronim_proiect",
     "obiect_contract",
-    "descriere", "observatii", "cuvinte_cheie"
+    "descriere", "observatii", "cuvinte_cheie",
 ]
 
 YEAR_COL_CANDIDATES_CP = ["an_referinta", "an_derulare", "data_incepere", "data_start"]
@@ -374,6 +380,19 @@ def ids_for_person(supabase: Client, person_name: str) -> list[str]:
         return []
 
 
+def apply_year_range_filter(q, col: str, y_from: int, y_to: int):
+    """
+    Dacă col e an (numeric): aplicăm gte/lte.
+    Dacă col e data_*: construim interval [1 ian y_from .. 31 dec y_to] (ISO).
+    """
+    if col.startswith("data_") or col.startswith("dt_") or col.endswith("_data"):
+        start = dt.datetime(int(y_from), 1, 1)
+        end = dt.datetime(int(y_to) + 1, 1, 1) - dt.timedelta(seconds=1)
+        return q.gte(col, start.isoformat()).lte(col, end.isoformat())
+    else:
+        return q.gte(col, int(y_from)).lte(col, int(y_to))
+
+
 # =========================================================
 # GATE
 # =========================================================
@@ -423,12 +442,12 @@ def gate():
 def run():
     st.set_page_config(page_title="IDBDC – Calea 1", layout="wide")
 
-    # 1) Gate (dacă oprește aici, folosește stilul lui)
+    # 1) Gate
     gate()
 
-    # 2) Explorator (stil + ascundere iconițe)
+    # 2) Explorator: full-blue everywhere
     hide_streamlit_chrome()
-    apply_style_app()
+    apply_style_full_blue()
 
     # Supabase din Secrets
     try:
@@ -470,7 +489,7 @@ def run():
     persoane = fetch_idbdc_people(supabase)
 
     # ----------------------------
-    # CRITERII
+    # CRITERII (5 + încă 1 în cazul Contracte&Proiecte)
     # ----------------------------
     if categorie == "Evenimente stiintifice":
         natura_list = fetch_distinct_values(supabase, "nom_evenimente_stiintifice", "natura_eveniment")
@@ -505,20 +524,33 @@ def run():
             persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     else:
+        # Contracte & Proiecte: 6 câmpuri (anul se scindează în 2)
         status_list = fetch_distinct_values(supabase, "nom_status_proiect", "status_contract_proiect")
         dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
 
-        c1, c2, c3, c4, c5 = st.columns(5)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+
         with c1:
             keyword = st.text_input("Cuvant cheie", value="").strip()
+
         with c2:
-            an_impl = st.number_input("An implementare", min_value=1900, max_value=2100, value=2024, step=1)
+            an_from = st.number_input("An implementare de la", min_value=1900, max_value=2100, value=2020, step=1)
+
         with c3:
-            status = st.selectbox("Status proiect", [""] + status_list)
+            an_to = st.number_input("An implementare pana la", min_value=1900, max_value=2100, value=2026, step=1)
+
         with c4:
-            dep = st.selectbox("Departament", [""] + dep_list)
+            status = st.selectbox("Status proiect", [""] + status_list)
+
         with c5:
+            dep = st.selectbox("Departament", [""] + dep_list)
+
+        with c6:
             persoana = st.selectbox("Responsabil contract / Director proiect", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
+
+        if int(an_to) < int(an_from):
+            st.error("Interval invalid: «An implementare pana la» trebuie să fie >= «An implementare de la».")
+            return
 
     if not st.button("🔎 Caută"):
         st.info("Completează criteriile și apasă Caută.")
@@ -571,15 +603,11 @@ def run():
                 q = q.in_("cod_identificare", ids)
 
     else:
-        if "an_impl" in locals() and an_impl:
+        # Contracte & Proiecte: interval an_from - an_to
+        if "an_from" in locals() and "an_to" in locals():
             for c in YEAR_COL_CANDIDATES_CP:
                 if c in cols:
-                    if c.startswith("data_"):
-                        start = dt.datetime(int(an_impl), 1, 1)
-                        end = dt.datetime(int(an_impl) + 1, 1, 1) - dt.timedelta(seconds=1)
-                        q = q.gte(c, start.isoformat()).lte(c, end.isoformat())
-                    else:
-                        q = q.eq(c, int(an_impl))
+                    q = apply_year_range_filter(q, c, int(an_from), int(an_to))
                     break
 
         if "status" in locals() and status:
@@ -632,7 +660,7 @@ def run():
     sel_cols = st.multiselect(
         "Selectează câmpurile pentru tabelul final:",
         options=available_cols,
-        default=defaults if defaults else available_cols[:6]
+        default=defaults if defaults else available_cols[:6],
     )
 
     if not sel_cols:
@@ -662,7 +690,7 @@ def run():
             "⬇️ Download Excel",
             data=buf,
             file_name="idbdc_rezultate.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
     with cC:
