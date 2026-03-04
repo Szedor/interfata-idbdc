@@ -1,5 +1,3 @@
-# grant_navigator/engine/internal_analytics.py
-
 import streamlit as st
 import pandas as pd
 from supabase import Client
@@ -14,9 +12,25 @@ def _safe_select_all(supabase: Client, table: str, limit: int = 800):
         return []
 
 
+def _filter_anywhere(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
+    """
+    Filtrare robusta: cauta keyword-ul in ORICE coloana (convertit la text).
+    """
+    k = (keyword or "").strip().lower()
+    if not k:
+        return df
+
+    # Construim un text per rand, concatenand toate coloanele
+    try:
+        row_text = df.astype(str).fillna("").agg(" | ".join, axis=1).str.lower()
+        return df[row_text.str.contains(k, na=False)]
+    except Exception:
+        # fallback: daca ceva nu merge, nu filtram
+        return df
+
+
 def render(supabase: Client):
     st.subheader("📊 Analiza interna IDBDC")
-
     st.caption("Selectezi categoria si rulezi analiza (tabel + export).")
 
     col1, col2, col3 = st.columns([1.3, 1.3, 1.6])
@@ -42,7 +56,6 @@ def render(supabase: Client):
     with col3:
         keyword = st.text_input("Cuvant cheie (optional)", value="").strip()
 
-    # Mapare tabele (in linie cu modulele existente)
     map_baze = {
         "CEP": "base_contracte_cep",
         "TERTI": "base_contracte_terti",
@@ -74,20 +87,13 @@ def render(supabase: Client):
 
     df = pd.DataFrame(rows)
 
-    # Filtrare simpla pe cateva coloane uzuale (daca exista)
+    # Filtrare keyword robusta
     if keyword:
-        cols_try = [
-            "titlu", "titlu_proiect", "titlu_eveniment",
-            "denumire", "denumire_proiect", "denumire_eveniment",
-            "descriere", "observatii", "cuvinte_cheie",
-            "cod_identificare",
-        ]
-        cols_try = [c for c in cols_try if c in df.columns]
-        if cols_try:
-            mask = False
-            for c in cols_try:
-                mask = mask | df[c].astype(str).str.contains(keyword, case=False, na=False)
-            df = df[mask]
+        df2 = _filter_anywhere(df, keyword)
+        if df2.empty:
+            st.warning("Nu am gasit potriviri pentru cuvantul cheie introdus.")
+            return
+        df = df2
 
     st.success(f"Total rezultate: {len(df)}")
 
