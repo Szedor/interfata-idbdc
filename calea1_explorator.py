@@ -9,13 +9,18 @@ import streamlit.components.v1 as components
 # =========================================================
 # CONFIG (FREEZE)
 # =========================================================
-PASSWORD_CONSULTARE = "EverDream2SZ"
 
 TITLE_GATE = "🛡️ Acces securizat – Interogare Baze de Date"
 SUBTITLE_GATE = "Departamentul Cercetare Dezvoltare Inovare"
 
 TITLE_MAIN = "🔎 Baze de Date – Departamentul Cercetare Dezvoltare Inovare"
 SUBTITLE_MAIN = "Interogare | Căutare | Consultare avansată"
+
+# Gate config din Secrets (Streamlit Cloud)
+# - GATE_ENABLED: true/false (default: true)
+# - PASSWORD_CONSULTARE: parola de acces temporar
+GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
+PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 
 
 # =========================================================
@@ -142,6 +147,16 @@ def apply_date_equals_filter(q, col: str, date_value: dt.date):
 
 
 def gate():
+    # Dacă gate e dezactivat din Secrets, acces direct (public / test intern)
+    if not GATE_ENABLED:
+        st.session_state.autorizat_consultare = True
+        return
+
+    # Dacă gate e activ dar parola nu e setată în Secrets, blocăm și explicăm
+    if not PASSWORD_CONSULTARE:
+        st.error("Config lipsă: setează PASSWORD_CONSULTARE în Streamlit Cloud → Settings → Secrets.")
+        st.stop()
+
     if "autorizat_consultare" not in st.session_state:
         st.session_state.autorizat_consultare = False
 
@@ -258,8 +273,14 @@ def run():
     st.set_page_config(page_title="IDBDC – Calea 1", layout="wide")
     gate()
 
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    # Supabase din Secrets (Streamlit Cloud)
+    try:
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+    except Exception:
+        st.error("Config lipsă: setează SUPABASE_URL și SUPABASE_KEY în Streamlit Cloud → Settings → Secrets.")
+        st.stop()
+
     supabase: Client = create_client(url, key)
 
     st.markdown(f"# {TITLE_MAIN}")
@@ -522,3 +543,7 @@ def run():
         if st.button("🖨️ Print (previzualizare)"):
             html_doc = make_printable_html(df_final, "IDBDC – Rezultate")
             components.html(html_doc, height=700, scrolling=True)
+
+
+if __name__ == "__main__":
+    run()
