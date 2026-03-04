@@ -15,60 +15,33 @@ GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
 PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 
 # Titluri (cum ai cerut)
-TITLE_LINE_1 = "Baze de date - Interogare | Cautare | Consultare avansansata".replace("avansansata", "avansata")
+TITLE_LINE_1 = "🔎 Baze de date - Interogare  | Cautare | Consultare avansata"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
+
+ACADEMIC_BLUE = "#0b2a52"
 
 
 # =========================================================
 # STYLE
 # =========================================================
 
-ACADEMIC_BLUE = "#0b2a52"
-LIGHT_BG = "#f7f9fc"
-
-
-def apply_style_app():
-    """Stil pentru aplicația principală (după autentificare)."""
+def hide_streamlit_chrome():
+    """
+    Ascunde elementele standard Streamlit (toolbar, meniu, footer).
+    Asta elimină și iconițele de tip GitHub/share din UI-ul standard.
+    """
     st.markdown(
-        f"""
+        """
         <style>
-          .stApp {{
-            background: {LIGHT_BG};
-          }}
-          div.block-container {{
-            padding-top: 1.2rem;
-            padding-bottom: 1.0rem;
-          }}
-
-          /* Header custom */
-          .idbdc-header {{
-            text-align: center;
-            margin-top: 0.2rem;
-            margin-bottom: 0.8rem;
-          }}
-          .idbdc-title-1 {{
-            font-size: 2.05rem;
-            font-weight: 800;
-            line-height: 1.15;
-            color: #0b1f3a;
-            margin: 0;
-          }}
-          .idbdc-title-2 {{
-            font-size: 1.55rem; /* puțin mai mic decât rândul 1 */
-            font-weight: 700;
-            line-height: 1.2;
-            color: #0b1f3a;
-            margin: 0.35rem 0 0 0;
-            opacity: 0.92;
-          }}
-
-          /* Mică armonizare vizuală */
-          .stButton > button {{
-            border-radius: 10px;
-          }}
-          .stTextInput input {{
-            border-radius: 10px;
-          }}
+          /* Ascunde bara de sus (unde apar iconițe/meniuri) */
+          header { visibility: hidden; height: 0px; }
+          /* Ascunde meniul din dreapta sus */
+          #MainMenu { visibility: hidden; }
+          /* Ascunde footer */
+          footer { visibility: hidden; height: 0px; }
+          /* Unele versiuni au și aceste elemente */
+          [data-testid="stToolbar"] { display: none !important; }
+          [data-testid="stDecoration"] { display: none !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -76,60 +49,119 @@ def apply_style_app():
 
 
 def apply_style_gate():
-    """Stil pentru ecranul de parolă (fundal albastru + card centrat)."""
+    """Ecranul de acces: fundal albastru + text alb (vizibil)."""
     st.markdown(
         f"""
         <style>
           .stApp {{
             background: {ACADEMIC_BLUE};
           }}
+
           div.block-container {{
             padding-top: 4.0rem;
             padding-bottom: 2.0rem;
           }}
 
-          /* Card centrat */
-          .gate-card {{
-            background: rgba(255,255,255,0.97);
+          /* Card central (semi-transparent) */
+          .gate-box {{
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.25);
             border-radius: 18px;
             padding: 26px 22px 18px 22px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.25);
-            border: 1px solid rgba(0,0,0,0.06);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.28);
           }}
 
           .gate-title {{
             text-align: center;
-            font-size: 1.35rem;
-            font-weight: 800;
-            color: {ACADEMIC_BLUE};
+            font-size: 1.45rem;
+            font-weight: 900;
+            color: #ffffff;
             margin: 0 0 0.35rem 0;
           }}
 
           .gate-subtitle {{
             text-align: center;
-            color: #173a63;
-            font-size: 0.98rem;
+            color: rgba(255,255,255,0.92);
+            font-size: 1.02rem;
+            font-weight: 600;
             margin: 0 0 1.1rem 0;
           }}
 
+          /* Etichete albe (cerința ta) */
           .stTextInput label {{
-            font-weight: 700;
-            color: #173a63;
+            color: #ffffff !important;
+            font-weight: 800 !important;
           }}
 
+          /* Input lizibil */
           .stTextInput input {{
-            border-radius: 12px;
+            background: rgba(255,255,255,0.96) !important;
+            color: #0b1f3a !important;
+            border-radius: 12px !important;
           }}
 
           .stButton > button {{
             width: 100%;
             border-radius: 12px;
-            font-weight: 800;
+            font-weight: 900;
+          }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_style_app():
+    """Explorator: fundal albastru academic + conținut pe card alb (nu obosește)."""
+    st.markdown(
+        f"""
+        <style>
+          .stApp {{
+            background: {ACADEMIC_BLUE};
           }}
 
-          /* mică reducere a lățimii inputului vizual */
-          [data-testid="stTextInput"] {{
-            margin-bottom: 0.4rem;
+          /* Card alb pentru toată zona de conținut */
+          div.block-container {{
+            background: rgba(255,255,255,0.97);
+            border-radius: 18px;
+            padding: 1.2rem 1.2rem 1.0rem 1.2rem;
+            margin-top: 1.0rem;
+            margin-bottom: 1.2rem;
+            max-width: 1550px;
+          }}
+
+          /* Header custom */
+          .idbdc-header {{
+            text-align: center;
+            margin-top: 0.2rem;
+            margin-bottom: 0.9rem;
+          }}
+
+          .idbdc-title-1 {{
+            font-size: 2.05rem;
+            font-weight: 900;
+            line-height: 1.15;
+            color: #0b1f3a;
+            margin: 0;
+          }}
+
+          /* Cerință: rândul 2 mărit (dar puțin sub rândul 1) */
+          .idbdc-title-2 {{
+            font-size: 1.78rem;
+            font-weight: 800;
+            line-height: 1.2;
+            color: #0b1f3a;
+            margin: 0.35rem 0 0 0;
+            opacity: 0.95;
+          }}
+
+          /* Mică armonizare vizuală */
+          .stButton > button {{
+            border-radius: 10px;
+            font-weight: 800;
+          }}
+          .stTextInput input {{
+            border-radius: 10px;
           }}
         </style>
         """,
@@ -156,7 +188,7 @@ def render_header():
 CATEGORII = {
     "Evenimente stiintifice": {
         "base_table": "base_evenimente_stiintifice",
-        "tipuri": None,  # nu există tipuri
+        "tipuri": None,
     },
     "Proprietate intelectuala": {
         "base_table": "base_prop_intelect",
@@ -333,12 +365,11 @@ def ids_for_person(supabase: Client, person_name: str) -> list[str]:
             .eq("nume_prenume", person_name)
             .execute()
         )
-        ids = sorted({
+        return sorted({
             str(r.get("cod_identificare", "")).strip()
             for r in (res.data or [])
             if str(r.get("cod_identificare", "")).strip()
         })
-        return ids
     except Exception:
         return []
 
@@ -353,6 +384,7 @@ def gate():
         return
 
     if not PASSWORD_CONSULTARE:
+        hide_streamlit_chrome()
         apply_style_gate()
         st.error("Config lipsă: setează PASSWORD_CONSULTARE în Streamlit Cloud → Settings → Secrets.")
         st.stop()
@@ -361,13 +393,14 @@ def gate():
         st.session_state.autorizat_consultare = False
 
     if not st.session_state.autorizat_consultare:
+        hide_streamlit_chrome()
         apply_style_gate()
 
-        left, mid, right = st.columns([1.7, 1.0, 1.7])
+        left, mid, right = st.columns([1.8, 1.0, 1.8])
         with mid:
-            st.markdown('<div class="gate-card">', unsafe_allow_html=True)
-            st.markdown(f'<div class="gate-title">{_html.escape("🛡️ Acces securizat")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="gate-subtitle">{_html.escape("Interogare baze de date – DCDI")}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="gate-box">', unsafe_allow_html=True)
+            st.markdown('<div class="gate-title">🛡️ Acces securizat</div>', unsafe_allow_html=True)
+            st.markdown('<div class="gate-subtitle">Interogare baze de date – DCDI</div>', unsafe_allow_html=True)
 
             parola = st.text_input("Parola acces:", type="password")
 
@@ -390,10 +423,11 @@ def gate():
 def run():
     st.set_page_config(page_title="IDBDC – Calea 1", layout="wide")
 
-    # 1) gate (dacă oprește aici, folosește stilul lui)
+    # 1) Gate (dacă oprește aici, folosește stilul lui)
     gate()
 
-    # 2) stil normal pentru aplicație
+    # 2) Explorator (stil + ascundere iconițe)
+    hide_streamlit_chrome()
     apply_style_app()
 
     # Supabase din Secrets
@@ -406,7 +440,7 @@ def run():
 
     supabase: Client = create_client(url, key)
 
-    # Header cum ai cerut
+    # Header (cerințele tale)
     render_header()
     st.divider()
 
@@ -431,31 +465,26 @@ def run():
     st.divider()
 
     # ----------------------------
-    # Persoane (DOAR reprezinta_idbdc=True din com_echipe_proiect)
+    # Persoane
     # ----------------------------
     persoane = fetch_idbdc_people(supabase)
 
     # ----------------------------
-    # CRITERII DE CĂUTARE (5)
+    # CRITERII
     # ----------------------------
     if categorie == "Evenimente stiintifice":
         natura_list = fetch_distinct_values(supabase, "nom_evenimente_stiintifice", "natura_eveniment")
         format_list = fetch_distinct_values(supabase, "nom_format_evenimente", "format_eveniment")
 
         c1, c2, c3, c4, c5 = st.columns(5)
-
         with c1:
             keyword = st.text_input("Cuvant cheie", value="").strip()
-
         with c2:
             natura = st.selectbox("Natura evenimentului", [""] + natura_list)
-
         with c3:
             fmt = st.selectbox("Formatul evenimentului", [""] + format_list)
-
         with c4:
             data_ev = st.date_input("Data evenimentului", value=None)
-
         with c5:
             persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
@@ -464,19 +493,14 @@ def run():
         dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
 
         c1, c2, c3, c4, c5 = st.columns(5)
-
         with c1:
             keyword = st.text_input("Cuvant cheie", value="").strip()
-
         with c2:
             tip_pi = st.selectbox("Tip proprietate intelectuala", [""] + tip_pi_list)
-
         with c3:
             an_acord = st.number_input("Anul acordarii", min_value=1900, max_value=2100, value=2024, step=1)
-
         with c4:
             dep = st.selectbox("Departament", [""] + dep_list)
-
         with c5:
             persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
@@ -485,32 +509,23 @@ def run():
         dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
 
         c1, c2, c3, c4, c5 = st.columns(5)
-
         with c1:
             keyword = st.text_input("Cuvant cheie", value="").strip()
-
         with c2:
             an_impl = st.number_input("An implementare", min_value=1900, max_value=2100, value=2024, step=1)
-
         with c3:
             status = st.selectbox("Status proiect", [""] + status_list)
-
         with c4:
             dep = st.selectbox("Departament", [""] + dep_list)
-
         with c5:
-            persoana = st.selectbox(
-                "Responsabil contract / Director proiect",
-                [""] + persoane,
-                help="Lista include doar persoanele cu reprezinta_idbdc = true."
-            )
+            persoana = st.selectbox("Responsabil contract / Director proiect", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     if not st.button("🔎 Caută"):
         st.info("Completează criteriile și apasă Caută.")
         return
 
     # ----------------------------
-    # QUERY base_table
+    # QUERY
     # ----------------------------
     cols = set(get_table_columns(supabase, base_table))
     q = supabase.table(base_table).select("*")
@@ -603,9 +618,6 @@ def run():
     df = pd.DataFrame(rows)
     df = enrich_reprezentant_idbdc(supabase, df)
 
-    # ----------------------------
-    # REZULTATE + SELECTARE COLOANE + EXPORT/PRINT
-    # ----------------------------
     st.divider()
     st.subheader("Rezultate (tabel)")
 
