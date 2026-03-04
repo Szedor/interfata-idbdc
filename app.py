@@ -7,6 +7,10 @@ st.set_page_config(page_title="IDBDC UPT - Sistem Integrat", layout="wide")
 query_params = st.query_params
 calea_activa = query_params.get("pagina", "explorator")
 
+# Alias: acceptă și ?pagina=ai ca să deschidă modulul 3
+if calea_activa == "ai":
+    calea_activa = "brainstorming"
+
 # Direcționare către scriptul corespunzător
 if calea_activa == "explorator":
     try:
@@ -27,7 +31,7 @@ elif calea_activa == "brainstorming":
         import calea3_brainstorming
         calea3_brainstorming.run()
     except Exception as e:
-        st.error(f"Eroare la încărcarea modulului Brainstorming AI: {e}")
+        st.error(f"Eroare la încărcarea modulului AI: {e}")
 
 else:
     st.warning("Pagina solicitată nu a fost găsită. Revenire la Explorator...")
