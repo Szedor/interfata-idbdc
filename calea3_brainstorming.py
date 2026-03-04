@@ -2,11 +2,16 @@ import streamlit as st
 import re
 from supabase import create_client, Client
 
+from grant_navigator.engine import internal_analytics
+from grant_navigator.engine import external_radar
+from grant_navigator.engine import strategy_recommendations
+from grant_navigator.engine import document_generator
+
+
 TITLE_LINE_1 = "Oportunitati si Analiza Cercetare"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
 
 ACADEMIC_BLUE = "#0b2a52"
-
 UPT_EMAIL_REGEX = re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", re.IGNORECASE)
 
 
@@ -34,8 +39,9 @@ def apply_style_gate():
           }}
 
           div.block-container {{
-            padding-top: 4rem;
-            padding-bottom: 2rem;
+            padding-top: 4.0rem;
+            padding-bottom: 2.0rem;
+            max-width: 1550px;
           }}
 
           .gate-box {{
@@ -51,7 +57,15 @@ def apply_style_gate():
             font-size: 1.45rem;
             font-weight: 900;
             color: #ffffff;
-            margin-bottom: 10px;
+            margin: 0 0 0.35rem 0;
+          }}
+
+          .gate-subtitle {{
+            text-align: center;
+            color: rgba(255,255,255,0.92);
+            font-size: 1.02rem;
+            font-weight: 600;
+            margin: 0 0 1.1rem 0;
           }}
 
           .stTextInput label {{
@@ -84,18 +98,20 @@ def apply_style_app():
             background: {ACADEMIC_BLUE};
           }}
 
+          /* Card alb central (ca in Calea 1) */
           div.block-container {{
             background: rgba(255,255,255,0.97);
             border-radius: 18px;
-            padding: 1.2rem;
-            margin-top: 1rem;
+            padding: 1.2rem 1.2rem 1.0rem 1.2rem;
+            margin-top: 1.0rem;
             margin-bottom: 1.2rem;
             max-width: 1550px;
           }}
 
           .idbdc-header {{
             text-align: center;
-            margin-bottom: 1rem;
+            margin-top: 0.2rem;
+            margin-bottom: 0.9rem;
           }}
 
           .idbdc-title-1 {{
@@ -113,6 +129,38 @@ def apply_style_app():
             color: #0b1f3a;
             margin: 0.35rem 0 0 0;
             opacity: 0.95;
+          }}
+
+          /* Welcome box (30% + centru) */
+          .welcome-wrap {{
+            width: 30%;
+            min-width: 320px;
+            margin: 0.35rem auto 0.85rem auto;
+          }}
+          .welcome-box {{
+            background: rgba(34, 139, 34, 0.12);
+            border: 1px solid rgba(34, 139, 34, 0.25);
+            border-radius: 14px;
+            padding: 10px 12px;
+            text-align: center;
+            font-weight: 800;
+            color: #0b1f3a;
+          }}
+
+          /* Butoane 4 sectiuni */
+          .nav-row {{
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 0.4rem 0 0.8rem 0;
+            flex-wrap: wrap;
+          }}
+
+          /* In Streamlit, stilizam butoanele standard */
+          div.stButton > button {{
+            border-radius: 12px;
+            font-weight: 900;
+            padding: 0.55rem 0.8rem;
           }}
         </style>
         """,
@@ -133,8 +181,12 @@ def render_header():
 
 
 def get_supabase() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    try:
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+    except Exception:
+        st.error("Config lipsă: setează SUPABASE_URL și SUPABASE_KEY în Streamlit Cloud → Settings → Secrets.")
+        st.stop()
     return create_client(url, key)
 
 
@@ -147,57 +199,46 @@ def lookup_user(supabase: Client, email: str):
             .limit(1)
             .execute()
         )
-
         if res.data and len(res.data) > 0:
             return res.data[0]
-
     except Exception:
         pass
-
     return None
 
 
 def email_gate(supabase: Client):
-
-    if "auth_brainstorm" not in st.session_state:
-        st.session_state.auth_brainstorm = False
-
+    if "auth_ai" not in st.session_state:
+        st.session_state.auth_ai = False
     if "user_name" not in st.session_state:
         st.session_state.user_name = None
 
-    if st.session_state.auth_brainstorm:
+    if st.session_state.auth_ai:
         return
 
     hide_streamlit_chrome()
     apply_style_gate()
 
-    _, col_ce, _ = st.columns([1,1,1])
-
-    with col_ce:
-
+    left, mid, right = st.columns([1.8, 1.0, 1.8])
+    with mid:
         st.markdown('<div class="gate-box">', unsafe_allow_html=True)
+        st.markdown('<div class="gate-title">🛡️ Acces securizat</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gate-subtitle">Oportunitati si Analiza Cercetare – DCDI</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="gate-title">Acces securizat</div>', unsafe_allow_html=True)
-
-        email = st.text_input("Email instituțional (prenume.nume@upt.ro)")
+        email = st.text_input("Email instituțional (prenume.nume@upt.ro)", value="")
 
         if st.button("Autentificare"):
-
             e = (email or "").strip().lower()
-
             if not UPT_EMAIL_REGEX.match(e):
-                st.error("Email invalid.")
+                st.error("Email invalid. Exemplu: prenume.nume@upt.ro")
                 st.stop()
 
             user = lookup_user(supabase, e)
-
             if not user:
                 st.error("Emailul nu există în baza det_resurse_umane.")
                 st.stop()
 
-            st.session_state.auth_brainstorm = True
-            st.session_state.user_name = user.get("nume_prenume")
-
+            st.session_state.auth_ai = True
+            st.session_state.user_name = (user.get("nume_prenume") or "").strip() or e
             st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -205,41 +246,82 @@ def email_gate(supabase: Client):
     st.stop()
 
 
-def run():
+def render_nav_buttons():
+    if "ai_section" not in st.session_state:
+        st.session_state.ai_section = "internal"
 
-    st.set_page_config(page_title="IDBDC – Oportunitati", layout="wide")
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+
+    with c1:
+        if st.button("📊 Analiza interna IDBDC", use_container_width=True):
+            st.session_state.ai_section = "internal"
+            st.rerun()
+
+    with c2:
+        if st.button("🛰️ Radar finantari", use_container_width=True):
+            st.session_state.ai_section = "radar"
+            st.rerun()
+
+    with c3:
+        if st.button("🎯 Recomandari strategice", use_container_width=True):
+            st.session_state.ai_section = "strategy"
+            st.rerun()
+
+    with c4:
+        if st.button("📝 Generare documente", use_container_width=True):
+            st.session_state.ai_section = "docs"
+            st.rerun()
+
+
+def run():
+    st.set_page_config(page_title="IDBDC – AI", layout="wide")
 
     supabase = get_supabase()
 
+    # Poarta email
     email_gate(supabase)
 
+    # Stil aplicatie
     hide_streamlit_chrome()
     apply_style_app()
 
+    # Header
     render_header()
 
-    st.success(f"Bine ai venit, {st.session_state.user_name}")
+    # Welcome (30% + centru)
+    st.markdown(
+        f"""
+        <div class="welcome-wrap">
+          <div class="welcome-box">Bine ai venit, {st.session_state.user_name}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.divider()
 
-    tabs = st.tabs([
-        "Analiza interna IDBDC",
-        "Radar finantari",
-        "Recomandari strategice",
-        "Generare documente"
-    ])
+    # Navigare prin 4 butoane
+    render_nav_buttons()
 
-    with tabs[0]:
-        st.info("Zona de analiza interna IDBDC (in dezvoltare).")
+    st.divider()
 
-    with tabs[1]:
-        st.info("Radar finantari nationale si internationale (in dezvoltare).")
+    # Randare sectiune activa
+    sec = st.session_state.get("ai_section", "internal")
 
-    with tabs[2]:
-        st.info("Recomandari strategice pentru proiecte (in dezvoltare).")
+    if sec == "internal":
+        internal_analytics.render(supabase)
 
-    with tabs[3]:
-        st.info("Generator documente si idei de proiect (in dezvoltare).")
+    elif sec == "radar":
+        external_radar.render()
+
+    elif sec == "strategy":
+        strategy_recommendations.render(supabase)
+
+    elif sec == "docs":
+        document_generator.render(supabase)
+
+    else:
+        st.info("Selecteaza o sectiune.")
 
 
 if __name__ == "__main__":
