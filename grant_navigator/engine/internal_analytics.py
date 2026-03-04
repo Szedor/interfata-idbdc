@@ -14,13 +14,9 @@ def _safe_select_all(supabase: Client, table: str, limit: int = 800):
 
 
 def _filter_anywhere(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
-    """
-    Filtrare robusta: cauta keyword-ul in ORICE coloana (convertit la text).
-    """
     k = (keyword or "").strip().lower()
     if not k:
         return df
-
     try:
         row_text = df.astype(str).fillna("").agg(" | ".join, axis=1).str.lower()
         return df[row_text.str.contains(k, na=False)]
@@ -29,10 +25,6 @@ def _filter_anywhere(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
 
 
 def _extract_quoted_text(q: str) -> str:
-    """
-    Daca utilizatorul scrie ceva intre ghilimele, luam acel text ca keyword principal.
-    Ex: proiecte cu "energie" -> energie
-    """
     if not q:
         return ""
     m = re.findall(r'"([^"]+)"', q)
@@ -41,16 +33,37 @@ def _extract_quoted_text(q: str) -> str:
     return ""
 
 
+def _ro_normalize(text: str) -> str:
+    """
+    Normalizeaza pentru romana:
+    - lower
+    - diacritice -> fara diacritice
+    - spatii multiple -> 1 spatiu
+    """
+    t = (text or "").strip().lower()
+    # diacritice RO
+    t = (
+        t.replace("ă", "a")
+        .replace("â", "a")
+        .replace("î", "i")
+        .replace("ș", "s")
+        .replace("ş", "s")
+        .replace("ț", "t")
+        .replace("ţ", "t")
+    )
+    t = re.sub(r"\s+", " ", t)
+    return t
+
+
 def _nlq_guess_table_and_keyword(question: str):
     """
-    Interpreteaza o intrebare simpla (beta):
-    - alege tabela (CEP/PNRR/PNCDI/... sau Evenimente / Prop. Intelectuala)
-    - extrage un keyword (optional)
+    Interpretare determinista (beta):
+    - decide tabela
+    - decide keyword (sau gol, cand e doar "arata lista")
     """
-    q = (question or "").strip()
-    q_low = q.lower()
+    q_raw = (question or "").strip()
+    q = _ro_normalize(q_raw)
 
-    # harti tabele (aceleasi ca in analiza ghidata)
     map_baze = {
         "CEP": "base_contracte_cep",
         "TERTI": "base_contracte_terti",
@@ -62,59 +75,77 @@ def _nlq_guess_table_and_keyword(question: str):
         "NONEU": "base_proiecte_noneu",
     }
 
-    # 1) Detectie categorie (evenimente / proprietate)
-    if any(x in q_low for x in ["eveniment", "conferin", "workshop", "simpozion", "manifestare"]):
+    # 1) Categorii speciale
+    if any(x in q for x in ["eveniment", "conferin", "workshop", "simpozion", "manifestare"]):
         table = "base_evenimente_stiintifice"
         tip = "Evenimente stiintifice"
-    elif any(x in q_low for x in ["proprietate", "brevet", "patent", "marca", "inventie"]):
+    elif any(x in q for x in ["proprietate", "brevet", "patent", "marca", "inventie"]):
         table = "base_prop_intelect"
         tip = "Proprietate intelectuala"
     else:
-        # 2) Detectie tip proiect/contract
+        # 2) Detectie tip
         detected = None
-        if "pnrr" in q_low:
+        if "pnrr" in q:
             detected = "PNRR"
-        elif "pncdi" in q_low:
+        elif "pncdi" in q:
             detected = "PNCDI"
-        elif "interreg" in q_low:
+        elif "interreg" in q:
             detected = "INTERREG"
-        elif any(x in q_low for x in ["international", "internațional", "internationale", "internaționale"]):
+        elif any(x in q for x in ["international", "internationale"]):
             detected = "INTERNATIONALE"
-        elif "noneu" in q_low or "non-eu" in q_low or "non eu" in q_low:
+        elif "noneu" in q or "non-eu" in q or "non eu" in q:
             detected = "NONEU"
-        elif "fdi" in q_low:
+        elif "fdi" in q:
             detected = "FDI"
-        elif "terti" in q_low or "terți" in q_low:
+        elif "terti" in q or "terti" in q:
             detected = "TERTI"
-        elif "cep" in q_low:
+        elif "cep" in q:
             detected = "CEP"
         else:
-            detected = "INTERNATIONALE"  # default (beta) - pentru baza ta curenta
+            detected = "INTERNATIONALE"  # default pentru baza ta curenta
 
         table = map_baze.get(detected, "base_proiecte_internationale")
         tip = detected
 
-    # 3) Keyword: prioritar text intre ghilimele
-    kw = _extract_quoted_text(q)
+    # 3) Regula FIXA: daca utilizatorul cere "arata proiecte(le) internationale"
+    # atunci keyword trebuie sa fie GOL (adica listam tot).
+    # Acceptam forme: proiecte/proiectele/proiectul + internationale/international(e)
+    show_all_patterns = [
+        r"\barata\b.*\bproiecte\b.*\binternationale\b",
+        r"\barata\b.*\bproiectele\b.*\binternationale\b",
+        r"\barata\b.*\bproiectul\b.*\binternational\b",
+        r"\blisteaza\b.*\bproiecte\b.*\binternationale\b",
+        r"\blisteaza\b.*\bproiectele\b.*\binternationale\b",
+    ]
+    for p in show_all_patterns:
+        if re.search(p, q):
+            return table, tip, ""  # keyword gol -> afisam tot
 
-    # daca nu avem ghilimele, incercam sa luam restul "relevant" (foarte simplu)
+    # 4) Keyword: prioritar ce e intre ghilimele
+    kw = _extract_quoted_text(q_raw)
+    kw = _ro_normalize(kw)
+
     if not kw:
-        # scoatem cuvintele de tip/categorie, ca sa ramana un posibil keyword
-        stop = [
-            "arata", "arată", "listeaza", "listează", "care", "ce", "cate", "câte",
-            "avem", "dupa", "după", "in", "în", "din", "pe", "cu", "fara", "fără",
-            "proiecte", "proiect", "proiectele",
-            "contracte", "contract", "contractele",
-            "evenimente", "eveniment",
-            "stiintifice", "științifice", "proprietate", "intelectuala", "intelectuală",
-            "pnrr", "pncdi", "cep", "terti", "terți", "fdi", "interreg", "noneu",
-            "international", "internațional", "internationale", "internaționale",
-            "domeniul", "domeniu", "parteneri", "partener", "finantare", "finanțare"
-        ]
-        words = re.findall(r"[A-Za-zĂÂÎȘȚăâîșț0-9\-]+", q_low)
+        stop = {
+            "arata", "listeaza", "care", "ce", "cate", "avem", "dupa",
+            "in", "din", "pe", "cu", "fara",
+            "proiect", "proiecte", "proiectele", "proiectul",
+            "contract", "contracte", "contractele", "contractul",
+            "eveniment", "evenimente",
+            "stiintifice", "proprietate", "intelectuala",
+            "pnrr", "pncdi", "cep", "terti", "fdi", "interreg", "noneu",
+            "international", "internationale", "domeniu", "domeniul",
+            "partener", "parteneri", "finantare", "finantari"
+        }
+
+        words = re.findall(r"[a-z0-9\-]+", q)
         words = [w for w in words if w not in stop and len(w) >= 3]
-        # luam maximum 6 cuvinte ca keyword (beta)
         kw = " ".join(words[:6]).strip()
+
+    # 5) Daca keyword-ul a ramas ceva generic, il anulam
+    generic = {"proiect", "proiecte", "proiectele", "contract", "contracte", "contractele", "eveniment", "evenimente"}
+    if kw in generic:
+        kw = ""
 
     return table, tip, kw
 
@@ -128,7 +159,6 @@ def _render_results(df: pd.DataFrame, table: str):
     st.subheader("Export")
 
     c1, c2 = st.columns(2)
-
     with c1:
         st.download_button(
             "⬇️ Download CSV",
@@ -155,9 +185,7 @@ def render(supabase: Client):
     st.subheader("📊 Analiza interna IDBDC")
     st.caption("Ai două moduri: (1) Întrebări în limbaj normal (beta) și (2) Analiză ghidată (tabel + export).")
 
-    # =========================================================
-    # 1) ÎNTREABĂ BAZA IDBDC (BETA)
-    # =========================================================
+    # 1) NLQ
     st.markdown("### 🧠 Întreabă baza IDBDC (beta)")
     q = st.text_input(
         "Scrie întrebarea (ex: Arată proiectele internaționale / Arată proiecte cu \"energie\")",
@@ -197,9 +225,7 @@ def render(supabase: Client):
 
     st.divider()
 
-    # =========================================================
-    # 2) ANALIZA GHIDATĂ (CEA EXISTENTĂ)
-    # =========================================================
+    # 2) ANALIZA GHIDATA
     st.markdown("### 🧩 Analiză ghidată (clasic)")
     col1, col2, col3 = st.columns([1.3, 1.3, 1.6])
 
@@ -217,7 +243,7 @@ def render(supabase: Client):
             tip = st.selectbox(
                 "Tip",
                 ["CEP", "TERTI", "PNCDI", "PNRR", "FDI", "INTERNATIONALE", "INTERREG", "NONEU"],
-                index=5,  # INTERNATIONALE implicit
+                index=5,
                 key="guided_tip",
             )
         else:
