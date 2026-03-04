@@ -2,15 +2,134 @@ import streamlit as st
 import re
 from supabase import create_client, Client
 
-from grant_navigator.engine import internal_analytics
-from grant_navigator.engine import external_radar
-from grant_navigator.engine import strategy_recommendations
-from grant_navigator.engine import document_generator
+TITLE_LINE_1 = "Oportunitati si Analiza Cercetare"
+TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
 
-
-APP_TITLE = "Grant Navigator – IDBDC"
+ACADEMIC_BLUE = "#0b2a52"
 
 UPT_EMAIL_REGEX = re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", re.IGNORECASE)
+
+
+def hide_streamlit_chrome():
+    st.markdown(
+        """
+        <style>
+          header { visibility: hidden; height: 0px; }
+          #MainMenu { visibility: hidden; }
+          footer { visibility: hidden; height: 0px; }
+          [data-testid="stToolbar"] { display: none !important; }
+          [data-testid="stDecoration"] { display: none !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_style_gate():
+    st.markdown(
+        f"""
+        <style>
+          .stApp {{
+            background: {ACADEMIC_BLUE};
+          }}
+
+          div.block-container {{
+            padding-top: 4rem;
+            padding-bottom: 2rem;
+          }}
+
+          .gate-box {{
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 18px;
+            padding: 26px 22px 18px 22px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+          }}
+
+          .gate-title {{
+            text-align: center;
+            font-size: 1.45rem;
+            font-weight: 900;
+            color: #ffffff;
+            margin-bottom: 10px;
+          }}
+
+          .stTextInput label {{
+            color: #ffffff !important;
+            font-weight: 800 !important;
+          }}
+
+          .stTextInput input {{
+            background: rgba(255,255,255,0.96) !important;
+            color: #0b1f3a !important;
+            border-radius: 12px !important;
+          }}
+
+          .stButton > button {{
+            width: 100%;
+            border-radius: 12px;
+            font-weight: 900;
+          }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_style_app():
+    st.markdown(
+        f"""
+        <style>
+          .stApp {{
+            background: {ACADEMIC_BLUE};
+          }}
+
+          div.block-container {{
+            background: rgba(255,255,255,0.97);
+            border-radius: 18px;
+            padding: 1.2rem;
+            margin-top: 1rem;
+            margin-bottom: 1.2rem;
+            max-width: 1550px;
+          }}
+
+          .idbdc-header {{
+            text-align: center;
+            margin-bottom: 1rem;
+          }}
+
+          .idbdc-title-1 {{
+            font-size: 2.05rem;
+            font-weight: 900;
+            line-height: 1.15;
+            color: #0b1f3a;
+            margin: 0;
+          }}
+
+          .idbdc-title-2 {{
+            font-size: 1.78rem;
+            font-weight: 800;
+            line-height: 1.2;
+            color: #0b1f3a;
+            margin: 0.35rem 0 0 0;
+            opacity: 0.95;
+          }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_header():
+    st.markdown(
+        f"""
+        <div class="idbdc-header">
+          <div class="idbdc-title-1">{TITLE_LINE_1}</div>
+          <div class="idbdc-title-2">{TITLE_LINE_2}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def get_supabase() -> Client:
@@ -20,11 +139,9 @@ def get_supabase() -> Client:
 
 
 def lookup_user(supabase: Client, email: str):
-
     try:
         res = (
-            supabase
-            .table("det_resurse_umane")
+            supabase.table("det_resurse_umane")
             .select("nume_prenume,email")
             .eq("email", email)
             .limit(1)
@@ -42,71 +159,87 @@ def lookup_user(supabase: Client, email: str):
 
 def email_gate(supabase: Client):
 
-    if "gn_authed" not in st.session_state:
-        st.session_state.gn_authed = False
+    if "auth_brainstorm" not in st.session_state:
+        st.session_state.auth_brainstorm = False
 
-    if "gn_user_name" not in st.session_state:
-        st.session_state.gn_user_name = None
+    if "user_name" not in st.session_state:
+        st.session_state.user_name = None
 
-    if st.session_state.gn_authed:
+    if st.session_state.auth_brainstorm:
         return
 
-    st.title("🔐 Acces Grant Navigator")
+    hide_streamlit_chrome()
+    apply_style_gate()
 
-    email = st.text_input("Email instituțional (prenume.nume@upt.ro)")
+    _, col_ce, _ = st.columns([1,1,1])
 
-    if st.button("Autentificare"):
+    with col_ce:
 
-        e = (email or "").strip().lower()
+        st.markdown('<div class="gate-box">', unsafe_allow_html=True)
 
-        if not UPT_EMAIL_REGEX.match(e):
-            st.error("Email invalid.")
-            st.stop()
+        st.markdown('<div class="gate-title">Acces securizat</div>', unsafe_allow_html=True)
 
-        user = lookup_user(supabase, e)
+        email = st.text_input("Email instituțional (prenume.nume@upt.ro)")
 
-        if not user:
-            st.error("Emailul nu există în baza det_resurse_umane.")
-            st.stop()
+        if st.button("Autentificare"):
 
-        st.session_state.gn_authed = True
-        st.session_state.gn_user_name = user.get("nume_prenume")
+            e = (email or "").strip().lower()
 
-        st.rerun()
+            if not UPT_EMAIL_REGEX.match(e):
+                st.error("Email invalid.")
+                st.stop()
+
+            user = lookup_user(supabase, e)
+
+            if not user:
+                st.error("Emailul nu există în baza det_resurse_umane.")
+                st.stop()
+
+            st.session_state.auth_brainstorm = True
+            st.session_state.user_name = user.get("nume_prenume")
+
+            st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.stop()
 
 
 def run():
 
-    st.set_page_config(page_title=APP_TITLE, layout="wide")
+    st.set_page_config(page_title="IDBDC – Oportunitati", layout="wide")
 
     supabase = get_supabase()
 
     email_gate(supabase)
 
-    st.title(APP_TITLE)
+    hide_streamlit_chrome()
+    apply_style_app()
 
-    st.success(f"Bine ai venit, {st.session_state.gn_user_name}")
+    render_header()
+
+    st.success(f"Bine ai venit, {st.session_state.user_name}")
+
+    st.divider()
 
     tabs = st.tabs([
-        "Analiză internă IDBDC",
-        "Radar finanțări",
-        "Recomandări strategice",
+        "Analiza interna IDBDC",
+        "Radar finantari",
+        "Recomandari strategice",
         "Generare documente"
     ])
 
     with tabs[0]:
-        internal_analytics.render(supabase)
+        st.info("Zona de analiza interna IDBDC (in dezvoltare).")
 
     with tabs[1]:
-        external_radar.render()
+        st.info("Radar finantari nationale si internationale (in dezvoltare).")
 
     with tabs[2]:
-        strategy_recommendations.render(supabase)
+        st.info("Recomandari strategice pentru proiecte (in dezvoltare).")
 
     with tabs[3]:
-        document_generator.render(supabase)
+        st.info("Generator documente si idei de proiect (in dezvoltare).")
 
 
 if __name__ == "__main__":
