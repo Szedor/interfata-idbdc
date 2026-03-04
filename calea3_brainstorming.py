@@ -11,182 +11,15 @@ from grant_navigator.engine import document_generator
 TITLE_LINE_1 = "Oportunitati si Analiza Cercetare"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
 
-ACADEMIC_BLUE = "#0b2a52"
+APP_BLUE = "#003366"      # identic cu calea2_admin
+SIDEBAR_BLUE = "#0b2a52"  # identic cu calea2_admin
+
 UPT_EMAIL_REGEX = re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", re.IGNORECASE)
 
 
-def hide_streamlit_chrome():
-    st.markdown(
-        """
-        <style>
-          header { visibility: hidden; height: 0px; }
-          #MainMenu { visibility: hidden; }
-          footer { visibility: hidden; height: 0px; }
-          [data-testid="stToolbar"] { display: none !important; }
-          [data-testid="stDecoration"] { display: none !important; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def apply_style_gate():
-    st.markdown(
-        f"""
-        <style>
-          .stApp {{
-            background: {ACADEMIC_BLUE};
-          }}
-
-          div.block-container {{
-            padding-top: 4.0rem;
-            padding-bottom: 2.0rem;
-            max-width: 1550px;
-          }}
-
-          .gate-box {{
-            background: rgba(255,255,255,0.10);
-            border: 1px solid rgba(255,255,255,0.25);
-            border-radius: 18px;
-            padding: 26px 22px 18px 22px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.28);
-          }}
-
-          .gate-title {{
-            text-align: center;
-            font-size: 1.45rem;
-            font-weight: 900;
-            color: #ffffff;
-            margin: 0 0 0.35rem 0;
-          }}
-
-          .gate-subtitle {{
-            text-align: center;
-            color: rgba(255,255,255,0.92);
-            font-size: 1.02rem;
-            font-weight: 600;
-            margin: 0 0 1.1rem 0;
-          }}
-
-          .stTextInput label {{
-            color: #ffffff !important;
-            font-weight: 800 !important;
-          }}
-
-          .stTextInput input {{
-            background: rgba(255,255,255,0.96) !important;
-            color: #0b1f3a !important;
-            border-radius: 12px !important;
-          }}
-
-          .stButton > button {{
-            width: 100%;
-            border-radius: 12px;
-            font-weight: 900;
-          }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def apply_style_app():
-    st.markdown(
-        f"""
-        <style>
-          .stApp {{
-            background: {ACADEMIC_BLUE};
-          }}
-
-          /* Card alb central (ca in Calea 1) */
-          div.block-container {{
-            background: rgba(255,255,255,0.97);
-            border-radius: 18px;
-            padding: 1.2rem 1.2rem 1.0rem 1.2rem;
-            margin-top: 1.0rem;
-            margin-bottom: 1.2rem;
-            max-width: 1550px;
-          }}
-
-          .idbdc-header {{
-            text-align: center;
-            margin-top: 0.2rem;
-            margin-bottom: 0.9rem;
-          }}
-
-          .idbdc-title-1 {{
-            font-size: 2.05rem;
-            font-weight: 900;
-            line-height: 1.15;
-            color: #0b1f3a;
-            margin: 0;
-          }}
-
-          .idbdc-title-2 {{
-            font-size: 1.78rem;
-            font-weight: 800;
-            line-height: 1.2;
-            color: #0b1f3a;
-            margin: 0.35rem 0 0 0;
-            opacity: 0.95;
-          }}
-
-          /* Welcome box (30% + centru) */
-          .welcome-wrap {{
-            width: 30%;
-            min-width: 320px;
-            margin: 0.35rem auto 0.85rem auto;
-          }}
-          .welcome-box {{
-            background: rgba(34, 139, 34, 0.12);
-            border: 1px solid rgba(34, 139, 34, 0.25);
-            border-radius: 14px;
-            padding: 10px 12px;
-            text-align: center;
-            font-weight: 800;
-            color: #0b1f3a;
-          }}
-
-          /* Butoane 4 sectiuni */
-          .nav-row {{
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 0.4rem 0 0.8rem 0;
-            flex-wrap: wrap;
-          }}
-
-          /* In Streamlit, stilizam butoanele standard */
-          div.stButton > button {{
-            border-radius: 12px;
-            font-weight: 900;
-            padding: 0.55rem 0.8rem;
-          }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_header():
-    st.markdown(
-        f"""
-        <div class="idbdc-header">
-          <div class="idbdc-title-1">{TITLE_LINE_1}</div>
-          <div class="idbdc-title-2">{TITLE_LINE_2}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def get_supabase() -> Client:
-    try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-    except Exception:
-        st.error("Config lipsă: setează SUPABASE_URL și SUPABASE_KEY în Streamlit Cloud → Settings → Secrets.")
-        st.stop()
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 
 
@@ -206,6 +39,116 @@ def lookup_user(supabase: Client, email: str):
     return None
 
 
+def apply_style():
+    st.markdown(
+        f"""
+        <style>
+            /* Fundal aplicație (identic calea 1/2) */
+            .stApp {{ background-color: {APP_BLUE} !important; }}
+
+            /* Sidebar */
+            [data-testid="stSidebar"] {{
+                background-color: {SIDEBAR_BLUE} !important;
+                border-right: 2px solid rgba(255,255,255,0.20);
+            }}
+
+            /* Text alb */
+            .stApp h1, .stApp h2, .stApp h3, .stApp h4,
+            .stApp p, .stApp label, .stApp .stMarkdown,
+            [data-testid="stSidebar"] p, [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
+                color: white !important;
+            }}
+
+            /* Input-uri */
+            input {{
+                color: #000000 !important;
+                background-color: #ffffff !important;
+            }}
+
+            /* Butoane */
+            div.stButton > button {{
+                border: 1px solid white !important;
+                color: white !important;
+                background-color: rgba(255,255,255,0.10) !important;
+                width: 100%;
+                font-size: 14px !important;
+                font-weight: bold !important;
+                height: 46px !important;
+                border-radius: 12px !important;
+            }}
+            div.stButton > button:hover {{
+                background-color: white !important;
+                color: {APP_BLUE} !important;
+            }}
+
+            /* Ascunde bara Streamlit */
+            [data-testid="stToolbar"] {{ visibility: hidden !important; height: 0px !important; }}
+            [data-testid="stHeader"]  {{ visibility: hidden !important; height: 0px !important; }}
+            [data-testid="stDecoration"] {{ visibility: hidden !important; height: 0px !important; }}
+            #MainMenu {{ visibility: hidden !important; }}
+
+            /* Titlu 2 randuri */
+            .idbdc-header {{
+                text-align: center;
+                margin-top: 0.25rem;
+                margin-bottom: 0.6rem;
+            }}
+            .idbdc-title-1 {{
+                font-size: 2.0rem;
+                font-weight: 900;
+                margin: 0;
+                color: #ffffff;
+            }}
+            .idbdc-title-2 {{
+                font-size: 1.7rem;
+                font-weight: 800;
+                margin: 4px 0 0 0;
+                color: #ffffff;
+                opacity: 0.95;
+            }}
+
+            /* Welcome: 30% si centrat */
+            .welcome-wrap {{
+                width: 30%;
+                min-width: 320px;
+                margin: 0.6rem auto 0.8rem auto;
+                text-align: center;
+            }}
+            .welcome-box {{
+                display: inline-block;
+                padding: 10px 14px;
+                border-radius: 14px;
+                background: rgba(255,255,255,0.12);
+                border: 1px solid rgba(255,255,255,0.25);
+                color: #ffffff;
+                font-weight: 900;
+            }}
+
+            /* Butoane sectiuni: mai compacte */
+            .nav-note {{
+                text-align:center;
+                opacity:0.92;
+                margin-bottom: 0.4rem;
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_header():
+    st.markdown(
+        f"""
+        <div class="idbdc-header">
+            <div class="idbdc-title-1">{TITLE_LINE_1}</div>
+            <div class="idbdc-title-2">{TITLE_LINE_2}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def email_gate(supabase: Client):
     if "auth_ai" not in st.session_state:
         st.session_state.auth_ai = False
@@ -215,41 +158,37 @@ def email_gate(supabase: Client):
     if st.session_state.auth_ai:
         return
 
-    hide_streamlit_chrome()
-    apply_style_gate()
+    render_header()
 
-    left, mid, right = st.columns([1.8, 1.0, 1.8])
+    _, mid, _ = st.columns([1.5, 1.0, 1.5])
     with mid:
-        st.markdown('<div class="gate-box">', unsafe_allow_html=True)
-        st.markdown('<div class="gate-title">🛡️ Acces securizat</div>', unsafe_allow_html=True)
-        st.markdown('<div class="gate-subtitle">Oportunitati si Analiza Cercetare – DCDI</div>', unsafe_allow_html=True)
-
+        st.subheader("🔐 Acces securizat")
         email = st.text_input("Email instituțional (prenume.nume@upt.ro)", value="")
 
         if st.button("Autentificare"):
             e = (email or "").strip().lower()
+
             if not UPT_EMAIL_REGEX.match(e):
                 st.error("Email invalid. Exemplu: prenume.nume@upt.ro")
                 st.stop()
 
             user = lookup_user(supabase, e)
             if not user:
-                st.error("Emailul nu există în baza det_resurse_umane.")
+                st.error("Emailul nu există în det_resurse_umane.email")
                 st.stop()
 
             st.session_state.auth_ai = True
             st.session_state.user_name = (user.get("nume_prenume") or "").strip() or e
-            st.rerun()
 
-        st.markdown("</div>", unsafe_allow_html=True)
+            # foarte important: la intrare, nu afisam automat nicio sectiune
+            st.session_state.ai_section = None
+
+            st.rerun()
 
     st.stop()
 
 
 def render_nav_buttons():
-    if "ai_section" not in st.session_state:
-        st.session_state.ai_section = "internal"
-
     c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
 
     with c1:
@@ -276,52 +215,53 @@ def render_nav_buttons():
 def run():
     st.set_page_config(page_title="IDBDC – AI", layout="wide")
 
+    apply_style()
     supabase = get_supabase()
 
-    # Poarta email
+    # Gate email
     email_gate(supabase)
 
-    # Stil aplicatie
-    hide_streamlit_chrome()
-    apply_style_app()
-
-    # Header
+    # Header + welcome
     render_header()
 
-    # Welcome (30% + centru)
     st.markdown(
         f"""
         <div class="welcome-wrap">
-          <div class="welcome-box">Bine ai venit, {st.session_state.user_name}</div>
+            <div class="welcome-box">Bine ai venit, {st.session_state.user_name}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.divider()
+    st.markdown('<div class="nav-note">Alege una dintre cele 4 sectiuni:</div>', unsafe_allow_html=True)
 
-    # Navigare prin 4 butoane
     render_nav_buttons()
 
     st.divider()
 
-    # Randare sectiune activa
-    sec = st.session_state.get("ai_section", "internal")
+    sec = st.session_state.get("ai_section", None)
+
+    if sec is None:
+        st.info("Selecteaza o sectiune de mai sus.")
+        return
 
     if sec == "internal":
         internal_analytics.render(supabase)
+        return
 
-    elif sec == "radar":
+    if sec == "radar":
         external_radar.render()
+        return
 
-    elif sec == "strategy":
+    if sec == "strategy":
         strategy_recommendations.render(supabase)
+        return
 
-    elif sec == "docs":
+    if sec == "docs":
         document_generator.render(supabase)
+        return
 
-    else:
-        st.info("Selecteaza o sectiune.")
+    st.info("Selecteaza o sectiune.")
 
 
 if __name__ == "__main__":
