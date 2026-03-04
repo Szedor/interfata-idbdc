@@ -89,9 +89,9 @@ def _nlq_guess_table_and_keyword(question: str):
         elif "cep" in q_low:
             detected = "CEP"
         else:
-            detected = "CEP"  # default (beta)
+            detected = "INTERNATIONALE"  # default (beta) - pentru baza ta curenta
 
-        table = map_baze.get(detected, "base_contracte_cep")
+        table = map_baze.get(detected, "base_proiecte_internationale")
         tip = detected
 
     # 3) Keyword: prioritar text intre ghilimele
@@ -103,7 +103,9 @@ def _nlq_guess_table_and_keyword(question: str):
         stop = [
             "arata", "arată", "listeaza", "listează", "care", "ce", "cate", "câte",
             "avem", "dupa", "după", "in", "în", "din", "pe", "cu", "fara", "fără",
-            "proiecte", "proiect", "contracte", "contract", "evenimente", "eveniment",
+            "proiecte", "proiect", "proiectele",
+            "contracte", "contract", "contractele",
+            "evenimente", "eveniment",
             "stiintifice", "științifice", "proprietate", "intelectuala", "intelectuală",
             "pnrr", "pncdi", "cep", "terti", "terți", "fdi", "interreg", "noneu",
             "international", "internațional", "internationale", "internaționale",
@@ -158,12 +160,12 @@ def render(supabase: Client):
     # =========================================================
     st.markdown("### 🧠 Întreabă baza IDBDC (beta)")
     q = st.text_input(
-        "Scrie întrebarea (ex: Ce proiecte PNRR avem cu \"energie\"? / Arată evenimente cu \"AI\" )",
+        "Scrie întrebarea (ex: Arată proiectele internaționale / Arată proiecte cu \"energie\")",
         value="",
         key="nlq_question",
     )
 
-    cqa1, cqa2 = st.columns([1, 3])
+    cqa1, _ = st.columns([1, 3])
     with cqa1:
         run_q = st.button("Răspunde", key="nlq_run")
 
@@ -173,7 +175,10 @@ def render(supabase: Client):
         else:
             table, tip, kw = _nlq_guess_table_and_keyword(q)
 
-            st.info(f"Am interpretat întrebarea ca: **{tip}** → tabela **{table}**" + (f" | keyword: **{kw}**" if kw else ""))
+            st.info(
+                f"Am interpretat întrebarea ca: **{tip}** → tabela **{table}**"
+                + (f" | keyword: **{kw}**" if kw else "")
+            )
 
             rows = _safe_select_all(supabase, table, limit=800)
             if not rows:
@@ -212,7 +217,7 @@ def render(supabase: Client):
             tip = st.selectbox(
                 "Tip",
                 ["CEP", "TERTI", "PNCDI", "PNRR", "FDI", "INTERNATIONALE", "INTERREG", "NONEU"],
-                index=0,
+                index=5,  # INTERNATIONALE implicit
                 key="guided_tip",
             )
         else:
@@ -233,7 +238,7 @@ def render(supabase: Client):
     }
 
     if categorie == "Contracte & Proiecte":
-        table = map_baze.get(tip, "")
+        table = map_baze.get(tip, "base_proiecte_internationale")
     elif categorie == "Evenimente stiintifice":
         table = "base_evenimente_stiintifice"
     else:
