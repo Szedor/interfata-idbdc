@@ -4,6 +4,9 @@ import re
 from supabase import Client
 
 
+# -------------------------
+# DB helpers
+# -------------------------
 def _safe_select_all(supabase: Client, table: str, limit: int = 800):
     try:
         res = supabase.table(table).select("*").limit(limit).execute()
@@ -13,6 +16,22 @@ def _safe_select_all(supabase: Client, table: str, limit: int = 800):
         return []
 
 
+def _safe_select_eq(supabase: Client, table: str, col: str, value: str, limit: int = 2000):
+    """
+    Citire cu filtru = value (server-side).
+    Mult mai eficient decât select("*") + filtrare în pandas.
+    """
+    try:
+        res = supabase.table(table).select("*").eq(col, value).limit(limit).execute()
+        return res.data or []
+    except Exception as e:
+        st.error(f"Eroare la citirea din baza de date ({table}): {e}")
+        return []
+
+
+# -------------------------
+# Text helpers
+# -------------------------
 def _filter_anywhere(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
     k = (keyword or "").strip().lower()
     if not k:
@@ -34,14 +53,7 @@ def _extract_quoted_text(q: str) -> str:
 
 
 def _ro_normalize(text: str) -> str:
-    """
-    Normalizeaza pentru romana:
-    - lower
-    - diacritice -> fara diacritice
-    - spatii multiple -> 1 spatiu
-    """
     t = (text or "").strip().lower()
-    # diacritice RO
     t = (
         t.replace("ă", "a")
         .replace("â", "a")
@@ -55,12 +67,10 @@ def _ro_normalize(text: str) -> str:
     return t
 
 
+# -------------------------
+# NLQ router (beta)
+# -------------------------
 def _nlq_guess_table_and_keyword(question: str):
-    """
-    Interpretare determinista (beta):
-    - decide tabela
-    - decide keyword (sau gol, cand e doar "arata lista")
-    """
     q_raw = (question or "").strip()
     q = _ro_normalize(q_raw)
 
@@ -75,7 +85,6 @@ def _nlq_guess_table_and_keyword(question: str):
         "NONEU": "base_proiecte_noneu",
     }
 
-    # 1) Categorii speciale
     if any(x in q for x in ["eveniment", "conferin", "workshop", "simpozion", "manifestare"]):
         table = "base_evenimente_stiintifice"
         tip = "Evenimente stiintifice"
@@ -83,7 +92,6 @@ def _nlq_guess_table_and_keyword(question: str):
         table = "base_prop_intelect"
         tip = "Proprietate intelectuala"
     else:
-        # 2) Detectie tip
         detected = None
         if "pnrr" in q:
             detected = "PNRR"
@@ -97,19 +105,16 @@ def _nlq_guess_table_and_keyword(question: str):
             detected = "NONEU"
         elif "fdi" in q:
             detected = "FDI"
-        elif "terti" in q or "terti" in q:
+        elif "terti" in q:
             detected = "TERTI"
         elif "cep" in q:
             detected = "CEP"
         else:
-            detected = "INTERNATIONALE"  # default pentru baza ta curenta
+            detected = "INTERNATIONALE"
 
         table = map_baze.get(detected, "base_proiecte_internationale")
         tip = detected
 
-    # 3) Regula FIXA: daca utilizatorul cere "arata proiecte(le) internationale"
-    # atunci keyword trebuie sa fie GOL (adica listam tot).
-    # Acceptam forme: proiecte/proiectele/proiectul + internationale/international(e)
     show_all_patterns = [
         r"\barata\b.*\bproiecte\b.*\binternationale\b",
         r"\barata\b.*\bproiectele\b.*\binternationale\b",
@@ -119,9 +124,8 @@ def _nlq_guess_table_and_keyword(question: str):
     ]
     for p in show_all_patterns:
         if re.search(p, q):
-            return table, tip, ""  # keyword gol -> afisam tot
+            return table, tip, ""
 
-    # 4) Keyword: prioritar ce e intre ghilimele
     kw = _extract_quoted_text(q_raw)
     kw = _ro_normalize(kw)
 
@@ -137,12 +141,10 @@ def _nlq_guess_table_and_keyword(question: str):
             "international", "internationale", "domeniu", "domeniul",
             "partener", "parteneri", "finantare", "finantari"
         }
-
         words = re.findall(r"[a-z0-9\-]+", q)
         words = [w for w in words if w not in stop and len(w) >= 3]
         kw = " ".join(words[:6]).strip()
 
-    # 5) Daca keyword-ul a ramas ceva generic, il anulam
     generic = {"proiect", "proiecte", "proiectele", "contract", "contracte", "contractele", "eveniment", "evenimente"}
     if kw in generic:
         kw = ""
@@ -150,6 +152,9 @@ def _nlq_guess_table_and_keyword(question: str):
     return table, tip, kw
 
 
+# -------------------------
+# UI helpers
+# -------------------------
 def _render_results(df: pd.DataFrame, table: str):
     st.success(f"Total rezultate: {len(df)}")
     st.subheader("Tabel (primele 200 randuri)")
@@ -181,9 +186,102 @@ def _render_results(df: pd.DataFrame, table: str):
         )
 
 
+def _render_single_table(title: str, rows: list, empty_msg: str):
+    st.markdown(f"#### {title}")
+    if not rows:
+        st.info(empty_msg)
+        return
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, height=240)
+
+
+def _render_team_table(rows: list):
+    st.markdown("#### 👥 Echipa proiect")
+    if not rows:
+        st.warning("Nu există încă echipă pentru acest proiect.")
+        return
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, height=360)
+
+
+# -------------------------
+# PROFIL PROIECT (determinist)
+# -------------------------
+def _render_profil_proiect(supabase: Client):
+    """
+    Profil proiect = un 'hub' determinist, ca în Administrare:
+    - folosește cod_identificare
+    - arată base + com_* (financiar/tehnic/echipă)
+    """
+    st.markdown("### 🧾 Profil proiect (rapid)")
+    st.caption("Introdu cod_identificare și vezi baza + completările (financiar / tehnic / echipă).")
+
+    # map pentru tabele base (le ai deja)
+    map_baze = {
+        "CEP": "base_contracte_cep",
+        "TERTI": "base_contracte_terti",
+        "PNCDI": "base_proiecte_pncdi",
+        "PNRR": "base_proiecte_pnrr",
+        "FDI": "base_proiecte_fdi",
+        "INTERNATIONALE": "base_proiecte_internationale",
+        "INTERREG": "base_proiecte_interreg",
+        "NONEU": "base_proiecte_noneu",
+    }
+    base_tables = list(map_baze.values())
+
+    # tabele com (numele astea le ajustăm doar dacă în DB sunt diferite)
+    COM_FIN = "com_date_financiare"
+    COM_TEH = "com_aspecte_tehnice"
+    COM_ECH = "com_echipe_proiect"
+
+    cod = st.text_input("cod_identificare", value="", key="profil_cod").strip()
+    run = st.button("Afișează profil", key="profil_run")
+
+    if not run:
+        return
+
+    if not cod:
+        st.warning("Completează cod_identificare.")
+        return
+
+    # 1) căutăm în toate base_* (ca să nu ratezi proiectul dacă e în alt tip)
+    base_rows_all = []
+    for t in base_tables:
+        base_rows_all.extend(_safe_select_eq(supabase, t, "cod_identificare", cod, limit=50))
+
+    st.markdown("#### 📌 Date de bază")
+    if not base_rows_all:
+        st.warning("Nu am găsit proiectul în tabelele base_* după acest cod_identificare.")
+    else:
+        st.dataframe(pd.DataFrame(base_rows_all), use_container_width=True, height=260)
+
+    st.divider()
+
+    # 2) com_* (server-side filter)
+    fin_rows = _safe_select_eq(supabase, COM_FIN, "cod_identificare", cod, limit=10)
+    teh_rows = _safe_select_eq(supabase, COM_TEH, "cod_identificare", cod, limit=10)
+    ech_rows = _safe_select_eq(supabase, COM_ECH, "cod_identificare", cod, limit=2000)
+
+    tabs = st.tabs(["💰 Financiar", "🧪 Tehnic", "👥 Echipă"])
+    with tabs[0]:
+        _render_single_table("💰 Date financiare", fin_rows, "Nu există încă date financiare pentru acest proiect.")
+    with tabs[1]:
+        _render_single_table("🧪 Aspecte tehnice", teh_rows, "Nu există încă aspecte tehnice pentru acest proiect.")
+    with tabs[2]:
+        _render_team_table(ech_rows)
+
+
+# -------------------------
+# MAIN render
+# -------------------------
 def render(supabase: Client):
     st.subheader("📊 Analiza interna IDBDC")
-    st.caption("Ai două moduri: (1) Întrebări în limbaj normal (beta) și (2) Analiză ghidată (tabel + export).")
+    st.caption("Ai două moduri: (1) Profil proiect (rapid) + (2) Întrebări NLQ (beta) și Analiză ghidată.")
+
+    # 0) PROFIL PROIECT (nou)
+    _render_profil_proiect(supabase)
+
+    st.divider()
 
     # 1) NLQ
     st.markdown("### 🧠 Întreabă baza IDBDC (beta)")
