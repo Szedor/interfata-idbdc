@@ -13,7 +13,7 @@ import streamlit.components.v1 as components
 GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
 PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 
-TITLE_LINE_1 = "🔎 Baze de date - Interogare  | Cautare | Consultare avansata"
+TITLE_LINE_1 = "🔎 Baze de date - Interogare | Cautare | Consultare avansata"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
 
 ACADEMIC_BLUE = "#0b2a52"
@@ -90,13 +90,26 @@ def apply_style_full_blue():
             border-radius: 10px !important;
           }}
 
+          /* IMPORTANT: butoane cu text vizibil (rezolvă alb pe alb) */
           .stButton > button {{
-            border-radius: 10px;
-            font-weight: 900;
+            border-radius: 10px !important;
+            font-weight: 900 !important;
+            background: rgba(255,255,255,0.96) !important;
+            color: #0b1f3a !important;
+            border: 1px solid rgba(255,255,255,0.50) !important;
+          }}
+          .stButton > button:hover {{
+            color: #0b1f3a !important;
+            border: 1px solid rgba(255,255,255,0.85) !important;
           }}
 
           h1, h2, h3 {{
             color: #ffffff !important;
+          }}
+
+          /* Un pic de spațiu sub taburi */
+          [data-testid="stTabs"] {{
+            margin-top: 0.2rem;
           }}
         </style>
         """,
@@ -155,6 +168,8 @@ def apply_style_gate():
             width: 100%;
             border-radius: 12px;
             font-weight: 900;
+            background: rgba(255,255,255,0.96) !important;
+            color: #0b1f3a !important;
           }}
         </style>
         """,
@@ -204,13 +219,8 @@ TEXT_COL_CANDIDATES = [
     "descriere", "observatii", "cuvinte_cheie",
 ]
 
-# Contracte/Proiecte: best effort
 YEAR_COL_CANDIDATES_CP = ["an_referinta", "an_derulare", "data_incepere", "data_start"]
-
-# Evenimente: best effort
 YEAR_COL_CANDIDATES_EV = ["data_inceput", "data_eveniment", "data_start", "data"]
-
-# PI: best effort
 YEAR_COL_CANDIDATES_PI = ["data_oficiala_acordare", "data_acordare", "data"]
 
 
@@ -432,19 +442,29 @@ def gate():
 # =========================================================
 
 def render_fisa_completa(supabase: Client):
-    st.subheader("Fișa completă (după cod)")
-    st.caption("Introdu cod_identificare și vezi toate înregistrările asociate (bază + completări, dacă există).")
+    st.markdown("## Fișa completă (după cod)")
+    st.caption("Introduceți cod_identificare și vedeți toate înregistrările asociate (bază + completări, dacă există).")
 
-    cod = st.text_input("cod_identificare", value="").strip()
-    if not st.button("📄 Afișează fișa"):
-        st.info("Completează codul și apasă «Afișează fișa».")
+    # mesaj scurt, mutat deasupra butonului
+    st.info("Introduceți codul și apăsați «Afișează fișa».", icon="ℹ️")
+
+    # input scurt + buton lângă
+    c1, c2, c3 = st.columns([1.2, 1.0, 2.8])
+    with c1:
+        cod = st.text_input("cod_identificare", value="", key="fisa_cod").strip()
+    with c2:
+        go = st.button("📄 Afișează fișa", key="fisa_go")
+    with c3:
+        st.write("")
+
+    if not go:
         return
 
     if not cod:
         st.warning("cod_identificare este obligatoriu.")
         return
 
-    # 1) caută în toate tabelele base (Contracte & Proiecte + Evenimente + PI)
+    # 1) caută în toate tabelele base
     base_tables = []
     for k, v in CATEGORII.items():
         if k == "Contracte & Proiecte":
@@ -467,7 +487,7 @@ def render_fisa_completa(supabase: Client):
         st.warning("Nu am găsit acest cod_identificare în tabelele de bază.")
         return
 
-    # 2) completări proiect (dacă există rânduri)
+    # 2) completări
     st.divider()
     st.markdown("### 🧩 Completări (dacă există)")
 
@@ -500,11 +520,11 @@ def render_fisa_completa(supabase: Client):
 # =========================================================
 
 def render_cautare_filtrare(supabase: Client):
-    st.subheader("Căutare & filtrare")
+    st.markdown("## Căutare & filtrare")
     st.caption("Căutare rapidă în baza IDBDC (fără export/print; exportul este în tabul 3).")
 
-    # Selectoare categorie/tip (identic ca logică)
-    nav1, nav2 = st.columns([1.2, 2.0])
+    # categorie pe coloană îngustă
+    nav1, nav2 = st.columns([1.2, 2.8])
     with nav1:
         categorie = st.selectbox("Alege categorie documente", list(CATEGORII.keys()), key="cf_cat")
 
@@ -580,13 +600,12 @@ def render_cautare_filtrare(supabase: Client):
         st.error("Interval invalid: «Anul pana la» trebuie să fie >= «Anul de la».")
         return
 
-    if not st.button("🔎 Caută (fără export)", key="cf_go"):
-        st.info("Completează criteriile și apasă Caută.")
+    st.info("Completați criteriile și apăsați «Caută».", icon="ℹ️")
+    if not st.button("🔎 Caută", key="cf_go"):
         return
 
     cols = set(get_table_columns(supabase, base_table))
     q = supabase.table(base_table).select("*")
-
     q = apply_keyword_filter(q, cols, keyword if "keyword" in locals() else "")
 
     if categorie == "Evenimente stiintifice":
@@ -604,7 +623,7 @@ def render_cautare_filtrare(supabase: Client):
         if persoana:
             ids = ids_for_person(supabase, persoana)
             if not ids:
-                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                st.info("Niciun rezultat (nu există coduri asociate persoanei).")
                 return
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
@@ -617,7 +636,7 @@ def render_cautare_filtrare(supabase: Client):
         if persoana:
             ids = ids_for_person(supabase, persoana)
             if not ids:
-                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                st.info("Niciun rezultat (nu există coduri asociate persoanei).")
                 return
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
@@ -628,17 +647,15 @@ def render_cautare_filtrare(supabase: Client):
                 if c in cols:
                     q = q.eq(c, status)
                     break
-
         if "dep" in locals() and dep:
             for c in ["acronym_departament", "departament", "departament_upt"]:
                 if c in cols:
                     q = q.eq(c, dep)
                     break
-
         if persoana:
             ids = ids_for_person(supabase, persoana)
             if not ids:
-                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                st.info("Niciun rezultat (nu există coduri asociate persoanei).")
                 return
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
@@ -661,7 +678,6 @@ def render_cautare_filtrare(supabase: Client):
 
     st.divider()
     st.subheader("Rezultate (tabel)")
-
     st.dataframe(df, use_container_width=True, height=560)
     st.caption(f"Total rezultate: {len(df)}")
 
@@ -671,17 +687,13 @@ def render_cautare_filtrare(supabase: Client):
 # =========================================================
 
 def render_cercetare_export_print(supabase: Client):
-    # ----------------------------
-    # SELECTOARE NAVIGARE
-    # ----------------------------
-    nav1, nav2 = st.columns([1.2, 2.0])
+    st.markdown("## Cercetare BD + Export/Print")
 
+    nav1, nav2 = st.columns([1.2, 2.8])
     with nav1:
         categorie = st.selectbox("Alege categorie documente", list(CATEGORII.keys()), key="ex_cat")
 
     tip = None
-    base_table = None
-
     if categorie == "Contracte & Proiecte":
         with nav2:
             tip = st.selectbox("Alege tipul de Contracte & Proiecte", list(CATEGORII[categorie]["tipuri"].keys()), key="ex_tip")
@@ -692,7 +704,6 @@ def render_cercetare_export_print(supabase: Client):
     st.divider()
 
     persoane = fetch_idbdc_people(supabase)
-
     current_year = dt.datetime.now().year
 
     if categorie == "Evenimente stiintifice":
@@ -700,7 +711,6 @@ def render_cercetare_export_print(supabase: Client):
         format_list = fetch_distinct_values(supabase, "nom_format_evenimente", "format_eveniment")
 
         c1, c2, c3, c4, c5, c6 = st.columns(6)
-
         with c1:
             keyword = st.text_input("Cuvant cheie", value="", key="ex_kw").strip()
         with c2:
@@ -720,7 +730,6 @@ def render_cercetare_export_print(supabase: Client):
         dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
 
         c1, c2, c3, c4, c5, c6 = st.columns(6)
-
         with c1:
             keyword = st.text_input("Cuvant cheie", value="", key="ex_kw2").strip()
         with c2:
@@ -740,7 +749,6 @@ def render_cercetare_export_print(supabase: Client):
         dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
 
         c1, c2, c3, c4, c5, c6 = st.columns(6)
-
         with c1:
             keyword = st.text_input("Cuvant cheie", value="", key="ex_kw3").strip()
         with c2:
@@ -759,13 +767,12 @@ def render_cercetare_export_print(supabase: Client):
         st.error("Interval invalid: «Anul pana la» trebuie să fie >= «Anul de la».")
         return
 
+    st.info("Completați criteriile și apăsați «Caută».", icon="ℹ️")
     if not st.button("🔎 Caută", key="ex_go"):
-        st.info("Completează criteriile și apasă Caută.")
         return
 
     cols = set(get_table_columns(supabase, base_table))
     q = supabase.table(base_table).select("*")
-
     q = apply_keyword_filter(q, cols, keyword if "keyword" in locals() else "")
 
     if categorie == "Evenimente stiintifice":
@@ -780,28 +787,23 @@ def render_cercetare_export_print(supabase: Client):
             q = q.eq("natura_eveniment", natura)
         if fmt and "format_eveniment" in cols:
             q = q.eq("format_eveniment", fmt)
-
         if persoana:
             ids = ids_for_person(supabase, persoana)
             if not ids:
-                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                st.info("Niciun rezultat (nu există coduri asociate persoanei).")
                 return
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
 
     elif categorie == "Proprietate intelectuala":
-        if "tip_pi" in locals() and tip_pi:
-            if "acronym_prop_intelect" in cols:
-                q = q.eq("acronym_prop_intelect", tip_pi)
-
-        if "dep" in locals() and dep:
-            if "acronym_departament" in cols:
-                q = q.eq("acronym_departament", dep)
-
+        if "tip_pi" in locals() and tip_pi and "acronym_prop_intelect" in cols:
+            q = q.eq("acronym_prop_intelect", tip_pi)
+        if "dep" in locals() and dep and "acronym_departament" in cols:
+            q = q.eq("acronym_departament", dep)
         if persoana:
             ids = ids_for_person(supabase, persoana)
             if not ids:
-                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                st.info("Niciun rezultat (nu există coduri asociate persoanei).")
                 return
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
@@ -812,17 +814,15 @@ def render_cercetare_export_print(supabase: Client):
                 if c in cols:
                     q = q.eq(c, status)
                     break
-
         if "dep" in locals() and dep:
             for c in ["acronym_departament", "departament", "departament_upt"]:
                 if c in cols:
                     q = q.eq(c, dep)
                     break
-
         if persoana:
             ids = ids_for_person(supabase, persoana)
             if not ids:
-                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                st.info("Niciun rezultat (nu există coduri asociate persoanei).")
                 return
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
@@ -908,7 +908,6 @@ def run():
     hide_streamlit_chrome()
     apply_style_full_blue()
 
-    # Supabase din Secrets
     try:
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
@@ -921,9 +920,6 @@ def run():
     render_header()
     st.divider()
 
-    # =====================================================
-    # TABS – CALEA 1
-    # =====================================================
     tab1, tab2, tab3 = st.tabs([
         "📄 Fișa completă (după cod)",
         "🔍 Căutare & filtrare",
