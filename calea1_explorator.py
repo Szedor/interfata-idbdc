@@ -45,6 +45,7 @@ def apply_style_full_blue():
           .stApp {{
             background: {ACADEMIC_BLUE} !important;
           }}
+
           div.block-container {{
             padding-top: 1.1rem;
             padding-bottom: 1.0rem;
@@ -90,26 +91,35 @@ def apply_style_full_blue():
             border-radius: 10px !important;
           }}
 
-          /* IMPORTANT: butoane cu text vizibil (rezolvă alb pe alb) */
+          /* IMPORTANT: butoane - lizibile (nu alb pe alb) */
           .stButton > button {{
             border-radius: 10px !important;
             font-weight: 900 !important;
             background: rgba(255,255,255,0.96) !important;
             color: #0b1f3a !important;
-            border: 1px solid rgba(255,255,255,0.50) !important;
+            border: 1px solid rgba(255,255,255,0.55) !important;
+            opacity: 1 !important;
           }}
           .stButton > button:hover {{
+            border: 1px solid rgba(255,255,255,0.90) !important;
             color: #0b1f3a !important;
-            border: 1px solid rgba(255,255,255,0.85) !important;
+            opacity: 1 !important;
+          }}
+          .stButton > button:disabled,
+          .stButton > button[disabled] {{
+            background: rgba(255,255,255,0.70) !important;
+            color: rgba(11,31,58,0.90) !important;
+            border: 1px solid rgba(255,255,255,0.40) !important;
+            opacity: 1 !important;
+          }}
+
+          /* Tabs: spațiere mai strânsă */
+          [data-testid="stTabs"] {{
+            margin-top: 0.15rem;
           }}
 
           h1, h2, h3 {{
             color: #ffffff !important;
-          }}
-
-          /* Un pic de spațiu sub taburi */
-          [data-testid="stTabs"] {{
-            margin-top: 0.2rem;
           }}
         </style>
         """,
@@ -170,6 +180,7 @@ def apply_style_gate():
             font-weight: 900;
             background: rgba(255,255,255,0.96) !important;
             color: #0b1f3a !important;
+            opacity: 1 !important;
           }}
         </style>
         """,
@@ -443,28 +454,35 @@ def gate():
 
 def render_fisa_completa(supabase: Client):
     st.markdown("## Fișa completă (după cod)")
-    st.caption("Introduceți cod_identificare și vedeți toate înregistrările asociate (bază + completări, dacă există).")
 
-    # mesaj scurt, mutat deasupra butonului
+    # Text explicit (NU caption) ca să nu "dispară"
+    st.markdown(
+        "<div style='color: rgba(255,255,255,0.88); font-size: 1.02rem; font-weight: 600; margin-top: 0.1rem; margin-bottom: 0.85rem;'>"
+        "Introduceți cod_identificare și vedeți toate înregistrările asociate (bază + completări, dacă există)."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # 1) input pe rândul lui (scurt)
+    c1, c2 = st.columns([1.2, 3.8])
+    with c1:
+        cod = st.text_input("Cod identificare", value="", key="fisa_cod").strip()
+    with c2:
+        st.write("")
+
+    # 2) mesaj pe rând separat
     st.info("Introduceți codul și apăsați «Afișează fișa».", icon="ℹ️")
 
-    # input scurt + buton lângă
-    c1, c2, c3 = st.columns([1.2, 1.0, 2.8])
-    with c1:
-        cod = st.text_input("cod_identificare", value="", key="fisa_cod").strip()
-    with c2:
-        go = st.button("📄 Afișează fișa", key="fisa_go")
-    with c3:
-        st.write("")
+    # 3) buton pe rând separat (lizibil)
+    go = st.button("📄 Afișează fișa", key="fisa_go")
 
     if not go:
         return
 
     if not cod:
-        st.warning("cod_identificare este obligatoriu.")
+        st.warning("Cod identificare este obligatoriu.")
         return
 
-    # 1) caută în toate tabelele base
     base_tables = []
     for k, v in CATEGORII.items():
         if k == "Contracte & Proiecte":
@@ -487,7 +505,6 @@ def render_fisa_completa(supabase: Client):
         st.warning("Nu am găsit acest cod_identificare în tabelele de bază.")
         return
 
-    # 2) completări
     st.divider()
     st.markdown("### 🧩 Completări (dacă există)")
 
@@ -516,14 +533,13 @@ def render_fisa_completa(supabase: Client):
 
 
 # =========================================================
-# TAB 2 – CĂUTARE & FILTRARE (FARA EXPORT/PRINT)
+# TAB 2 – CAUTARE & FILTRARE
 # =========================================================
 
 def render_cautare_filtrare(supabase: Client):
     st.markdown("## Căutare & filtrare")
     st.caption("Căutare rapidă în baza IDBDC (fără export/print; exportul este în tabul 3).")
 
-    # categorie pe coloană îngustă
     nav1, nav2 = st.columns([1.2, 2.8])
     with nav1:
         categorie = st.selectbox("Alege categorie documente", list(CATEGORII.keys()), key="cf_cat")
@@ -683,12 +699,13 @@ def render_cautare_filtrare(supabase: Client):
 
 
 # =========================================================
-# TAB 3 – CERCETARE BD + EXPORT/PRINT (CODUL TAU, PASTRAT)
+# TAB 3 – CERCETARE BD + EXPORT/PRINT
 # =========================================================
 
 def render_cercetare_export_print(supabase: Client):
     st.markdown("## Cercetare BD + Export/Print")
 
+    # categorie (fără divider mare după)
     nav1, nav2 = st.columns([1.2, 2.8])
     with nav1:
         categorie = st.selectbox("Alege categorie documente", list(CATEGORII.keys()), key="ex_cat")
@@ -701,7 +718,8 @@ def render_cercetare_export_print(supabase: Client):
     else:
         base_table = CATEGORII[categorie]["base_table"]
 
-    st.divider()
+    # spațiu mic, nu divider
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     persoane = fetch_idbdc_people(supabase)
     current_year = dt.datetime.now().year
