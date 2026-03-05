@@ -278,18 +278,7 @@ def apply_keyword_filter(q, cols: set, keyword: str):
     return q
 
 
-def apply_date_equals_filter(q, col: str, date_value: dt.date):
-    start = dt.datetime.combine(date_value, dt.time.min)
-    end = start + dt.timedelta(days=1)
-    end_adj = end - dt.timedelta(seconds=1)
-    return q.gte(col, start.isoformat()).lte(col, end_adj.isoformat())
-
-
 def apply_year_range_filter(q, col: str, y_from: int, y_to: int):
-    """
-    - dacă col e an numeric: gte/lte
-    - dacă col e data/timestamp: interval date
-    """
     c = (col or "").lower()
     if c.startswith("data_") or c.startswith("dt_") or c.endswith("_data") or c in ("data",):
         start = dt.datetime(int(y_from), 1, 1)
@@ -299,7 +288,6 @@ def apply_year_range_filter(q, col: str, y_from: int, y_to: int):
 
 
 def apply_year_range_best_effort(q, cols: set, candidates: list[str], y_from: int, y_to: int):
-    """Aplică intervalul de ani pe prima coloană existentă din lista candidates."""
     for c in candidates:
         if c in cols:
             return apply_year_range_filter(q, c, y_from, y_to)
@@ -389,6 +377,14 @@ def ids_for_person(supabase: Client, person_name: str) -> list[str]:
         return []
 
 
+def _safe_select_eq(supabase: Client, table: str, col: str, value: str, limit: int = 2000) -> list[dict]:
+    try:
+        res = supabase.table(table).select("*").eq(col, value).limit(limit).execute()
+        return res.data or []
+    except Exception:
+        return []
+
+
 # =========================================================
 # GATE
 # =========================================================
@@ -432,63 +428,270 @@ def gate():
 
 
 # =========================================================
-# MAIN
+# TAB 1 – FISA COMPLETA (DUPA COD)
 # =========================================================
 
-def run():
-    st.set_page_config(page_title="IDBDC – Calea 1", layout="wide")
+def render_fisa_completa(supabase: Client):
+    st.subheader("Fișa completă (după cod)")
+    st.caption("Introdu cod_identificare și vezi toate înregistrările asociate (bază + completări, dacă există).")
 
-    gate()
-    hide_streamlit_chrome()
-    apply_style_full_blue()
+    cod = st.text_input("cod_identificare", value="").strip()
+    if not st.button("📄 Afișează fișa"):
+        st.info("Completează codul și apasă «Afișează fișa».")
+        return
 
-    # Supabase din Secrets
-    try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-    except Exception:
-        st.error("Config lipsă: setează SUPABASE_URL și SUPABASE_KEY în Streamlit Cloud → Settings → Secrets.")
-        st.stop()
+    if not cod:
+        st.warning("cod_identificare este obligatoriu.")
+        return
 
-    supabase: Client = create_client(url, key)
+    # 1) caută în toate tabelele base (Contracte & Proiecte + Evenimente + PI)
+    base_tables = []
+    for k, v in CATEGORII.items():
+        if k == "Contracte & Proiecte":
+            base_tables.extend(list(v["tipuri"].values()))
+        else:
+            base_tables.append(v["base_table"])
 
-    render_header()
+    found_any = False
     st.divider()
+    st.markdown("### 📌 Date de bază")
 
+    for t in base_tables:
+        rows = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=50)
+        if rows:
+            found_any = True
+            st.markdown(f"#### {t}")
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, height=260)
+
+    if not found_any:
+        st.warning("Nu am găsit acest cod_identificare în tabelele de bază.")
+        return
+
+    # 2) completări proiect (dacă există rânduri)
+    st.divider()
+    st.markdown("### 🧩 Completări (dacă există)")
+
+    tab_fin, tab_teh, tab_ech = st.tabs(["💰 Financiar", "🧪 Tehnic", "👥 Echipă"])
+
+    with tab_fin:
+        rows = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
+        if not rows:
+            st.info("Nu există încă date financiare pentru acest cod.")
+        else:
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, height=260)
+
+    with tab_teh:
+        rows = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
+        if not rows:
+            st.info("Nu există încă aspecte tehnice pentru acest cod.")
+        else:
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, height=260)
+
+    with tab_ech:
+        rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
+        if not rows:
+            st.info("Nu există încă echipă pentru acest cod.")
+        else:
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, height=360)
+
+
+# =========================================================
+# TAB 2 – CĂUTARE & FILTRARE (FARA EXPORT/PRINT)
+# =========================================================
+
+def render_cautare_filtrare(supabase: Client):
+    st.subheader("Căutare & filtrare")
+    st.caption("Căutare rapidă în baza IDBDC (fără export/print; exportul este în tabul 3).")
+
+    # Selectoare categorie/tip (identic ca logică)
+    nav1, nav2 = st.columns([1.2, 2.0])
+    with nav1:
+        categorie = st.selectbox("Alege categorie documente", list(CATEGORII.keys()), key="cf_cat")
+
+    tip = None
+    if categorie == "Contracte & Proiecte":
+        with nav2:
+            tip = st.selectbox("Alege tipul de Contracte & Proiecte", list(CATEGORII[categorie]["tipuri"].keys()), key="cf_tip")
+        base_table = CATEGORII[categorie]["tipuri"][tip]
+    else:
+        base_table = CATEGORII[categorie]["base_table"]
+
+    persoane = fetch_idbdc_people(supabase)
+    current_year = dt.datetime.now().year
+
+    if categorie == "Evenimente stiintifice":
+        natura_list = fetch_distinct_values(supabase, "nom_evenimente_stiintifice", "natura_eveniment")
+        format_list = fetch_distinct_values(supabase, "nom_format_evenimente", "format_eveniment")
+
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        with c1:
+            keyword = st.text_input("Cuvant cheie", value="", key="cf_kw").strip()
+        with c2:
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1, key="cf_y1")
+        with c3:
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1, key="cf_y2")
+        with c4:
+            natura = st.selectbox("Natura evenimentului", [""] + natura_list, key="cf_nat")
+        with c5:
+            fmt = st.selectbox("Formatul evenimentului", [""] + format_list, key="cf_fmt")
+        with c6:
+            persoana = st.selectbox("Persoana de contact", [""] + persoane, key="cf_p",
+                                  help="Lista include doar persoanele cu reprezinta_idbdc = true.")
+
+    elif categorie == "Proprietate intelectuala":
+        tip_pi_list = fetch_distinct_values(supabase, "nom_prop_intelect", "acronym_prop_intelect")
+        dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
+
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        with c1:
+            keyword = st.text_input("Cuvant cheie", value="", key="cf_kw2").strip()
+        with c2:
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 5, step=1, key="cf_y3")
+        with c3:
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1, key="cf_y4")
+        with c4:
+            tip_pi = st.selectbox("Tip proprietate intelectuala", [""] + tip_pi_list, key="cf_tpi")
+        with c5:
+            dep = st.selectbox("Departament", [""] + dep_list, key="cf_dep")
+        with c6:
+            persoana = st.selectbox("Persoana de contact", [""] + persoane, key="cf_p2",
+                                  help="Lista include doar persoanele cu reprezinta_idbdc = true.")
+
+    else:
+        status_list = fetch_distinct_values(supabase, "nom_status_proiect", "status_contract_proiect")
+        dep_list = fetch_distinct_values(supabase, "nom_departament", "acronym_departament")
+
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        with c1:
+            keyword = st.text_input("Cuvant cheie", value="", key="cf_kw3").strip()
+        with c2:
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1, key="cf_y5")
+        with c3:
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1, key="cf_y6")
+        with c4:
+            status = st.selectbox("Status proiect", [""] + status_list, key="cf_st")
+        with c5:
+            dep = st.selectbox("Departament", [""] + dep_list, key="cf_dep2")
+        with c6:
+            persoana = st.selectbox("Responsabil contract / Director proiect", [""] + persoane, key="cf_p3",
+                                  help="Lista include doar persoanele cu reprezinta_idbdc = true.")
+
+    if int(an_to) < int(an_from):
+        st.error("Interval invalid: «Anul pana la» trebuie să fie >= «Anul de la».")
+        return
+
+    if not st.button("🔎 Caută (fără export)", key="cf_go"):
+        st.info("Completează criteriile și apasă Caută.")
+        return
+
+    cols = set(get_table_columns(supabase, base_table))
+    q = supabase.table(base_table).select("*")
+
+    q = apply_keyword_filter(q, cols, keyword if "keyword" in locals() else "")
+
+    if categorie == "Evenimente stiintifice":
+        q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_EV, int(an_from), int(an_to))
+    elif categorie == "Proprietate intelectuala":
+        q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_PI, int(an_from), int(an_to))
+    else:
+        q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_CP, int(an_from), int(an_to))
+
+    if categorie == "Evenimente stiintifice":
+        if natura and "natura_eveniment" in cols:
+            q = q.eq("natura_eveniment", natura)
+        if fmt and "format_eveniment" in cols:
+            q = q.eq("format_eveniment", fmt)
+        if persoana:
+            ids = ids_for_person(supabase, persoana)
+            if not ids:
+                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                return
+            if "cod_identificare" in cols:
+                q = q.in_("cod_identificare", ids)
+
+    elif categorie == "Proprietate intelectuala":
+        if "tip_pi" in locals() and tip_pi and "acronym_prop_intelect" in cols:
+            q = q.eq("acronym_prop_intelect", tip_pi)
+        if "dep" in locals() and dep and "acronym_departament" in cols:
+            q = q.eq("acronym_departament", dep)
+        if persoana:
+            ids = ids_for_person(supabase, persoana)
+            if not ids:
+                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                return
+            if "cod_identificare" in cols:
+                q = q.in_("cod_identificare", ids)
+
+    else:
+        if "status" in locals() and status:
+            for c in ["status_contract_proiect", "status_proiect", "status"]:
+                if c in cols:
+                    q = q.eq(c, status)
+                    break
+
+        if "dep" in locals() and dep:
+            for c in ["acronym_departament", "departament", "departament_upt"]:
+                if c in cols:
+                    q = q.eq(c, dep)
+                    break
+
+        if persoana:
+            ids = ids_for_person(supabase, persoana)
+            if not ids:
+                st.info("Niciun rezultat (nu există coduri asociate persoanei selectate).")
+                return
+            if "cod_identificare" in cols:
+                q = q.in_("cod_identificare", ids)
+
+    q = q.limit(800)
+
+    try:
+        res = q.execute()
+        rows = res.data or []
+    except Exception as e:
+        st.error(f"Eroare interogare: {e}")
+        return
+
+    if not rows:
+        st.info("Niciun rezultat.")
+        return
+
+    df = pd.DataFrame(rows)
+    df = enrich_reprezentant_idbdc(supabase, df)
+
+    st.divider()
+    st.subheader("Rezultate (tabel)")
+
+    st.dataframe(df, use_container_width=True, height=560)
+    st.caption(f"Total rezultate: {len(df)}")
+
+
+# =========================================================
+# TAB 3 – CERCETARE BD + EXPORT/PRINT (CODUL TAU, PASTRAT)
+# =========================================================
+
+def render_cercetare_export_print(supabase: Client):
     # ----------------------------
     # SELECTOARE NAVIGARE
     # ----------------------------
     nav1, nav2 = st.columns([1.2, 2.0])
 
     with nav1:
-        categorie = st.selectbox("Alege categorie documente", list(CATEGORII.keys()))
+        categorie = st.selectbox("Alege categorie documente", list(CATEGORII.keys()), key="ex_cat")
 
     tip = None
     base_table = None
 
     if categorie == "Contracte & Proiecte":
         with nav2:
-            tip = st.selectbox("Alege tipul de Contracte & Proiecte", list(CATEGORII[categorie]["tipuri"].keys()))
+            tip = st.selectbox("Alege tipul de Contracte & Proiecte", list(CATEGORII[categorie]["tipuri"].keys()), key="ex_tip")
         base_table = CATEGORII[categorie]["tipuri"][tip]
     else:
         base_table = CATEGORII[categorie]["base_table"]
 
     st.divider()
 
-    # ----------------------------
-    # Persoane
-    # ----------------------------
     persoane = fetch_idbdc_people(supabase)
-
-    # ----------------------------
-    # CRITERII (Anul de la / Anul pana la apare la toate)
-    # ----------------------------
-    # 1) Cuvant cheie
-    # 2) Anul de la
-    # 3) Anul pana la
-    # 4) specific categorie
-    # 5) specific categorie
-    # 6) Persoana
 
     current_year = dt.datetime.now().year
 
@@ -499,19 +702,18 @@ def run():
         c1, c2, c3, c4, c5, c6 = st.columns(6)
 
         with c1:
-            keyword = st.text_input("Cuvant cheie", value="").strip()
+            keyword = st.text_input("Cuvant cheie", value="", key="ex_kw").strip()
         with c2:
-            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1)
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1, key="ex_y1")
         with c3:
-            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1)
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1, key="ex_y2")
         with c4:
-            natura = st.selectbox("Natura evenimentului", [""] + natura_list)
+            natura = st.selectbox("Natura evenimentului", [""] + natura_list, key="ex_nat")
         with c5:
-            fmt = st.selectbox("Formatul evenimentului", [""] + format_list)
+            fmt = st.selectbox("Formatul evenimentului", [""] + format_list, key="ex_fmt")
         with c6:
-            persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
-
-        data_ev = None  # păstrăm variabila pentru compatibilitate (nu mai folosim caseta de dată aici)
+            persoana = st.selectbox("Persoana de contact", [""] + persoane, key="ex_p",
+                                  help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     elif categorie == "Proprietate intelectuala":
         tip_pi_list = fetch_distinct_values(supabase, "nom_prop_intelect", "acronym_prop_intelect")
@@ -520,17 +722,18 @@ def run():
         c1, c2, c3, c4, c5, c6 = st.columns(6)
 
         with c1:
-            keyword = st.text_input("Cuvant cheie", value="").strip()
+            keyword = st.text_input("Cuvant cheie", value="", key="ex_kw2").strip()
         with c2:
-            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 5, step=1)
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 5, step=1, key="ex_y3")
         with c3:
-            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1)
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1, key="ex_y4")
         with c4:
-            tip_pi = st.selectbox("Tip proprietate intelectuala", [""] + tip_pi_list)
+            tip_pi = st.selectbox("Tip proprietate intelectuala", [""] + tip_pi_list, key="ex_tpi")
         with c5:
-            dep = st.selectbox("Departament", [""] + dep_list)
+            dep = st.selectbox("Departament", [""] + dep_list, key="ex_dep")
         with c6:
-            persoana = st.selectbox("Persoana de contact", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
+            persoana = st.selectbox("Persoana de contact", [""] + persoane, key="ex_p2",
+                                  help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     else:
         status_list = fetch_distinct_values(supabase, "nom_status_proiect", "status_contract_proiect")
@@ -539,35 +742,32 @@ def run():
         c1, c2, c3, c4, c5, c6 = st.columns(6)
 
         with c1:
-            keyword = st.text_input("Cuvant cheie", value="").strip()
+            keyword = st.text_input("Cuvant cheie", value="", key="ex_kw3").strip()
         with c2:
-            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1)
+            an_from = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year - 2, step=1, key="ex_y5")
         with c3:
-            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1)
+            an_to = st.number_input("Anul pana la", min_value=1900, max_value=2100, value=current_year, step=1, key="ex_y6")
         with c4:
-            status = st.selectbox("Status proiect", [""] + status_list)
+            status = st.selectbox("Status proiect", [""] + status_list, key="ex_st")
         with c5:
-            dep = st.selectbox("Departament", [""] + dep_list)
+            dep = st.selectbox("Departament", [""] + dep_list, key="ex_dep2")
         with c6:
-            persoana = st.selectbox("Responsabil contract / Director proiect", [""] + persoane, help="Lista include doar persoanele cu reprezinta_idbdc = true.")
+            persoana = st.selectbox("Responsabil contract / Director proiect", [""] + persoane, key="ex_p3",
+                                  help="Lista include doar persoanele cu reprezinta_idbdc = true.")
 
     if int(an_to) < int(an_from):
         st.error("Interval invalid: «Anul pana la» trebuie să fie >= «Anul de la».")
         return
 
-    if not st.button("🔎 Caută"):
+    if not st.button("🔎 Caută", key="ex_go"):
         st.info("Completează criteriile și apasă Caută.")
         return
 
-    # ----------------------------
-    # QUERY
-    # ----------------------------
     cols = set(get_table_columns(supabase, base_table))
     q = supabase.table(base_table).select("*")
 
     q = apply_keyword_filter(q, cols, keyword if "keyword" in locals() else "")
 
-    # Interval ani - pentru toate categoriile (best effort pe coloanele candidate)
     if categorie == "Evenimente stiintifice":
         q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_EV, int(an_from), int(an_to))
     elif categorie == "Proprietate intelectuala":
@@ -575,7 +775,6 @@ def run():
     else:
         q = apply_year_range_best_effort(q, cols, YEAR_COL_CANDIDATES_CP, int(an_from), int(an_to))
 
-    # filtre specifice
     if categorie == "Evenimente stiintifice":
         if natura and "natura_eveniment" in cols:
             q = q.eq("natura_eveniment", natura)
@@ -659,6 +858,7 @@ def run():
         "Selectează câmpurile pentru tabelul final:",
         options=available_cols,
         default=defaults if defaults else available_cols[:6],
+        key="ex_cols"
     )
 
     if not sel_cols:
@@ -692,9 +892,52 @@ def run():
         )
 
     with cC:
-        if st.button("🖨️ Print (previzualizare)"):
+        if st.button("🖨️ Print (previzualizare)", key="ex_print"):
             html_doc = make_printable_html(df_final, "IDBDC – Rezultate")
             components.html(html_doc, height=700, scrolling=True)
+
+
+# =========================================================
+# MAIN
+# =========================================================
+
+def run():
+    st.set_page_config(page_title="IDBDC – Calea 1", layout="wide")
+
+    gate()
+    hide_streamlit_chrome()
+    apply_style_full_blue()
+
+    # Supabase din Secrets
+    try:
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+    except Exception:
+        st.error("Config lipsă: setează SUPABASE_URL și SUPABASE_KEY în Streamlit Cloud → Settings → Secrets.")
+        st.stop()
+
+    supabase: Client = create_client(url, key)
+
+    render_header()
+    st.divider()
+
+    # =====================================================
+    # TABS – CALEA 1
+    # =====================================================
+    tab1, tab2, tab3 = st.tabs([
+        "📄 Fișa completă (după cod)",
+        "🔍 Căutare & filtrare",
+        "📊 Cercetare BD + Export/Print"
+    ])
+
+    with tab1:
+        render_fisa_completa(supabase)
+
+    with tab2:
+        render_cautare_filtrare(supabase)
+
+    with tab3:
+        render_cercetare_export_print(supabase)
 
 
 if __name__ == "__main__":
