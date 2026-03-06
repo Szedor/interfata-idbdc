@@ -1,6 +1,6 @@
-# grant_navigator/engine/__init__.py
-
-from . import internal_analytics
-from . import external_radar
-from . import strategy_recommendations
-from . import document_generator
+# grant_navigator/__init__.py
+"""
+Grant Navigator – IDBDC Modul 3 AI
+Analiză internă, radar finanțări, recomandări strategice, generare documente.
+Toate secțiunile folosesc Claude API pentru răspunsuri generate de AI.
+"""
