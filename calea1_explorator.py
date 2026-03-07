@@ -483,7 +483,7 @@ def render_fisa_completa(supabase: Client):
     st.markdown(
         "<div style='color:rgba(255,255,255,0.88);font-size:1.02rem;font-weight:600;"
         "margin-bottom:0.85rem;'>Introduceți cod_identificare și vedeți toate datele "
-        "asociate: bază + completări financiare, tehnice și echipă.</div>",
+        "asociate: informații generale + completări financiare, tehnice și echipă.</div>",
         unsafe_allow_html=True,
     )
 
@@ -491,6 +491,10 @@ def render_fisa_completa(supabase: Client):
     with c1:
         cod = st.text_input("Cod identificare", value="", key="fisa_cod").strip()
 
+    st.markdown(
+        "<style>.fisa-go-btn > button { color: #0b1f3a !important; background: rgba(255,255,255,0.96) !important; }</style>",
+        unsafe_allow_html=True,
+    )
     st.info("Introduceți codul și apăsați «Afișează fișa».", icon="ℹ️")
     go = st.button("📄 Afișează fișa", key="fisa_go")
 
@@ -500,22 +504,35 @@ def render_fisa_completa(supabase: Client):
         st.warning("Cod identificare este obligatoriu.")
         return
 
+    # Coloane interne care nu se afișează
+    COLS_HIDDEN = {
+        "responsabil_idbdc", "observatii_idbdc",
+        "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
+    }
+
     found_any = False
     st.divider()
-    st.markdown("### 📌 Date de bază")
+    st.markdown("### 📌 Informații generale")
 
     for t in ALL_BASE_TABLES:
         rows = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=50)
         if rows:
             found_any = True
             st.markdown(f"#### {t}")
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, height=260)
+            df_row = pd.DataFrame(rows)
+            # Elimină coloanele interne
+            df_row = df_row[[c for c in df_row.columns if c not in COLS_HIDDEN]]
+            # Un singur rând → afișare orizontală ca listă cheie-valoare
+            if len(df_row) == 1:
+                st.dataframe(df_row, use_container_width=True, hide_index=True, height=60)
+            else:
+                st.dataframe(df_row, use_container_width=True, hide_index=True, height=min(260, 40 + len(df_row) * 35))
 
     if not found_any:
         st.warning("Nu am găsit acest cod_identificare în tabelele de bază.")
         return
 
-    st.divider()
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     st.markdown("### 🧩 Completări")
 
     tab_fin, tab_teh, tab_ech = st.tabs(list(COM_TABLES.keys()))
@@ -547,61 +564,107 @@ def render_fisa_completa(supabase: Client):
 # =========================================================
 
 def render_vedere_rapida(supabase: Client):
-    st.markdown("## 🗂️ Vedere rapidă — date de identificare")
+    st.markdown("## 🗂️ Vedere rapidă – selecție informații")
     st.markdown(
         "<div style='color:rgba(255,255,255,0.88);font-size:1.02rem;font-weight:600;"
-        "margin-bottom:0.85rem;'>Afișare exclusiv din tabelele base_*. "
-        "Cuvântul cheie caută și în echipă / departament.</div>",
+        "margin-bottom:0.85rem;'>Cuvântul cheie caută în echipe, departament, "
+        "anul de implementare sau perioada de implementare și informații generale din tabelele de bază.</div>",
         unsafe_allow_html=True,
     )
 
     c1, c2, c3 = st.columns([1.2, 1.4, 2.0])
 
     with c1:
-        categorie = st.selectbox("Categorie", list(CATEGORII.keys()), key="vr_cat")
+        categorie = st.selectbox("Categorie", [""] + list(CATEGORII.keys()), key="vr_cat")
 
     tip = None
-    cat_data = CATEGORII[categorie]
+    cat_data = CATEGORII.get(categorie, {}) if categorie else {}
     if cat_data.get("tipuri"):
         with c2:
-            tip = st.selectbox("Tip", list(cat_data["tipuri"].keys()), key="vr_tip")
+            tip = st.selectbox("Tip", [""] + list(cat_data["tipuri"].keys()), key="vr_tip")
     else:
         with c2:
             st.write("")
 
     with c3:
-        keyword = st.text_input("Cuvânt cheie (opțional)", value="", key="vr_kw").strip()
+        keyword = st.text_input("Cuvânt cheie", value="", key="vr_kw").strip()
 
-    st.info("Selectați categoria și apăsați «Afișează».", icon="ℹ️")
+    st.info("Selectați cel puțin categoria și apăsați «Afișează».", icon="ℹ️")
     if not st.button("🗂️ Afișează", key="vr_go"):
         return
 
-    base_table = _resolve_base_table(categorie, tip)
-    if not base_table:
-        st.warning("Selectați un tip valid.")
+    # Validare: cel puțin categoria SAU keyword trebuie completat
+    if not categorie and not keyword:
+        st.warning("Selectați cel puțin o categorie sau introduceți un cuvânt cheie.")
         return
 
-    cols_list = get_table_columns(supabase, base_table)
-    cols = set(cols_list)
-
-    q = supabase.table(base_table).select("*")
-
-    # Keyword în tabelul base
-    if keyword:
-        q = apply_keyword_filter(q, cols, keyword)
-
-    q = q.limit(800)
-
-    try:
-        res   = q.execute()
-        rows  = res.data or []
-    except Exception as e:
-        st.error(f"Eroare interogare: {e}")
+    # ---- Cele 5 variante de selecție ----
+    # Varianta 5: doar keyword (fără categorie)
+    if not categorie and keyword:
+        dfs = []
+        for t in ALL_BASE_TABLES:
+            cols_list_t = get_table_columns(supabase, t)
+            cols_t = set(cols_list_t)
+            q = supabase.table(t).select("*")
+            q = apply_keyword_filter(q, cols_t, keyword)
+            q = q.limit(800)
+            try:
+                res = q.execute()
+                rows = res.data or []
+                if rows:
+                    df_t = pd.DataFrame(rows)
+                    df_t["_sursa"] = t
+                    dfs.append(df_t)
+            except Exception:
+                pass
+        if not dfs:
+            st.info("Niciun rezultat.")
+            return
+        df = pd.concat(dfs, ignore_index=True)
+        st.divider()
+        st.subheader("Rezultate — toate categoriile")
+        st.dataframe(df, use_container_width=True, height=560)
+        st.caption(f"Total: {len(df)} înregistrări")
         return
 
-    df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=cols_list)
+    # Variantele 1-4: categorie selectată
+    if cat_data.get("tipuri") and tip:
+        # Varianta 2 sau 3: categorie + tip (cu sau fără keyword)
+        base_table = _resolve_base_table(categorie, tip)
+        tables_to_query = [base_table] if base_table else []
+    elif cat_data.get("tipuri") and not tip:
+        # Varianta 1 sau 4: toate tipurile din categorie
+        tables_to_query = list(cat_data["tipuri"].values())
+    else:
+        # Categorie fără tipuri (Evenimente, Proprietate intelectuala)
+        base_table = cat_data.get("base_table")
+        tables_to_query = [base_table] if base_table else []
 
-    # Dacă keyword nu a găsit nimic în base, căutăm și în com_echipe_proiect
+    if not tables_to_query:
+        st.warning("Nu s-a putut determina tabela. Verificați selecția.")
+        return
+
+    dfs = []
+    for t in tables_to_query:
+        cols_list_t = get_table_columns(supabase, t)
+        cols_t = set(cols_list_t)
+        q = supabase.table(t).select("*")
+        if keyword:
+            q = apply_keyword_filter(q, cols_t, keyword)
+        q = q.limit(800)
+        try:
+            res = q.execute()
+            rows = res.data or []
+            if rows:
+                df_t = pd.DataFrame(rows)
+                df_t["_sursa"] = t
+                dfs.append(df_t)
+        except Exception as e:
+            st.error(f"Eroare interogare {t}: {e}")
+
+    df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+    # Dacă keyword nu a găsit nimic, căutăm în com_echipe_proiect
     if keyword and df.empty:
         try:
             res_ech = (
@@ -616,23 +679,30 @@ def render_vedere_rapida(supabase: Client):
                 for r in (res_ech.data or [])
                 if r.get("cod_identificare")
             })
-            if ids_from_echipa and "cod_identificare" in cols:
-                res2 = (
-                    supabase.table(base_table)
-                    .select("*")
-                    .in_("cod_identificare", ids_from_echipa)
-                    .limit(800)
-                    .execute()
-                )
-                rows = res2.data or []
-                df   = pd.DataFrame(rows) if rows else pd.DataFrame(columns=cols_list)
-                if not df.empty:
+            if ids_from_echipa:
+                for t in tables_to_query:
+                    cols_t = set(get_table_columns(supabase, t))
+                    if "cod_identificare" in cols_t:
+                        res2 = (
+                            supabase.table(t)
+                            .select("*")
+                            .in_("cod_identificare", ids_from_echipa)
+                            .limit(800)
+                            .execute()
+                        )
+                        rows2 = res2.data or []
+                        if rows2:
+                            df_t = pd.DataFrame(rows2)
+                            df_t["_sursa"] = t
+                            dfs.append(df_t)
+                if dfs:
+                    df = pd.concat(dfs, ignore_index=True)
                     st.caption("Rezultate găsite prin echipă/responsabil.")
         except Exception:
             pass
 
-    # Dacă tot e gol, caută în det_resurse_umane după departament
-    if keyword and df.empty and "acronim_departament" in cols:
+    # Dacă tot e gol, caută după departament
+    if keyword and df.empty:
         try:
             res_dep = (
                 supabase.table("det_resurse_umane")
@@ -643,16 +713,23 @@ def render_vedere_rapida(supabase: Client):
             )
             deps = list({r["acronim_departament"] for r in (res_dep.data or []) if r.get("acronim_departament")})
             if deps:
-                res3 = (
-                    supabase.table(base_table)
-                    .select("*")
-                    .in_("acronim_departament", deps)
-                    .limit(800)
-                    .execute()
-                )
-                rows = res3.data or []
-                df   = pd.DataFrame(rows) if rows else pd.DataFrame(columns=cols_list)
-                if not df.empty:
+                for t in tables_to_query:
+                    cols_t = set(get_table_columns(supabase, t))
+                    if "acronim_departament" in cols_t:
+                        res3 = (
+                            supabase.table(t)
+                            .select("*")
+                            .in_("acronim_departament", deps)
+                            .limit(800)
+                            .execute()
+                        )
+                        rows3 = res3.data or []
+                        if rows3:
+                            df_t = pd.DataFrame(rows3)
+                            df_t["_sursa"] = t
+                            dfs.append(df_t)
+                if dfs:
+                    df = pd.concat(dfs, ignore_index=True)
                     st.caption("Rezultate găsite prin departament.")
         except Exception:
             pass
@@ -662,7 +739,8 @@ def render_vedere_rapida(supabase: Client):
         return
 
     st.divider()
-    st.subheader(f"Rezultate — {base_table}")
+    sursa_label = ", ".join(df["_sursa"].unique()) if "_sursa" in df.columns else categorie
+    st.subheader(f"Rezultate — {sursa_label}")
     st.dataframe(df, use_container_width=True, height=560)
     st.caption(f"Total: {len(df)} înregistrări")
 
@@ -785,7 +863,7 @@ def render_cautare_aprofundata(supabase: Client):
         unsafe_allow_html=True,
     )
 
-    nav1, nav2 = st.columns([1.2, 2.8])
+    nav1, nav2, nav3 = st.columns([1.2, 1.4, 1.4])
     with nav1:
         categorie = st.selectbox("Categorie", list(CATEGORII.keys()), key="ca_cat")
 
