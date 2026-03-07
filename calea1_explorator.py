@@ -806,7 +806,7 @@ def render_explorare_criteriu(supabase: Client):
         elif criteriu == "An de referință":
             valoare = st.selectbox("An de referință", [""] + ani_list, key="ec_val_an")
         else:  # Cuvânt cheie
-            valoare = st.text_input("Cuvânt cheie (titlu sau acronim)", value="", key="ec_val_kw").strip()
+            valoare = st.text_input("Cuvânt cheie (titlu sau acronim)", value="", key="ec_val_kw", label_visibility="visible").strip()
 
     st.info("Selectați criteriul și valoarea, apoi apăsați «Explorează».", icon="ℹ️")
     if not st.button("🔎 Explorează", key="ec_go"):
@@ -898,6 +898,13 @@ def _render_ec_rezultate(supabase: Client):
     # ---- EXPORT — doar utilizatori autentificați cu @upt.ro ----
     st.divider()
     if render_export_auth(supabase, tab_key="ec"):
+        st.subheader("📤 Export")
+        cA, cB, cC, cD = st.columns(4)
+
+        with cA:
+            csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+            st.download_button("⬇️ CSV", data=csv_bytes,
+                               file_name="idbdc_explorare.csv", mime="text/csv", key="ec_csv")
 
         with cB:
             buf = io.BytesIO()
