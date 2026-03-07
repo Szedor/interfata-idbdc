@@ -147,26 +147,36 @@ def apply_style_full_blue():
             color: rgba(255,255,255,0.88) !important;
           }}
 
-          /* ---- CASETE INPUT / SELECTBOX — fundal închis, text alb ---- */
-          .stTextInput input,
-          .stTextInput textarea,
-          .stNumberInput input {{
+          /* ---- CASETE TEXT — același stil ca selectbox ---- */
+          .stTextInput > div > div,
+          .stTextInput > div > div > input,
+          .stTextInput input {{
             background: #1a3a5c !important;
             color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
             border-radius: 10px !important;
             font-weight: 600 !important;
-            -webkit-text-fill-color: #ffffff !important;
-            border: 1px solid rgba(255,255,255,0.40) !important;
+            border: 1px solid rgba(255,255,255,0.30) !important;
           }}
 
-          .stTextInput input::placeholder,
-          .stTextInput textarea::placeholder {{
-            color: rgba(255,255,255,0.55) !important;
-            -webkit-text-fill-color: rgba(255,255,255,0.55) !important;
+          .stTextInput input::placeholder {{
+            color: rgba(255,255,255,0.50) !important;
+            -webkit-text-fill-color: rgba(255,255,255,0.50) !important;
             opacity: 1 !important;
           }}
 
-          /* Selectbox — fundal închis, text alb */
+          /* NumberInput */
+          .stNumberInput > div > div,
+          .stNumberInput > div > div > input,
+          .stNumberInput input {{
+            background: #1a3a5c !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+          }}
+
+          /* Selectbox — același stil */
           .stSelectbox > div > div,
           .stSelectbox [data-baseweb="select"],
           .stSelectbox [data-baseweb="select"] > div,
@@ -182,22 +192,18 @@ def apply_style_full_blue():
             font-weight: 600 !important;
           }}
 
-          /* NumberInput */
-          .stNumberInput > div > div {{
-            background: #1a3a5c !important;
-            border-radius: 10px !important;
-          }}
-
           /* Multiselect */
+          .stMultiSelect > div > div,
           .stMultiSelect [data-baseweb="select"] > div,
           .stMultiSelect [data-baseweb="select"] span,
           .stMultiSelect [data-baseweb="select"] input {{
             background: #1a3a5c !important;
             color: #ffffff !important;
             -webkit-text-fill-color: #ffffff !important;
+            border-radius: 10px !important;
           }}
 
-          /* Lista derulantă deschisă — fundal alb, text închis pentru lizibilitate */
+          /* Lista derulantă deschisă — alb cu text închis */
           [data-baseweb="popover"],
           [data-baseweb="popover"] *,
           [data-baseweb="menu"],
@@ -621,15 +627,18 @@ def render_fisa_completa(supabase: Client):
 # AUTENTIFICARE EXPORT — funcție comună Tab 2 și Tab 3
 # =========================================================
 
-def render_export_auth(supabase: Client) -> bool:
+def render_export_auth(supabase: Client, tab_key: str = "tab") -> bool:
     """
     Afișează bara de autentificare pentru export/print.
-    Returnează True dacă utilizatorul este autentificat cu @upt.ro.
-    Autentificarea se păstrează pe toată sesiunea. Nu folosește rerun.
+    tab_key: cheie unică per tab ('ec' pentru Tab2, 'ca' pentru Tab3).
+    Autentificările sunt independente per tab.
     """
-    # Dacă deja autentificat (fie prin Modul 3, fie prin bara din Modul 1)
-    if st.session_state.get("auth_ai", False) or \
-       st.session_state.get("export_auth", False):
+    import re as _re
+    auth_key = f"export_auth_{tab_key}"
+    pattern  = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
+
+    # Autentificat prin Modul 3 SAU prin bara acestui tab
+    if st.session_state.get("auth_ai", False) or st.session_state.get(auth_key, False):
         nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
         st.markdown(
             f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);"
@@ -648,20 +657,17 @@ def render_export_auth(supabase: Client) -> bool:
         unsafe_allow_html=True,
     )
 
-    import re as _re
-    pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
-
     ea1, ea2, _ = st.columns([2.0, 1.0, 3.0])
     with ea1:
         email_exp = st.text_input(
-            "Email instituțional",
+            "Email",
             value="",
-            key="export_email_input",
+            key=f"export_email_input_{tab_key}",
             label_visibility="collapsed",
             placeholder="prenume.nume@upt.ro",
         ).strip().lower()
     with ea2:
-        auth_clicked = st.button("✅ Autorizare", key="export_auth_btn")
+        auth_clicked = st.button("✅ Autorizare", key=f"export_auth_btn_{tab_key}")
 
     if auth_clicked:
         if not pattern.match(email_exp):
@@ -674,10 +680,9 @@ def render_export_auth(supabase: Client) -> bool:
                     .limit(1).execute()
                 if res.data:
                     user = res.data[0]
-                    st.session_state.export_auth = True
-                    st.session_state.user_email  = email_exp
-                    st.session_state.user_name   = (user.get("nume_prenume") or "").strip() or email_exp
-                    # Nu facem rerun — returnăm True direct în același ciclu
+                    st.session_state[auth_key] = True
+                    st.session_state.user_email = email_exp
+                    st.session_state.user_name  = (user.get("nume_prenume") or "").strip() or email_exp
                     nume = st.session_state.user_name
                     st.markdown(
                         f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);"
@@ -777,7 +782,7 @@ def render_explorare_criteriu(supabase: Client):
     current_year  = dt.datetime.now().year
     ani_list      = [str(a) for a in range(current_year, 1999, -1)]
 
-    cc1, cc2 = st.columns([1.2, 2.4])
+    cc1, cc2, cc3 = st.columns([1.2, 1.8, 2.0])
     with cc1:
         criteriu = st.selectbox(
             "Alege criteriul",
@@ -793,13 +798,13 @@ def render_explorare_criteriu(supabase: Client):
 
     with cc2:
         if criteriu == "Status":
-            valoare = st.selectbox("Valoare Status", [""] + status_list, key="ec_val_st")
+            valoare = st.selectbox("Status", [""] + status_list, key="ec_val_st")
         elif criteriu == "Departament":
-            valoare = st.selectbox("Valoare Departament", [""] + dep_list, key="ec_val_dep")
+            valoare = st.selectbox("Departament", [""] + dep_list, key="ec_val_dep")
         elif criteriu == "Director / Responsabil":
-            valoare = st.selectbox("Valoare Director / Responsabil", [""] + persoane_list, key="ec_val_p")
+            valoare = st.selectbox("Director / Responsabil", [""] + persoane_list, key="ec_val_p")
         elif criteriu == "An de referință":
-            valoare = st.selectbox("Valoare An", [""] + ani_list, key="ec_val_an")
+            valoare = st.selectbox("An de referință", [""] + ani_list, key="ec_val_an")
         else:  # Cuvânt cheie
             valoare = st.text_input("Cuvânt cheie (titlu sau acronim)", value="", key="ec_val_kw").strip()
 
@@ -892,14 +897,7 @@ def _render_ec_rezultate(supabase: Client):
 
     # ---- EXPORT — doar utilizatori autentificați cu @upt.ro ----
     st.divider()
-    if render_export_auth(supabase):
-        st.subheader("📤 Export")
-        cA, cB, cC, cD = st.columns(4)
-
-        with cA:
-            csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
-            st.download_button("⬇️ CSV", data=csv_bytes,
-                               file_name="idbdc_explorare.csv", mime="text/csv", key="ec_csv")
+    if render_export_auth(supabase, tab_key="ec"):
 
         with cB:
             buf = io.BytesIO()
@@ -1171,7 +1169,7 @@ def _render_ca_rezultate(supabase: Client):
 
     # ---- EXPORT ----
     st.divider()
-    if render_export_auth(supabase):
+    if render_export_auth(supabase, tab_key="ca"):
         st.subheader("📤 Export")
 
         cA, cB, cC, cD = st.columns(4)
