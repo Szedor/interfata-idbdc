@@ -587,6 +587,72 @@ def render_fisa_completa(supabase: Client):
 
 
 # =========================================================
+# AUTENTIFICARE EXPORT — funcție comună Tab 2 și Tab 3
+# =========================================================
+
+def render_export_auth(supabase: Client) -> bool:
+    """
+    Afișează bara de autentificare pentru export/print.
+    Returnează True dacă utilizatorul este autentificat cu @upt.ro.
+    Autentificarea se păstrează pe toată sesiunea.
+    """
+    # Dacă deja autentificat (fie prin Modul 3, fie prin bara din Modul 1)
+    if st.session_state.get("auth_ai", False) or \
+       st.session_state.get("export_auth", False):
+        nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
+        st.markdown(
+            f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);"
+            f"border-radius:10px;padding:8px 16px;color:#ffffff;font-weight:700;font-size:0.95rem;"
+            f"margin-bottom:0.5rem;'>✅ Export autorizat — {nume}</div>",
+            unsafe_allow_html=True,
+        )
+        return True
+
+    # Bara de autentificare
+    st.markdown(
+        "<div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);"
+        "border-radius:12px;padding:12px 18px;margin-bottom:0.6rem;'>"
+        "<span style='color:#ffffff;font-weight:800;font-size:0.97rem;'>"
+        "🔐 Pentru Export sau Print — autentificare cu email UPT</span></div>",
+        unsafe_allow_html=True,
+    )
+
+    ea1, ea2, ea3 = st.columns([2.0, 1.0, 3.0])
+    with ea1:
+        email_exp = st.text_input(
+            "Email instituțional (prenume.nume@upt.ro)",
+            value="",
+            key="export_email_input",
+            label_visibility="collapsed",
+            placeholder="prenume.nume@upt.ro",
+        ).strip().lower()
+    with ea2:
+        if st.button("✅ Autorizare", key="export_auth_btn"):
+            import re as _re
+            pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
+            if not pattern.match(email_exp):
+                st.error("Email invalid. Format: prenume.nume@upt.ro")
+            else:
+                try:
+                    res = supabase.table("det_resurse_umane") \
+                        .select("nume_prenume,email") \
+                        .eq("email", email_exp) \
+                        .limit(1).execute()
+                    if res.data:
+                        user = res.data[0]
+                        st.session_state.export_auth = True
+                        st.session_state.user_email  = email_exp
+                        st.session_state.user_name   = (user.get("nume_prenume") or "").strip() or email_exp
+                        st.rerun()
+                    else:
+                        st.error("Emailul nu există în baza de date IDBDC.")
+                except Exception as e:
+                    st.error(f"Eroare verificare: {e}")
+
+    return False
+
+
+# =========================================================
 # TAB 2 — EXPLORARE DUPĂ CRITERIU
 # =========================================================
 
@@ -767,13 +833,8 @@ def render_explorare_criteriu(supabase: Client):
     st.caption(f"Total: {len(df)} înregistrări")
 
     # ---- EXPORT — doar utilizatori autentificați cu @upt.ro ----
-    user_email = st.session_state.get("user_email", "")
-    are_acces_export = (
-        st.session_state.get("auth_ai", False) or
-        (isinstance(user_email, str) and user_email.endswith("@upt.ro"))
-    )
-    if are_acces_export:
-        st.divider()
+    st.divider()
+    if render_export_auth(supabase):
         st.subheader("📤 Export")
         cA, cB, cC, cD = st.columns(4)
 
@@ -1036,82 +1097,70 @@ def render_cautare_aprofundata(supabase: Client):
 
     # ---- EXPORT ----
     st.divider()
-    st.subheader("📤 Export")
+    if render_export_auth(supabase):
+        st.subheader("📤 Export")
 
-    cA, cB, cC, cD = st.columns(4)
+        cA, cB, cC, cD = st.columns(4)
 
-    with cA:
-        csv_bytes = df_final.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "⬇️ CSV",
-            data=csv_bytes,
-            file_name="idbdc_rezultate.csv",
-            mime="text/csv",
-            key="exp_csv",
-        )
-
-    with cB:
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            df_final.to_excel(writer, index=False, sheet_name="Rezultate")
-        buf.seek(0)
-        st.download_button(
-            "⬇️ Excel",
-            data=buf,
-            file_name="idbdc_rezultate.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="exp_xlsx",
-        )
-
-    with cC:
-        try:
-            from reportlab.lib.pagesizes import A4, landscape
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-            from reportlab.lib import colors
-            from reportlab.lib.styles import getSampleStyleSheet
-
-            pdf_buf = io.BytesIO()
-            doc = SimpleDocTemplate(pdf_buf, pagesize=landscape(A4),
-                                    leftMargin=20, rightMargin=20,
-                                    topMargin=20, bottomMargin=20)
-            styles   = getSampleStyleSheet()
-            elements = []
-
-            # Header
-            elements.append(Paragraph("IDBDC – Rezultate căutare", styles["Title"]))
-
-            # Tabel
-            data_rows = [list(df_final.columns)]
-            for _, row in df_final.iterrows():
-                data_rows.append([str(v) if v is not None else "" for v in row])
-
-            t = Table(data_rows, repeatRows=1)
-            t.setStyle(TableStyle([
-                ("BACKGROUND",  (0, 0), (-1, 0), colors.HexColor("#0b2a52")),
-                ("TEXTCOLOR",   (0, 0), (-1, 0), colors.white),
-                ("FONTSIZE",    (0, 0), (-1, -1), 7),
-                ("GRID",        (0, 0), (-1, -1), 0.5, colors.grey),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
-                ("VALIGN",      (0, 0), (-1, -1), "TOP"),
-            ]))
-            elements.append(t)
-            doc.build(elements)
-            pdf_buf.seek(0)
-
+        with cA:
+            csv_bytes = df_final.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
-                "⬇️ PDF",
-                data=pdf_buf,
-                file_name="idbdc_rezultate.pdf",
-                mime="application/pdf",
-                key="exp_pdf",
+                "⬇️ CSV", data=csv_bytes,
+                file_name="idbdc_rezultate.csv", mime="text/csv", key="exp_csv",
             )
-        except ImportError:
-            st.caption("PDF indisponibil (reportlab lipsă)")
 
-    with cD:
-        if st.button("🖨️ Print", key="ca_print"):
-            html_doc = make_printable_html(df_final, "IDBDC – Rezultate")
-            components.html(html_doc, height=700, scrolling=True)
+        with cB:
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+                df_final.to_excel(writer, index=False, sheet_name="Rezultate")
+            buf.seek(0)
+            st.download_button(
+                "⬇️ Excel", data=buf,
+                file_name="idbdc_rezultate.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="exp_xlsx",
+            )
+
+        with cC:
+            try:
+                from reportlab.lib.pagesizes import A4, landscape
+                from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+                from reportlab.lib import colors
+                from reportlab.lib.styles import getSampleStyleSheet
+
+                pdf_buf = io.BytesIO()
+                doc = SimpleDocTemplate(pdf_buf, pagesize=landscape(A4),
+                                        leftMargin=20, rightMargin=20,
+                                        topMargin=20, bottomMargin=20)
+                styles   = getSampleStyleSheet()
+                elements = [Paragraph("IDBDC – Rezultate căutare", styles["Title"])]
+                data_rows = [list(df_final.columns)]
+                for _, row in df_final.iterrows():
+                    data_rows.append([str(v) if v is not None else "" for v in row])
+                t = Table(data_rows, repeatRows=1)
+                t.setStyle(TableStyle([
+                    ("BACKGROUND",     (0, 0), (-1, 0), colors.HexColor("#0b2a52")),
+                    ("TEXTCOLOR",      (0, 0), (-1, 0), colors.white),
+                    ("FONTSIZE",       (0, 0), (-1, -1), 7),
+                    ("GRID",           (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
+                    ("VALIGN",         (0, 0), (-1, -1), "TOP"),
+                ]))
+                elements.append(t)
+                doc.build(elements)
+                pdf_buf.seek(0)
+                st.download_button(
+                    "⬇️ PDF", data=pdf_buf,
+                    file_name="idbdc_rezultate.pdf",
+                    mime="application/pdf", key="exp_pdf",
+                )
+            except ImportError:
+                st.caption("PDF indisponibil (reportlab lipsă)")
+
+        with cD:
+            if st.button("🖨️ Print", key="ca_print"):
+                html_doc = make_printable_html(df_final, "IDBDC – Rezultate")
+                components.html(html_doc, height=700, scrolling=True)
 
 
 # =========================================================
