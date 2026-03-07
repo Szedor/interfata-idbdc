@@ -147,56 +147,67 @@ def apply_style_full_blue():
             color: rgba(255,255,255,0.88) !important;
           }}
 
-          /* ---- CASETE INPUT / SELECTBOX — text vizibil ---- */
+          /* ---- CASETE INPUT / SELECTBOX — fundal închis, text alb ---- */
           .stTextInput input,
           .stTextInput textarea,
           .stNumberInput input {{
-            background: #ffffff !important;
-            color: #0b1f3a !important;
+            background: #1a3a5c !important;
+            color: #ffffff !important;
             border-radius: 10px !important;
             font-weight: 600 !important;
-            -webkit-text-fill-color: #0b1f3a !important;
+            -webkit-text-fill-color: #ffffff !important;
+            border: 1px solid rgba(255,255,255,0.40) !important;
           }}
 
           .stTextInput input::placeholder,
           .stTextInput textarea::placeholder {{
-            color: #6b7a99 !important;
-            -webkit-text-fill-color: #6b7a99 !important;
+            color: rgba(255,255,255,0.55) !important;
+            -webkit-text-fill-color: rgba(255,255,255,0.55) !important;
             opacity: 1 !important;
           }}
 
-          /* Selectbox — container și text selectat */
+          /* Selectbox — fundal închis, text alb */
           .stSelectbox > div > div,
-          .stSelectbox > div > div > div,
           .stSelectbox [data-baseweb="select"],
           .stSelectbox [data-baseweb="select"] > div,
           .stSelectbox [data-baseweb="select"] > div > div,
           .stSelectbox [data-baseweb="select"] > div > div > div,
           .stSelectbox [data-baseweb="select"] span,
-          .stSelectbox [data-baseweb="select"] input {{
-            background: #ffffff !important;
-            color: #0b1f3a !important;
-            -webkit-text-fill-color: #0b1f3a !important;
+          .stSelectbox [data-baseweb="select"] input,
+          .stSelectbox [data-baseweb="select"] svg {{
+            background: #1a3a5c !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
             border-radius: 10px !important;
             font-weight: 600 !important;
           }}
 
-          /* Multiselect */
-          .stMultiSelect [data-baseweb="select"] > div,
-          .stMultiSelect [data-baseweb="select"] span {{
-            background: #ffffff !important;
-            color: #0b1f3a !important;
-            -webkit-text-fill-color: #0b1f3a !important;
+          /* NumberInput */
+          .stNumberInput > div > div {{
+            background: #1a3a5c !important;
+            border-radius: 10px !important;
           }}
 
-          /* Lista derulantă deschisă */
+          /* Multiselect */
+          .stMultiSelect [data-baseweb="select"] > div,
+          .stMultiSelect [data-baseweb="select"] span,
+          .stMultiSelect [data-baseweb="select"] input {{
+            background: #1a3a5c !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+          }}
+
+          /* Lista derulantă deschisă — fundal alb, text închis pentru lizibilitate */
+          [data-baseweb="popover"],
           [data-baseweb="popover"] *,
+          [data-baseweb="menu"],
           [data-baseweb="menu"] *,
+          [role="listbox"],
           [role="listbox"] *,
           [role="option"] {{
+            background-color: #ffffff !important;
             color: #0b1f3a !important;
             -webkit-text-fill-color: #0b1f3a !important;
-            background-color: #ffffff !important;
           }}
           [role="option"]:hover,
           [role="option"][aria-selected="true"] {{
@@ -794,6 +805,8 @@ def render_explorare_criteriu(supabase: Client):
 
     st.info("Selectați criteriul și valoarea, apoi apăsați «Explorează».", icon="ℹ️")
     if not st.button("🔎 Explorează", key="ec_go"):
+        if "ec_rezultate_df" in st.session_state:
+            _render_ec_rezultate(supabase)
         return
 
     if not valoare:
@@ -857,8 +870,22 @@ def render_explorare_criteriu(supabase: Client):
         st.info("Niciun rezultat pentru criteriul selectat.")
         return
 
+    # Salvăm rezultatele în session_state — supraviețuiesc oricărei interacțiuni
+    st.session_state["ec_rezultate_df"] = df
+    st.session_state["ec_rezultate_label"] = ", ".join(df["_sursa"].unique()) if "_sursa" in df.columns else "toate categoriile"
+
+    # Afișare rezultate
+    _render_ec_rezultate(supabase)
+
+
+def _render_ec_rezultate(supabase: Client):
+    """Afișează tabelul și secțiunea de export pentru Tab 2. Separat pentru a putea fi reapelat."""
+    df = st.session_state.get("ec_rezultate_df", pd.DataFrame())
+    sursa_label = st.session_state.get("ec_rezultate_label", "")
+    if df.empty:
+        return
+
     st.divider()
-    sursa_label = ", ".join(df["_sursa"].unique()) if "_sursa" in df.columns else "toate categoriile"
     st.subheader(f"Rezultate — {sursa_label}")
     st.dataframe(df, use_container_width=True, height=560)
     st.caption(f"Total: {len(df)} înregistrări")
@@ -901,12 +928,12 @@ def render_explorare_criteriu(supabase: Client):
                     data_rows.append([str(v) if v is not None else "" for v in row])
                 t_pdf = Table(data_rows, repeatRows=1)
                 t_pdf.setStyle(TableStyle([
-                    ("BACKGROUND",  (0, 0), (-1, 0), colors.HexColor("#0b2a52")),
-                    ("TEXTCOLOR",   (0, 0), (-1, 0), colors.white),
-                    ("FONTSIZE",    (0, 0), (-1, -1), 7),
-                    ("GRID",        (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("BACKGROUND",     (0, 0), (-1, 0), colors.HexColor("#0b2a52")),
+                    ("TEXTCOLOR",      (0, 0), (-1, 0), colors.white),
+                    ("FONTSIZE",       (0, 0), (-1, -1), 7),
+                    ("GRID",           (0, 0), (-1, -1), 0.5, colors.grey),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
-                    ("VALIGN",      (0, 0), (-1, -1), "TOP"),
+                    ("VALIGN",         (0, 0), (-1, -1), "TOP"),
                 ]))
                 elements.append(t_pdf)
                 doc.build(elements)
@@ -1065,7 +1092,11 @@ def render_cautare_aprofundata(supabase: Client):
         return
 
     st.info("Completați criteriile și apăsați «Caută».", icon="ℹ️")
+
+    # Dacă există rezultate salvate din căutarea anterioară, le afișăm
     if not st.button("🔎 Caută", key="ca_go"):
+        if "ca_rezultate_df" in st.session_state:
+            _render_ca_rezultate(supabase)
         return
 
     if not base_table:
@@ -1096,10 +1127,22 @@ def render_cautare_aprofundata(supabase: Client):
     df = pd.DataFrame(rows)
     df = enrich_reprezentant_idbdc(supabase, df)
 
+    # Salvăm în session_state
+    st.session_state["ca_rezultate_df"] = df
+
+    # Afișare
+    _render_ca_rezultate(supabase)
+
+
+def _render_ca_rezultate(supabase: Client):
+    """Afișează tabelul și exportul pentru Tab 3. Separat pentru a rezista la interacțiuni."""
+    df = st.session_state.get("ca_rezultate_df", pd.DataFrame())
+    if df.empty:
+        return
+
     st.divider()
     st.subheader("Rezultate")
 
-    # Selectare coloane pentru tabelul final
     available_cols = list(df.columns)
     defaults = [c for c in ["cod_identificare", "reprezentant_idbdc"] if c in available_cols]
     for c in ["titlul_proiect", "titlu_proiect", "titlu_eveniment", "denumire", "titlul"]:
