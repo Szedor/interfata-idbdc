@@ -225,12 +225,18 @@ def apply_style_full_blue():
             font-weight: 900 !important;
             background: rgba(255,255,255,0.96) !important;
             color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important;
             border: 1px solid rgba(255,255,255,0.55) !important;
             opacity: 1 !important;
+          }}
+          .stButton > button p {{
+            color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important;
           }}
           .stButton > button:hover {{
             border: 1px solid rgba(255,255,255,0.90) !important;
             color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important;
             opacity: 1 !important;
           }}
 
