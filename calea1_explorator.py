@@ -147,40 +147,60 @@ def apply_style_full_blue():
             color: rgba(255,255,255,0.88) !important;
           }}
 
+          /* ---- CASETE INPUT / SELECTBOX — text vizibil ---- */
           .stTextInput input,
-          .stSelectbox [data-baseweb="select"] > div,
-          .stSelectbox [data-baseweb="select"] > div > div,
-          .stSelectbox [data-baseweb="select"] span,
-          .stNumberInput input,
-          .stDateInput input {{
+          .stTextInput textarea,
+          .stNumberInput input {{
             background: #ffffff !important;
             color: #0b1f3a !important;
             border-radius: 10px !important;
             font-weight: 600 !important;
+            -webkit-text-fill-color: #0b1f3a !important;
           }}
 
-          /* Text vizibil în interiorul selectbox-urilor */
-          [data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
-          [data-baseweb="select"] div,
-          [data-baseweb="select"] span {{
-            color: #0b1f3a !important;
-          }}
-
-          /* Placeholder text */
-          .stTextInput input::placeholder {{
+          .stTextInput input::placeholder,
+          .stTextInput textarea::placeholder {{
             color: #6b7a99 !important;
+            -webkit-text-fill-color: #6b7a99 !important;
             opacity: 1 !important;
           }}
 
-          /* Opțiuni din dropdown când sunt deschise */
-          [data-baseweb="popover"] li,
-          [data-baseweb="menu"] li,
+          /* Selectbox — container și text selectat */
+          .stSelectbox > div > div,
+          .stSelectbox > div > div > div,
+          .stSelectbox [data-baseweb="select"],
+          .stSelectbox [data-baseweb="select"] > div,
+          .stSelectbox [data-baseweb="select"] > div > div,
+          .stSelectbox [data-baseweb="select"] > div > div > div,
+          .stSelectbox [data-baseweb="select"] span,
+          .stSelectbox [data-baseweb="select"] input {{
+            background: #ffffff !important;
+            color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important;
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+          }}
+
+          /* Multiselect */
+          .stMultiSelect [data-baseweb="select"] > div,
+          .stMultiSelect [data-baseweb="select"] span {{
+            background: #ffffff !important;
+            color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important;
+          }}
+
+          /* Lista derulantă deschisă */
+          [data-baseweb="popover"] *,
+          [data-baseweb="menu"] *,
+          [role="listbox"] *,
           [role="option"] {{
             color: #0b1f3a !important;
-            background: #ffffff !important;
+            -webkit-text-fill-color: #0b1f3a !important;
+            background-color: #ffffff !important;
           }}
-          [role="option"]:hover {{
-            background: #e8eef8 !important;
+          [role="option"]:hover,
+          [role="option"][aria-selected="true"] {{
+            background-color: #dce6f5 !important;
           }}
 
           .stButton > button {{
@@ -594,7 +614,7 @@ def render_export_auth(supabase: Client) -> bool:
     """
     Afișează bara de autentificare pentru export/print.
     Returnează True dacă utilizatorul este autentificat cu @upt.ro.
-    Autentificarea se păstrează pe toată sesiunea.
+    Autentificarea se păstrează pe toată sesiunea. Nu folosește rerun.
     """
     # Dacă deja autentificat (fie prin Modul 3, fie prin bara din Modul 1)
     if st.session_state.get("auth_ai", False) or \
@@ -617,37 +637,48 @@ def render_export_auth(supabase: Client) -> bool:
         unsafe_allow_html=True,
     )
 
-    ea1, ea2, ea3 = st.columns([2.0, 1.0, 3.0])
+    import re as _re
+    pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
+
+    ea1, ea2, _ = st.columns([2.0, 1.0, 3.0])
     with ea1:
         email_exp = st.text_input(
-            "Email instituțional (prenume.nume@upt.ro)",
+            "Email instituțional",
             value="",
             key="export_email_input",
             label_visibility="collapsed",
             placeholder="prenume.nume@upt.ro",
         ).strip().lower()
     with ea2:
-        if st.button("✅ Autorizare", key="export_auth_btn"):
-            import re as _re
-            pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
-            if not pattern.match(email_exp):
-                st.error("Email invalid. Format: prenume.nume@upt.ro")
-            else:
-                try:
-                    res = supabase.table("det_resurse_umane") \
-                        .select("nume_prenume,email") \
-                        .eq("email", email_exp) \
-                        .limit(1).execute()
-                    if res.data:
-                        user = res.data[0]
-                        st.session_state.export_auth = True
-                        st.session_state.user_email  = email_exp
-                        st.session_state.user_name   = (user.get("nume_prenume") or "").strip() or email_exp
-                        st.rerun()
-                    else:
-                        st.error("Emailul nu există în baza de date IDBDC.")
-                except Exception as e:
-                    st.error(f"Eroare verificare: {e}")
+        auth_clicked = st.button("✅ Autorizare", key="export_auth_btn")
+
+    if auth_clicked:
+        if not pattern.match(email_exp):
+            st.error("Email invalid. Format: prenume.nume@upt.ro")
+        else:
+            try:
+                res = supabase.table("det_resurse_umane") \
+                    .select("nume_prenume,email") \
+                    .eq("email", email_exp) \
+                    .limit(1).execute()
+                if res.data:
+                    user = res.data[0]
+                    st.session_state.export_auth = True
+                    st.session_state.user_email  = email_exp
+                    st.session_state.user_name   = (user.get("nume_prenume") or "").strip() or email_exp
+                    # Nu facem rerun — returnăm True direct în același ciclu
+                    nume = st.session_state.user_name
+                    st.markdown(
+                        f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);"
+                        f"border-radius:10px;padding:8px 16px;color:#ffffff;font-weight:700;font-size:0.95rem;"
+                        f"margin-bottom:0.5rem;'>✅ Export autorizat — {nume}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    return True
+                else:
+                    st.error("Emailul nu există în baza de date IDBDC.")
+            except Exception as e:
+                st.error(f"Eroare verificare: {e}")
 
     return False
 
