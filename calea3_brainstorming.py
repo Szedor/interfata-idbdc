@@ -203,6 +203,7 @@ def email_gate(supabase: Client):
 
             st.session_state.auth_ai   = True
             st.session_state.user_name = (user.get("nume_prenume") or "").strip() or e
+            st.session_state.user_email = e
             st.session_state.ai_section = None
             st.rerun()
 
