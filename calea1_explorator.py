@@ -149,11 +149,38 @@ def apply_style_full_blue():
 
           .stTextInput input,
           .stSelectbox [data-baseweb="select"] > div,
+          .stSelectbox [data-baseweb="select"] > div > div,
+          .stSelectbox [data-baseweb="select"] span,
           .stNumberInput input,
           .stDateInput input {{
-            background: rgba(255,255,255,0.96) !important;
+            background: #ffffff !important;
             color: #0b1f3a !important;
             border-radius: 10px !important;
+            font-weight: 600 !important;
+          }}
+
+          /* Text vizibil în interiorul selectbox-urilor */
+          [data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
+          [data-baseweb="select"] div,
+          [data-baseweb="select"] span {{
+            color: #0b1f3a !important;
+          }}
+
+          /* Placeholder text */
+          .stTextInput input::placeholder {{
+            color: #6b7a99 !important;
+            opacity: 1 !important;
+          }}
+
+          /* Opțiuni din dropdown când sunt deschise */
+          [data-baseweb="popover"] li,
+          [data-baseweb="menu"] li,
+          [role="option"] {{
+            color: #0b1f3a !important;
+            background: #ffffff !important;
+          }}
+          [role="option"]:hover {{
+            background: #e8eef8 !important;
           }}
 
           .stButton > button {{
@@ -739,9 +766,13 @@ def render_explorare_criteriu(supabase: Client):
     st.dataframe(df, use_container_width=True, height=560)
     st.caption(f"Total: {len(df)} înregistrări")
 
-    # ---- EXPORT — doar utilizatori @upt.ro ----
+    # ---- EXPORT — doar utilizatori autentificați cu @upt.ro ----
     user_email = st.session_state.get("user_email", "")
-    if user_email.endswith("@upt.ro"):
+    are_acces_export = (
+        st.session_state.get("auth_ai", False) or
+        (isinstance(user_email, str) and user_email.endswith("@upt.ro"))
+    )
+    if are_acces_export:
         st.divider()
         st.subheader("📤 Export")
         cA, cB, cC, cD = st.columns(4)
