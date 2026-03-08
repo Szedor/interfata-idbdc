@@ -333,9 +333,11 @@ def porneste_motorul(supabase):
 
     def is_date_col(col: str) -> bool:
         c = (col or "").lower()
-        if c in ("data_ultimei_modificari",):
+        # Excludem coloanele stocate ca text în DB, chiar dacă numele sugerează dată
+        EXCLUDE_DATE = {"data_ultimei_modificari", "data_start", "data_inceput", "data_sfarsit"}
+        if c in EXCLUDE_DATE:
             return False
-        return c.startswith("data_") or c.endswith("_data") or (c.startswith("dt_"))
+        return c.startswith("data_") or c.endswith("_data") or c.startswith("dt_")
 
     def is_year_col(col: str) -> bool:
         c = (col or "").lower()
@@ -475,6 +477,10 @@ def porneste_motorul(supabase):
             )
 
         if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
+            # Convertim varchar -> bool pentru compatibilitate cu CheckboxColumn
+            df["reprezinta_idbdc"] = df["reprezinta_idbdc"].apply(
+                lambda v: True if str(v).strip().upper() in ("TRUE", "DA", "1", "YES") else False
+            )
             cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
                 label="reprezinta_idbdc",
                 help="DA/NU",
@@ -928,6 +934,11 @@ def porneste_motorul(supabase):
                 # Autofill functie_upt pentru echipa
                 if table_name == "com_echipe_proiect":
                     df_for_save = autofill_functie_upt(df_for_save)
+                    # Convertim bool -> varchar pentru reprezinta_idbdc
+                    if "reprezinta_idbdc" in df_for_save.columns:
+                        df_for_save["reprezinta_idbdc"] = df_for_save["reprezinta_idbdc"].apply(
+                            lambda v: "TRUE" if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else "FALSE"
+                        )
 
                 if "cod_identificare" in df_for_save.columns:
                     df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
