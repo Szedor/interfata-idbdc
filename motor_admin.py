@@ -850,20 +850,6 @@ def porneste_motorul(supabase):
         st.warning("Fișa este deja validată iar editarea este blocată. Deblochează dacă vrei modificare.")
 
     # ============================
-    # BUTOANE
-    # ============================
-
-    b1, b2, b3 = st.columns(3)
-    with b1:
-        btn_save = st.button("💾 SALVARE (toată fișa)", disabled=(lock_after_validate and already_valid))
-    with b2:
-        btn_validate = st.button("✅ VALIDARE (toată fișa)")
-    with b3:
-        btn_delete = st.button("🗑️ ȘTERGE FIȘA")
-
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-
-    # ============================
     # TAB-URI + EDITOR
     # ============================
 
@@ -920,6 +906,19 @@ def porneste_motorul(supabase):
             with s5:
                 st.caption("Validat")
                 st.write(fmt_bool(r.get("validat_idbdc", False)))
+
+    # ============================
+    # BUTOANE — după editori pentru a păstra starea corectă
+    # ============================
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        btn_save = st.button("💾 SALVARE (toată fișa)", disabled=(lock_after_validate and already_valid))
+    with b2:
+        btn_validate = st.button("✅ VALIDARE (toată fișa)")
+    with b3:
+        btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
     # ============================
     # SALVARE (DIRECT)
