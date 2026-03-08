@@ -802,11 +802,15 @@ def porneste_motorul(supabase):
     table_names = [t for _, t in tabele]
 
     # ============================
-    # ÎNCĂRCARE
+    # ÎNCĂRCARE — doar prima dată sau când se schimbă codul/tabela
     # ============================
 
     state_key = lambda t: f"df_admin__{t}"
     state_key_raw = lambda t: f"df_admin_raw__{t}"
+
+    # Cheie unică pentru combinația cod + tabelă bază — detectăm schimbarea
+    session_context_key = f"admin_context__{tabela_baza}__{cod}"
+    context_changed = (st.session_state.get("admin_context_last") != session_context_key)
 
     loaded = {}
     exists_map = {}
@@ -821,15 +825,20 @@ def porneste_motorul(supabase):
         st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Introducere noutate» dacă vrei să creezi.")
         return
 
-    for _, table_name in tabele:
-        df, cols = loaded[table_name]
-        if df.empty and cols:
-            df_full = prepare_empty_single_row(cols, cod)
-        else:
-            df_full = df.copy()
-
-        st.session_state[state_key_raw(table_name)] = df_full.copy()
-        st.session_state[state_key(table_name)] = hide_control_cols(df_full)
+    # Încărcăm în session_state DOAR dacă s-a schimbat contextul (cod nou sau tabelă nouă)
+    # La rerun cauzat de butoane, NU suprascriem — păstrăm datele editate
+    if context_changed:
+        st.session_state["admin_context_last"] = session_context_key
+        for _, table_name in tabele:
+            df, cols = loaded[table_name]
+            if df.empty and cols:
+                df_full = prepare_empty_single_row(cols, cod)
+            else:
+                df_full = df.copy()
+            st.session_state[state_key_raw(table_name)] = df_full.copy()
+            st.session_state[state_key(table_name)] = hide_control_cols(df_full)
+            # Resetăm și datele editate
+            st.session_state.pop(f"edited_data__{table_name}__{cod}", None)
 
     base_full = st.session_state[state_key_raw(tabela_baza)]
 
@@ -973,6 +982,7 @@ def porneste_motorul(supabase):
             ok, msg = direct_save_all_tables(items, operator)
             if ok:
                 st.success(msg)
+                st.session_state.pop("admin_context_last", None)
                 st.rerun()
             else:
                 st.error(f"Eroare la salvare: {msg}")
@@ -990,6 +1000,7 @@ def porneste_motorul(supabase):
             ok, msg = direct_validate_all_tables(cod, table_names, operator)
             if ok:
                 st.success(msg)
+                st.session_state.pop("admin_context_last", None)
                 st.rerun()
             else:
                 st.error(f"Eroare la validare: {msg}")
