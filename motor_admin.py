@@ -16,7 +16,6 @@ def porneste_motorul(supabase):
         "validat_idbdc",
     ]
 
-    # NOM/DET whitelist (gard de siguranță)
     NOMDET_WHITELIST = [
         "nom_categorie",
         "nom_status_proiect",
@@ -29,7 +28,6 @@ def porneste_motorul(supabase):
         "det_resurse_umane",
     ]
 
-    # pentru det_resurse_umane (dropdown-uri)
     NOMDET_DROPDOWN_MAP = {
         "det_resurse_umane": {
             "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
@@ -56,21 +54,28 @@ def porneste_motorul(supabase):
         except Exception:
             return []
 
+    def is_date_col(col: str) -> bool:
+        c = (col or "").lower()
+        if c in ("data_ultimei_modificari",):
+            return False
+        return c.startswith("data_") or c.endswith("_data") or c.startswith("dt_")
+
+    def is_year_col(col: str) -> bool:
+        c = (col or "").lower()
+        return c == "an" or c.startswith("an_")
+
     def empty_row(columns):
         row = {c: None for c in columns}
-
         if "status_confirmare" in row:
             row["status_confirmare"] = False
         if "validat_idbdc" in row:
             row["validat_idbdc"] = False
         if "reprezinta_idbdc" in row:
             row["reprezinta_idbdc"] = False
-
         y = current_year()
         for c in columns:
             if c == "an" or c.startswith("an_"):
                 row[c] = y
-
         return row
 
     def load_single_row(table_name: str, cod: str):
@@ -91,7 +96,7 @@ def porneste_motorul(supabase):
                 df[c] = None
         df = df[cols]
 
-        # Forțăm tipul corect pentru coloanele date — pandas poate citi NULL ca object
+        # Forțăm tipul corect pentru coloanele date
         for c in df.columns:
             if is_date_col(c):
                 df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
@@ -122,7 +127,6 @@ def porneste_motorul(supabase):
 
     def merge_back_control_cols(df_edited: pd.DataFrame, df_original: pd.DataFrame) -> pd.DataFrame:
         out = df_edited.copy()
-
         for c in CONTROL_COLS:
             if c in df_original.columns:
                 if c not in out.columns:
@@ -131,16 +135,13 @@ def porneste_motorul(supabase):
                     out[c] = list(df_original[c]) + [None] * max(0, (len(out) - len(df_original)))
                 except Exception:
                     out[c] = df_original[c].iloc[0] if len(df_original) else None
-
         for c in df_original.columns:
             if c not in out.columns:
                 out[c] = df_original[c]
-
         try:
             out = out[df_original.columns]
         except Exception:
             pass
-
         return out
 
     def fmt_bool(v):
@@ -167,12 +168,10 @@ def porneste_motorul(supabase):
                     continue
                 out[k] = v
                 continue
-
             if v is None:
                 continue
             if isinstance(v, str) and v.strip() == "":
                 continue
-
             out[k] = v
         return out
 
@@ -182,14 +181,12 @@ def porneste_motorul(supabase):
             return
         except Exception:
             pass
-
         try:
             upd = supabase.table(table_name).update(payload).eq("cod_identificare", cod).execute()
             if upd.data:
                 return
         except Exception:
             pass
-
         supabase.table(table_name).insert(payload).execute()
 
     def direct_save_all_tables(items: list, operator: str) -> tuple[bool, str]:
@@ -277,13 +274,10 @@ def porneste_motorul(supabase):
                     continue
 
                 payload = {}
-
                 if "validat_idbdc" in cols:
                     payload["validat_idbdc"] = True
-
                 if "data_ultimei_modificari" in cols:
                     payload["data_ultimei_modificari"] = now_iso()
-
                 if "observatii_idbdc" in cols:
                     try:
                         cur = (
@@ -301,7 +295,6 @@ def porneste_motorul(supabase):
                         payload["observatii_idbdc"] = msg
 
                 payload = cleanup_payload(payload)
-
                 if not payload:
                     continue
 
@@ -322,7 +315,6 @@ def porneste_motorul(supabase):
     def direct_delete_all_tables(cod: str, table_names: list[str]) -> tuple[bool, str]:
         ok_any = False
         errors = []
-
         for t in table_names:
             try:
                 cols = set(get_table_columns(t))
@@ -340,18 +332,6 @@ def porneste_motorul(supabase):
         if errors:
             return True, "Ștergere parțială (cu unele avertismente)."
         return True, "Fișa a fost ștearsă."
-
-    def is_date_col(col: str) -> bool:
-        c = (col or "").lower()
-        # Excludem coloanele stocate ca text în DB, chiar dacă numele sugerează dată
-        EXCLUDE_DATE = {"data_ultimei_modificari", "data_start", "data_inceput", "data_sfarsit"}
-        if c in EXCLUDE_DATE:
-            return False
-        return c.startswith("data_") or c.endswith("_data") or c.startswith("dt_")
-
-    def is_year_col(col: str) -> bool:
-        c = (col or "").lower()
-        return c == "an" or c.startswith("an_")
 
     @st.cache_data(show_spinner=False, ttl=600)
     def load_dropdown_options(source_table: str, source_col: str):
@@ -372,7 +352,6 @@ def porneste_motorul(supabase):
 
     @st.cache_data(show_spinner=False, ttl=600)
     def load_functie_map() -> dict:
-        """Returnează dict {nume_prenume: acronim_functie_upt} din det_resurse_umane."""
         try:
             res = supabase.table("det_resurse_umane") \
                 .select("nume_prenume,acronim_functie_upt") \
@@ -386,7 +365,6 @@ def porneste_motorul(supabase):
             return {}
 
     def autofill_functie_upt(df: pd.DataFrame) -> pd.DataFrame:
-        """Completează automat functie_upt pe baza nume_prenume din det_resurse_umane."""
         if "nume_prenume" not in df.columns or "functie_upt" not in df.columns:
             return df
         functie_map = load_functie_map()
@@ -487,9 +465,8 @@ def porneste_motorul(supabase):
             )
 
         if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
-            # Convertim varchar -> bool pentru compatibilitate cu CheckboxColumn
             df["reprezinta_idbdc"] = df["reprezinta_idbdc"].apply(
-                lambda v: True if str(v).strip().upper() in ("TRUE", "DA", "1", "YES") else False
+                lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
             cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
                 label="reprezinta_idbdc",
@@ -552,7 +529,6 @@ def porneste_motorul(supabase):
 
     def _nomdet_build_column_config(table_name: str, df: pd.DataFrame):
         cfg = {}
-
         rel = NOMDET_DROPDOWN_MAP.get(table_name, {})
         for target_col, (src_table, src_col) in rel.items():
             if target_col not in df.columns:
@@ -565,25 +541,18 @@ def porneste_motorul(supabase):
                 options=options,
                 required=False,
             )
-
         if "__STERGE__" in df.columns:
-            cfg["__STERGE__"] = st.column_config.CheckboxColumn(
-                label="Șterge",
-                default=False,
-            )
-
+            cfg["__STERGE__"] = st.column_config.CheckboxColumn(label="Șterge", default=False)
         for c in df.columns:
             if c == "__STERGE__":
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(label=c, format="YYYY-MM-DD", step=1)
-
         for c in df.columns:
             if c == "__STERGE__":
                 continue
             if is_year_col(c):
                 cfg[c] = st.column_config.NumberColumn(label=c, min_value=1900, max_value=2100, step=1, format="%d")
-
         return cfg
 
     def render_nomenclatoare_admin_box():
@@ -591,16 +560,13 @@ def porneste_motorul(supabase):
         if rol != "ADMIN":
             return
 
-        # mesaj persistent (după rerun)
         if st.session_state.get("nomdet_saved_ok", False):
             st.success("Salvarea realizată cu succes!")
             st.session_state.nomdet_saved_ok = False
 
         with st.expander("🧩 Nomenclatoare & Detalii", expanded=False):
             st.caption("Alege tabela, editează în grid și apasă SALVARE.")
-
             tabela = st.selectbox("Tabelă", NOMDET_WHITELIST, index=0, key="nomdet_table")
-
             cols = get_table_columns(tabela)
             if not cols:
                 st.error("Nu pot citi coloanele tablei (idbdc_get_columns nu a returnat nimic).")
@@ -628,7 +594,6 @@ def porneste_motorul(supabase):
                 df["__STERGE__"] = False
 
             cfg = _nomdet_build_column_config(tabela, df)
-
             edited = st.data_editor(
                 df,
                 use_container_width=True,
@@ -659,7 +624,6 @@ def porneste_motorul(supabase):
                     if payloads:
                         supabase.table(tabela).upsert(payloads, on_conflict=pk).execute()
 
-                    # setăm mesajul persistent și rerun
                     st.session_state.nomdet_saved_ok = True
                     st.rerun()
 
@@ -685,7 +649,6 @@ def porneste_motorul(supabase):
           [data-testid="stSidebar"] h3 {
             color: #ffffff !important;
           }
-
           div.block-container { padding-top: 1.0rem; padding-bottom: 1.0rem; }
           .stRadio, .stToggle { margin-bottom: 0.2rem; }
           .stButton { margin-top: 0.2rem; margin-bottom: 0.2rem; }
@@ -703,7 +666,6 @@ def porneste_motorul(supabase):
         unsafe_allow_html=True,
     )
 
-    # (IMPORTANT) Expanderul ADMIN apare SUS, înainte de Categoria de date
     render_nomenclatoare_admin_box()
 
     st.divider()
@@ -720,15 +682,9 @@ def porneste_motorul(supabase):
         )
     with c2:
         if cat_admin == "Contracte":
-            tip_admin = st.selectbox(
-                "Tipul de contract",
-                ["", "CEP", "TERTI"],
-            )
+            tip_admin = st.selectbox("Tipul de contract", ["", "CEP", "TERTI"])
         elif cat_admin == "Proiecte":
-            tip_admin = st.selectbox(
-                "Tipul de proiect",
-                ["", "FDI", "PNRR", "PNCDI", "INTERNATIONALE", "INTERREG", "NONEU"],
-            )
+            tip_admin = st.selectbox("Tipul de proiect", ["", "FDI", "PNRR", "PNCDI", "INTERNATIONALE", "INTERREG", "NONEU"])
         else:
             tip_admin = ""
     with c3:
@@ -747,9 +703,7 @@ def porneste_motorul(supabase):
         "PNCDI": "base_proiecte_pncdi",
     }
 
-    if cat_admin == "Contracte":
-        tabela_baza = map_baze.get(tip_admin)
-    elif cat_admin == "Proiecte":
+    if cat_admin in ("Contracte", "Proiecte"):
         tabela_baza = map_baze.get(tip_admin)
     elif cat_admin == "Evenimente stiintifice":
         tabela_baza = "base_evenimente_stiintifice"
@@ -859,7 +813,6 @@ def porneste_motorul(supabase):
         with tabs[i]:
             df_show = st.session_state[state_key(table_name)].copy()
 
-            # la Date financiare: "valuta" după "an_referinta"
             if table_name == "com_date_financiare" and "an_referinta" in df_show.columns and "valuta" in df_show.columns:
                 cols = list(df_show.columns)
                 cols.remove("valuta")
@@ -868,7 +821,7 @@ def porneste_motorul(supabase):
                 df_show = df_show[cols]
 
             col_cfg = build_column_config_for_table(table_name, df_show)
-            num_rows_mode = "dynamic" if table_name == "com_echipe_proiect" else "fixed"
+            num_rows_mode = "dynamic" if table_name in ("com_echipe_proiect", "com_date_financiare") else "fixed"
 
             edited = st.data_editor(
                 df_show,
@@ -876,11 +829,9 @@ def porneste_motorul(supabase):
                 hide_index=True,
                 num_rows=num_rows_mode,
                 column_config=col_cfg,
-                disabled=(lock_after_validate and already_valid and table_name != tabela_baza),
-                key=f"editor__{table_name}__{cod}",
+                disabled=(lock_after_validate and already_valid),
             )
             edited_data[table_name] = edited
-            st.session_state[f"edited_data__{table_name}__{cod}"] = edited
 
     # ============================
     # STATUS FIȘĂ
@@ -889,7 +840,6 @@ def porneste_motorul(supabase):
     if len(base_full) > 0:
         with st.expander("Status fișă", expanded=False):
             r = base_full.iloc[0].to_dict()
-
             s1, s2, s3, s4, s5 = st.columns([1.2, 2.2, 1.0, 1.6, 1.0])
             with s1:
                 st.caption("Responsabil")
@@ -909,7 +859,18 @@ def porneste_motorul(supabase):
                 st.write(fmt_bool(r.get("validat_idbdc", False)))
 
     # ============================
-    # BUTOANE — după editori pentru a păstra starea corectă
+    # MESAJ PERSISTENT
+    # ============================
+
+    if "admin_msg" in st.session_state:
+        msg_type, msg_text = st.session_state.pop("admin_msg")
+        if msg_type == "success":
+            st.success(msg_text)
+        else:
+            st.error(msg_text)
+
+    # ============================
+    # BUTOANE — după editori
     # ============================
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
@@ -921,63 +882,16 @@ def porneste_motorul(supabase):
     with b3:
         btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
-    # Mesaj persistent după salvare/validare
-    if "admin_msg" in st.session_state:
-        msg_type, msg_text = st.session_state.pop("admin_msg")
-        if msg_type == "success":
-            st.success(msg_text)
-        else:
-            st.error(msg_text)
-
     # ============================
-    # SALVARE (DIRECT)
+    # SALVARE
     # ============================
 
     if btn_save:
         operator = st.session_state.operator_identificat
         try:
             items = []
-
             for _, table_name in tabele:
-                # Citim datele editate direct din session_state Streamlit (key unic per editor)
-                editor_key = f"editor__{table_name}__{cod}"
-                editor_state = st.session_state.get(editor_key)
-
-                if editor_state is not None:
-                    # st.data_editor cu key stochează {"edited_rows", "added_rows", "deleted_rows"}
-                    df_raw = st.session_state[state_key_raw(table_name)].copy()
-                    df_visible = hide_control_cols(df_raw)
-
-                    # Aplicăm modificările din editor
-                    edited_rows = editor_state.get("edited_rows", {})
-                    added_rows = editor_state.get("added_rows", [])
-                    deleted_rows = editor_state.get("deleted_rows", [])
-
-                    # Aplicăm edited_rows
-                    for idx_str, changes in edited_rows.items():
-                        idx = int(idx_str)
-                        for col, val in changes.items():
-                            if idx < len(df_visible):
-                                df_visible.at[df_visible.index[idx], col] = val
-
-                    # Aplicăm added_rows
-                    for new_row in added_rows:
-                        new_r = {c: None for c in df_visible.columns}
-                        new_r.update(new_row)
-                        df_visible = pd.concat([df_visible, pd.DataFrame([new_r])], ignore_index=True)
-
-                    # Aplicăm deleted_rows
-                    if deleted_rows:
-                        df_visible = df_visible.drop(index=deleted_rows).reset_index(drop=True)
-
-                    df_edit_visible = df_visible
-                else:
-                    # Fallback: folosim datele din session_state salvate explicit
-                    df_edit_visible = st.session_state.get(
-                        f"edited_data__{table_name}__{cod}",
-                        st.session_state.get(state_key(table_name))
-                    )
-
+                df_edit_visible = edited_data[table_name]
                 df_raw_original = st.session_state[state_key_raw(table_name)]
                 _, cols_real = loaded[table_name]
                 if not cols_real:
@@ -987,14 +901,8 @@ def porneste_motorul(supabase):
 
                 df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
 
-                # Autofill functie_upt pentru echipa
                 if table_name == "com_echipe_proiect":
                     df_for_save = autofill_functie_upt(df_for_save)
-                    # Convertim bool -> varchar pentru reprezinta_idbdc
-                    if "reprezinta_idbdc" in df_for_save.columns:
-                        df_for_save["reprezinta_idbdc"] = df_for_save["reprezinta_idbdc"].apply(
-                            lambda v: "TRUE" if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else "FALSE"
-                        )
 
                 if "cod_identificare" in df_for_save.columns:
                     df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
@@ -1005,27 +913,23 @@ def porneste_motorul(supabase):
                     cod_row = data.get("cod_identificare")
                     if cod_row is None or str(cod_row).strip() == "":
                         continue
-
                     payload = {k: data.get(k) for k in cols_real if k in data}
                     payload["cod_identificare"] = str(cod_row).strip()
-
                     items.append({"table": table_name, "payload": payload})
 
             ok, msg = direct_save_all_tables(items, operator)
             if ok:
                 st.session_state["admin_msg"] = ("success", msg)
-                st.session_state.pop("admin_context_last", None)
-                st.rerun()
             else:
                 st.session_state["admin_msg"] = ("error", f"Eroare la salvare: {msg}")
-                st.rerun()
+            st.rerun()
 
         except Exception as e:
             st.session_state["admin_msg"] = ("error", f"Eroare la salvare: {e}")
             st.rerun()
 
     # ============================
-    # VALIDARE (DIRECT)
+    # VALIDARE
     # ============================
 
     if btn_validate:
@@ -1034,17 +938,15 @@ def porneste_motorul(supabase):
             ok, msg = direct_validate_all_tables(cod, table_names, operator)
             if ok:
                 st.session_state["admin_msg"] = ("success", msg)
-                st.session_state.pop("admin_context_last", None)
-                st.rerun()
             else:
                 st.session_state["admin_msg"] = ("error", f"Eroare la validare: {msg}")
-                st.rerun()
+            st.rerun()
         except Exception as e:
             st.session_state["admin_msg"] = ("error", f"Eroare la validare: {e}")
             st.rerun()
 
     # ============================
-    # ȘTERGERE (DIRECT) + CONFIRMARE
+    # ȘTERGERE + CONFIRMARE
     # ============================
 
     if btn_delete:
@@ -1059,11 +961,12 @@ def porneste_motorul(supabase):
                         for k in (state_key(table_name), state_key_raw(table_name)):
                             if k in st.session_state:
                                 del st.session_state[k]
-                    st.success(msg)
-                    st.rerun()
+                    st.session_state["admin_msg"] = ("success", msg)
                 else:
-                    st.error(f"Eroare la ștergere: {msg}")
+                    st.session_state["admin_msg"] = ("error", f"Eroare la ștergere: {msg}")
+                st.rerun()
             except Exception as e:
-                st.error(f"Eroare la ștergere: {e}")
+                st.session_state["admin_msg"] = ("error", f"Eroare la ștergere: {e}")
+                st.rerun()
         else:
             st.info("Bifează confirmarea și tastează exact codul pentru a executa ștergerea.")
