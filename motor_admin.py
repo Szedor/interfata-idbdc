@@ -90,6 +90,12 @@ def porneste_motorul(supabase):
             if c not in df.columns:
                 df[c] = None
         df = df[cols]
+
+        # Forțăm tipul corect pentru coloanele date — pandas poate citi NULL ca object
+        for c in df.columns:
+            if is_date_col(c):
+                df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
+
         return df, cols, True
 
     def prepare_empty_single_row(cols: list, cod: str):
@@ -98,7 +104,11 @@ def porneste_motorul(supabase):
         r = empty_row(cols)
         if "cod_identificare" in r:
             r["cod_identificare"] = cod
-        return pd.DataFrame([r], columns=cols)
+        df = pd.DataFrame([r], columns=cols)
+        for c in df.columns:
+            if is_date_col(c):
+                df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
+        return df
 
     def append_observatii(existing: str, msg: str) -> str:
         base = (existing or "").strip()
