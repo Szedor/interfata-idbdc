@@ -802,15 +802,11 @@ def porneste_motorul(supabase):
     table_names = [t for _, t in tabele]
 
     # ============================
-    # ÎNCĂRCARE — doar prima dată sau când se schimbă codul/tabela
+    # ÎNCĂRCARE
     # ============================
 
     state_key = lambda t: f"df_admin__{t}"
     state_key_raw = lambda t: f"df_admin_raw__{t}"
-
-    # Cheie unică pentru combinația cod + tabelă bază — detectăm schimbarea
-    session_context_key = f"admin_context__{tabela_baza}__{cod}"
-    context_changed = (st.session_state.get("admin_context_last") != session_context_key)
 
     loaded = {}
     exists_map = {}
@@ -825,20 +821,14 @@ def porneste_motorul(supabase):
         st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Introducere noutate» dacă vrei să creezi.")
         return
 
-    # Încărcăm în session_state DOAR dacă s-a schimbat contextul (cod nou sau tabelă nouă)
-    # La rerun cauzat de butoane, NU suprascriem — păstrăm datele editate
-    if context_changed:
-        st.session_state["admin_context_last"] = session_context_key
-        for _, table_name in tabele:
-            df, cols = loaded[table_name]
-            if df.empty and cols:
-                df_full = prepare_empty_single_row(cols, cod)
-            else:
-                df_full = df.copy()
-            st.session_state[state_key_raw(table_name)] = df_full.copy()
-            st.session_state[state_key(table_name)] = hide_control_cols(df_full)
-            # Resetăm și datele editate
-            st.session_state.pop(f"edited_data__{table_name}__{cod}", None)
+    for _, table_name in tabele:
+        df, cols = loaded[table_name]
+        if df.empty and cols:
+            df_full = prepare_empty_single_row(cols, cod)
+        else:
+            df_full = df.copy()
+        st.session_state[state_key_raw(table_name)] = df_full.copy()
+        st.session_state[state_key(table_name)] = hide_control_cols(df_full)
 
     base_full = st.session_state[state_key_raw(tabela_baza)]
 
@@ -931,6 +921,14 @@ def porneste_motorul(supabase):
     with b3:
         btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
+    # Mesaj persistent după salvare/validare
+    if "admin_msg" in st.session_state:
+        msg_type, msg_text = st.session_state.pop("admin_msg")
+        if msg_type == "success":
+            st.success(msg_text)
+        else:
+            st.error(msg_text)
+
     # ============================
     # SALVARE (DIRECT)
     # ============================
@@ -941,11 +939,45 @@ def porneste_motorul(supabase):
             items = []
 
             for _, table_name in tabele:
-                # Citim din session_state — persistă după rerun
-                df_edit_visible = st.session_state.get(
-                    f"edited_data__{table_name}__{cod}",
-                    edited_data.get(table_name)
-                )
+                # Citim datele editate direct din session_state Streamlit (key unic per editor)
+                editor_key = f"editor__{table_name}__{cod}"
+                editor_state = st.session_state.get(editor_key)
+
+                if editor_state is not None:
+                    # st.data_editor cu key stochează {"edited_rows", "added_rows", "deleted_rows"}
+                    df_raw = st.session_state[state_key_raw(table_name)].copy()
+                    df_visible = hide_control_cols(df_raw)
+
+                    # Aplicăm modificările din editor
+                    edited_rows = editor_state.get("edited_rows", {})
+                    added_rows = editor_state.get("added_rows", [])
+                    deleted_rows = editor_state.get("deleted_rows", [])
+
+                    # Aplicăm edited_rows
+                    for idx_str, changes in edited_rows.items():
+                        idx = int(idx_str)
+                        for col, val in changes.items():
+                            if idx < len(df_visible):
+                                df_visible.at[df_visible.index[idx], col] = val
+
+                    # Aplicăm added_rows
+                    for new_row in added_rows:
+                        new_r = {c: None for c in df_visible.columns}
+                        new_r.update(new_row)
+                        df_visible = pd.concat([df_visible, pd.DataFrame([new_r])], ignore_index=True)
+
+                    # Aplicăm deleted_rows
+                    if deleted_rows:
+                        df_visible = df_visible.drop(index=deleted_rows).reset_index(drop=True)
+
+                    df_edit_visible = df_visible
+                else:
+                    # Fallback: folosim datele din session_state salvate explicit
+                    df_edit_visible = st.session_state.get(
+                        f"edited_data__{table_name}__{cod}",
+                        st.session_state.get(state_key(table_name))
+                    )
+
                 df_raw_original = st.session_state[state_key_raw(table_name)]
                 _, cols_real = loaded[table_name]
                 if not cols_real:
@@ -981,14 +1013,16 @@ def porneste_motorul(supabase):
 
             ok, msg = direct_save_all_tables(items, operator)
             if ok:
-                st.success(msg)
+                st.session_state["admin_msg"] = ("success", msg)
                 st.session_state.pop("admin_context_last", None)
                 st.rerun()
             else:
-                st.error(f"Eroare la salvare: {msg}")
+                st.session_state["admin_msg"] = ("error", f"Eroare la salvare: {msg}")
+                st.rerun()
 
         except Exception as e:
-            st.error(f"Eroare la salvare: {e}")
+            st.session_state["admin_msg"] = ("error", f"Eroare la salvare: {e}")
+            st.rerun()
 
     # ============================
     # VALIDARE (DIRECT)
@@ -999,13 +1033,15 @@ def porneste_motorul(supabase):
         try:
             ok, msg = direct_validate_all_tables(cod, table_names, operator)
             if ok:
-                st.success(msg)
+                st.session_state["admin_msg"] = ("success", msg)
                 st.session_state.pop("admin_context_last", None)
                 st.rerun()
             else:
-                st.error(f"Eroare la validare: {msg}")
+                st.session_state["admin_msg"] = ("error", f"Eroare la validare: {msg}")
+                st.rerun()
         except Exception as e:
-            st.error(f"Eroare la validare: {e}")
+            st.session_state["admin_msg"] = ("error", f"Eroare la validare: {e}")
+            st.rerun()
 
     # ============================
     # ȘTERGERE (DIRECT) + CONFIRMARE
