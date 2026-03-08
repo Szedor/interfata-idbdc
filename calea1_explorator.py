@@ -147,16 +147,35 @@ def apply_style_full_blue():
             color: rgba(255,255,255,0.88) !important;
           }}
 
-          /* ---- CASETE TEXT — același stil ca selectbox ---- */
+          /* ---- CASETE TEXT — toate stările: normal, hover, focus, active, autofill ---- */
           .stTextInput > div > div,
           .stTextInput > div > div > input,
-          .stTextInput input {{
+          .stTextInput input,
+          .stTextInput input:hover,
+          .stTextInput input:focus,
+          .stTextInput input:active,
+          .stTextInput input:focus-visible,
+          .stTextInput > div > div:hover,
+          .stTextInput > div > div:focus-within,
+          .stTextInput [data-baseweb="input"],
+          .stTextInput [data-baseweb="input"]:hover,
+          .stTextInput [data-baseweb="input"]:focus-within {{
             background: #1a3a5c !important;
+            background-color: #1a3a5c !important;
             color: #ffffff !important;
             -webkit-text-fill-color: #ffffff !important;
             border-radius: 10px !important;
             font-weight: 600 !important;
             border: 1px solid rgba(255,255,255,0.30) !important;
+            caret-color: #ffffff !important;
+          }}
+
+          .stTextInput input:-webkit-autofill,
+          .stTextInput input:-webkit-autofill:hover,
+          .stTextInput input:-webkit-autofill:focus {{
+            -webkit-box-shadow: 0 0 0px 1000px #1a3a5c inset !important;
+            -webkit-text-fill-color: #ffffff !important;
+            caret-color: #ffffff !important;
           }}
 
           .stTextInput input::placeholder {{
@@ -165,15 +184,24 @@ def apply_style_full_blue():
             opacity: 1 !important;
           }}
 
-          /* NumberInput */
+          /* NumberInput — toate stările */
           .stNumberInput > div > div,
           .stNumberInput > div > div > input,
-          .stNumberInput input {{
+          .stNumberInput input,
+          .stNumberInput input:hover,
+          .stNumberInput input:focus,
+          .stNumberInput input:active,
+          .stNumberInput input:focus-visible,
+          .stNumberInput [data-baseweb="input"],
+          .stNumberInput [data-baseweb="input"]:hover,
+          .stNumberInput [data-baseweb="input"]:focus-within {{
             background: #1a3a5c !important;
+            background-color: #1a3a5c !important;
             color: #ffffff !important;
             -webkit-text-fill-color: #ffffff !important;
             border-radius: 10px !important;
             font-weight: 600 !important;
+            caret-color: #ffffff !important;
           }}
 
           /* Selectbox — același stil */
