@@ -165,7 +165,7 @@ def run():
         st.stop()
 
     st.sidebar.success(
-        f"Operator: {st.session_state.operator_identificat} ({st.session_state.operator_rol})"
+        f"Operator: {st.session_state.operator_identificat}"
     )
 
     if st.sidebar.button("Ieșire / Resetare"):
