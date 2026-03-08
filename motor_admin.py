@@ -878,8 +878,10 @@ def porneste_motorul(supabase):
                 num_rows=num_rows_mode,
                 column_config=col_cfg,
                 disabled=(lock_after_validate and already_valid and table_name != tabela_baza),
+                key=f"editor__{table_name}__{cod}",
             )
             edited_data[table_name] = edited
+            st.session_state[f"edited_data__{table_name}__{cod}"] = edited
 
     # ============================
     # STATUS FIȘĂ
@@ -930,7 +932,11 @@ def porneste_motorul(supabase):
             items = []
 
             for _, table_name in tabele:
-                df_edit_visible = edited_data[table_name]
+                # Citim din session_state — persistă după rerun
+                df_edit_visible = st.session_state.get(
+                    f"edited_data__{table_name}__{cod}",
+                    edited_data.get(table_name)
+                )
                 df_raw_original = st.session_state[state_key_raw(table_name)]
                 _, cols_real = loaded[table_name]
                 if not cols_real:
