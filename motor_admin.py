@@ -358,6 +358,36 @@ def porneste_motorul(supabase):
         except Exception:
             return []
 
+    @st.cache_data(show_spinner=False, ttl=600)
+    def load_functie_map() -> dict:
+        """Returnează dict {nume_prenume: acronim_functie_upt} din det_resurse_umane."""
+        try:
+            res = supabase.table("det_resurse_umane") \
+                .select("nume_prenume,acronim_functie_upt") \
+                .execute()
+            return {
+                r["nume_prenume"]: r.get("acronim_functie_upt", "")
+                for r in (res.data or [])
+                if r.get("nume_prenume")
+            }
+        except Exception:
+            return {}
+
+    def autofill_functie_upt(df: pd.DataFrame) -> pd.DataFrame:
+        """Completează automat functie_upt pe baza nume_prenume din det_resurse_umane."""
+        if "nume_prenume" not in df.columns or "functie_upt" not in df.columns:
+            return df
+        functie_map = load_functie_map()
+        if not functie_map:
+            return df
+        for idx, row in df.iterrows():
+            nume = row.get("nume_prenume")
+            if nume and str(nume).strip():
+                functie = functie_map.get(str(nume).strip(), "")
+                if functie:
+                    df.at[idx, "functie_upt"] = functie
+        return df
+
     def build_column_config_for_table(table_name: str, df: pd.DataFrame):
         DROPDOWN_MAP = {
             "base_contracte_cep": {
@@ -449,6 +479,13 @@ def porneste_motorul(supabase):
                 label="reprezinta_idbdc",
                 help="DA/NU",
                 default=False,
+            )
+
+        if table_name == "com_echipe_proiect" and "functie_upt" in df.columns:
+            cfg["functie_upt"] = st.column_config.TextColumn(
+                label="functie_upt",
+                help="Completat automat din det_resurse_umane",
+                disabled=True,
             )
 
         for c in df.columns:
@@ -887,6 +924,10 @@ def porneste_motorul(supabase):
                     continue
 
                 df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
+
+                # Autofill functie_upt pentru echipa
+                if table_name == "com_echipe_proiect":
+                    df_for_save = autofill_functie_upt(df_for_save)
 
                 if "cod_identificare" in df_for_save.columns:
                     df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
