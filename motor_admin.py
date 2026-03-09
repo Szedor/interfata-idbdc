@@ -903,6 +903,126 @@ def porneste_motorul(supabase):
         )
 
     # ============================
+    # EDITOR ECHIPA — doua zone separate
+    # ============================
+
+    def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name):
+        """
+        Randare editor echipa in doua zone:
+        - Zona 1 (sus): reprezentanti IDBDC — editor mic fix, proeminent
+        - Zona 2 (jos): restul echipei — editor dinamic cu inaltime fixa + scroll intern
+        Ambele zone folosesc dropdown pentru nume_prenume.
+        La salvare, cele doua zone se reunesc intr-un singur DataFrame.
+        """
+
+        # Incarcam lista de persoane pentru dropdown
+        persoane_disponibile = load_dropdown_options("det_resurse_umane", "nume_prenume")
+
+        # Inlocuim SelectboxColumn pentru nume_prenume cu lista completa
+        col_cfg_echipa = dict(col_cfg)
+        if "nume_prenume" in df_show.columns:
+            col_cfg_echipa["nume_prenume"] = st.column_config.SelectboxColumn(
+                label="🔽 Nume și prenume",
+                options=persoane_disponibile,
+                required=True,
+                help="🔽 Selectează persoana din lista angajaților",
+            )
+
+        # Impartim df in reprezentanti si restul
+        if "reprezinta_idbdc" in df_show.columns:
+            mask_rep = df_show["reprezinta_idbdc"].apply(
+                lambda v: v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
+            )
+            df_rep   = df_show[mask_rep].copy().reset_index(drop=True)
+            df_rest  = df_show[~mask_rep].copy().reset_index(drop=True)
+        else:
+            df_rep  = pd.DataFrame(columns=df_show.columns)
+            df_rest = df_show.copy()
+
+        # ── ZONA 1 — Reprezentanti IDBDC ──────────────────────────────────
+        st.markdown(
+            "<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
+            "border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            "<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
+            "⭐ Reprezentanți IDBDC</span> "
+            "<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>(director / responsabil proiect)</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        key_rep = f"editor_echipa_rep_{cod}"
+        edited_rep = st.data_editor(
+            df_rep,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            column_config=col_cfg_echipa,
+            disabled=editing_blocked,
+            key=key_rep,
+            height=min(200, 60 + max(1, len(df_rep)) * 38),
+        )
+
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+        # ── ZONA 2 — Restul echipei ────────────────────────────────────────
+        nr_rest = len(df_rest)
+        st.markdown(
+            f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
+            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
+            f"👥 Membri echipă</span> "
+            f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_rest} persoane</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Filtru rapid text deasupra editorului
+        filter_key = f"echipa_filter_{cod}"
+        filtru = st.text_input(
+            "🔍 Filtrează după nume",
+            value="",
+            key=filter_key,
+            placeholder="Tastează pentru a filtra lista...",
+            label_visibility="collapsed",
+        ).strip().lower()
+
+        df_rest_filtered = df_rest.copy()
+        if filtru and "nume_prenume" in df_rest_filtered.columns:
+            df_rest_filtered = df_rest_filtered[
+                df_rest_filtered["nume_prenume"].astype(str).str.lower().str.contains(filtru, na=False)
+            ].reset_index(drop=True)
+
+        key_rest = f"editor_echipa_rest_{cod}"
+        edited_rest = st.data_editor(
+            df_rest_filtered,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            column_config=col_cfg_echipa,
+            disabled=editing_blocked,
+            key=key_rest,
+            height=400,
+        )
+
+        # ── Reunim cele doua zone pentru salvare ──────────────────────────
+        # Forțam reprezinta_idbdc corect pentru fiecare zona
+        if "reprezinta_idbdc" in edited_rep.columns:
+            edited_rep = edited_rep.copy()
+            edited_rep["reprezinta_idbdc"] = True
+        if "reprezinta_idbdc" in edited_rest.columns:
+            edited_rest = edited_rest.copy()
+            edited_rest["reprezinta_idbdc"] = False
+
+        df_reunited = pd.concat([edited_rep, edited_rest], ignore_index=True)
+
+        # Eliminam randuri fara nume (goale)
+        if "nume_prenume" in df_reunited.columns:
+            df_reunited = df_reunited[
+                df_reunited["nume_prenume"].notna() &
+                (df_reunited["nume_prenume"].astype(str).str.strip() != "")
+            ].reset_index(drop=True)
+
+        edited_data[table_name] = df_reunited
+
+    # ============================
     # TAB-URI + EDITOR
     # ============================
 
@@ -921,7 +1041,16 @@ def porneste_motorul(supabase):
                 df_show = df_show[cols]
 
             col_cfg = build_column_config_for_table(table_name, df_show)
-            num_rows_mode = "dynamic" if table_name in ("com_echipe_proiect", "com_date_financiare") else "fixed"
+
+            # ── Editor special pentru echipa: doua zone separate ──────────
+            if table_name == "com_echipe_proiect":
+                _render_echipa_editor(
+                    df_show, col_cfg, cod, editing_blocked,
+                    edited_data, state_key, table_name,
+                )
+                continue
+
+            num_rows_mode = "dynamic" if table_name == "com_date_financiare" else "fixed"
             editor_key = f"editor_{table_name}_{cod}"
 
             edited = st.data_editor(
@@ -1037,35 +1166,37 @@ def porneste_motorul(supabase):
                     continue
 
                 # Reconstruim DataFrame-ul din starea editorului — supraviețuiește rerun-ului
-                editor_key = f"editor_{table_name}_{cod}"
-                editor_state = st.session_state.get(editor_key)
                 df_base = st.session_state[state_key(table_name)].copy()
 
-                if editor_state is not None and isinstance(editor_state, dict):
-                    edited_rows = editor_state.get("edited_rows", {})
-                    added_rows  = editor_state.get("added_rows", [])
-                    deleted_rows = editor_state.get("deleted_rows", [])
-
-                    # Aplicăm modificările pe rândurile existente
-                    for idx_str, changes in edited_rows.items():
-                        idx = int(idx_str)
-                        if idx < len(df_base):
-                            for col, val in changes.items():
-                                df_base.at[df_base.index[idx], col] = val
-
-                    # Adăugăm rânduri noi
-                    for new_row in added_rows:
-                        new_r = {c: None for c in df_base.columns}
-                        new_r.update(new_row)
-                        df_base = pd.concat([df_base, pd.DataFrame([new_r])], ignore_index=True)
-
-                    # Ștergem rândurile marcate
-                    if deleted_rows:
-                        df_base = df_base.drop(index=[i for i in deleted_rows if i < len(df_base)]).reset_index(drop=True)
-
-                    df_edit_visible = df_base
-                else:
+                # Pentru echipa: _render_echipa_editor a reunit deja cele doua zone in edited_data
+                if table_name == "com_echipe_proiect":
                     df_edit_visible = edited_data.get(table_name, df_base)
+                else:
+                    editor_key = f"editor_{table_name}_{cod}"
+                    editor_state = st.session_state.get(editor_key)
+
+                    if editor_state is not None and isinstance(editor_state, dict):
+                        edited_rows = editor_state.get("edited_rows", {})
+                        added_rows  = editor_state.get("added_rows", [])
+                        deleted_rows = editor_state.get("deleted_rows", [])
+
+                        for idx_str, changes in edited_rows.items():
+                            idx = int(idx_str)
+                            if idx < len(df_base):
+                                for col, val in changes.items():
+                                    df_base.at[df_base.index[idx], col] = val
+
+                        for new_row in added_rows:
+                            new_r = {c: None for c in df_base.columns}
+                            new_r.update(new_row)
+                            df_base = pd.concat([df_base, pd.DataFrame([new_r])], ignore_index=True)
+
+                        if deleted_rows:
+                            df_base = df_base.drop(index=[i for i in deleted_rows if i < len(df_base)]).reset_index(drop=True)
+
+                        df_edit_visible = df_base
+                    else:
+                        df_edit_visible = edited_data.get(table_name, df_base)
 
                 df_raw_original = st.session_state[state_key_raw(table_name)]
 
