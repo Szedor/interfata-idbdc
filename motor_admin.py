@@ -874,9 +874,9 @@ def porneste_motorul(supabase):
         st.session_state[toggle_key] = not already_valid if already_valid else True
 
     # Toggle: OFF = Fișa este blocată | ON = Fișa este deblocată
+    # Nu folosim value= — starea e controlată exclusiv prin session_state[toggle_key]
     deblocat = st.toggle(
         "🔓 Fișa este deblocată" if st.session_state[toggle_key] else "🔒 Fișa este blocată",
-        value=st.session_state[toggle_key],
         key=toggle_key,
         help="OFF = Fișa este blocată (doar citire). ON = Fișa este deblocată (editare activă).",
     )
