@@ -96,10 +96,20 @@ def porneste_motorul(supabase):
                 df[c] = None
         df = df[cols]
 
-        # Forțăm tipul corect pentru coloanele date
+        # Forțăm tipul corect pentru coloanele date — explicit datetime.date sau None
+        import datetime as _dt
         for c in df.columns:
             if is_date_col(c):
-                df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
+                def _to_date(v):
+                    if v is None or (isinstance(v, float) and pd.isna(v)):
+                        return None
+                    if isinstance(v, _dt.date):
+                        return v
+                    try:
+                        return pd.to_datetime(str(v)).date()
+                    except Exception:
+                        return None
+                df[c] = df[c].apply(_to_date)
 
         return df, cols, True
 
@@ -109,10 +119,11 @@ def porneste_motorul(supabase):
         r = empty_row(cols)
         if "cod_identificare" in r:
             r["cod_identificare"] = cod
+        import datetime as _dt
         df = pd.DataFrame([r], columns=cols)
         for c in df.columns:
             if is_date_col(c):
-                df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
+                df[c] = df[c].apply(lambda v: None if v is None else (v if isinstance(v, _dt.date) else None))
         return df
 
     def append_observatii(existing: str, msg: str) -> str:
@@ -390,6 +401,11 @@ def porneste_motorul(supabase):
                 "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
+            "base_contracte_speciale": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
             "base_proiecte_fdi": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
                 "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
@@ -446,6 +462,44 @@ def porneste_motorul(supabase):
             },
         }
 
+        # Etichete frumoase pentru coloane în data_editor
+        COL_LABELS_ADMIN = {
+            "denumire_categorie":         "Categorie ▾",
+            "acronim_contracte_proiecte": "Acronim contract/proiect ▾",
+            "status_contract_proiect":    "Status ▾",
+            "cod_domeniu_fdi":            "Domeniu FDI ▾",
+            "natura_eveniment":           "Natura evenimentului ▾",
+            "format_eveniment":           "Format eveniment ▾",
+            "acronim_prop_intelect":      "Tip proprietate intelectuală ▾",
+            "nume_prenume":               "Nume și prenume ▾",
+            "status_personal":            "Status personal ▾",
+            "valuta":                     "Valută ▾",
+            "acronim_functie_upt":        "Funcție UPT ▾",
+            "acronim_departament":        "Departament ▾",
+            "cod_universitate":           "Universitate ▾",
+            "reprezinta_idbdc":           "Reprezintă IDBDC",
+            "functie_upt":                "Funcție UPT (auto)",
+            "cod_identificare":           "Cod identificare",
+            "an_derulare":                "An derulare",
+            "an_referinta":               "An referință",
+            "an_inceput":                 "An început",
+            "an_sfarsit":                 "An sfârșit",
+            "data_contract":              "Data contract 📅",
+            "data_inceput":               "Data început 📅",
+            "data_sfarsit":               "Data sfârșit 📅",
+            "data_semnare":               "Data semnare 📅",
+            "data_depunere":              "Data depunere 📅",
+            "data_acordare":              "Data acordare 📅",
+            "data_eveniment":             "Data eveniment 📅",
+            "data_start":                 "Data start 📅",
+            "titlul_proiect":             "Titlul proiectului",
+            "denumire_beneficiar":        "Beneficiar",
+            "derulat_prin":               "Derulat prin",
+        }
+
+        def _col_label_admin(col: str) -> str:
+            return COL_LABELS_ADMIN.get(col, col.replace("_", " ").capitalize())
+
         rel = DROPDOWN_MAP.get(table_name, {})
         cfg = {}
 
@@ -459,9 +513,10 @@ def porneste_motorul(supabase):
             if not options:
                 continue
             cfg[target_col] = st.column_config.SelectboxColumn(
-                label=target_col,
+                label=_col_label_admin(target_col),
                 options=options,
                 required=False,
+                help="Selectează din listă ▾",
             )
 
         if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
@@ -469,14 +524,14 @@ def porneste_motorul(supabase):
                 lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
             cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
-                label="reprezinta_idbdc",
-                help="DA/NU",
+                label=_col_label_admin("reprezinta_idbdc"),
+                help="Bifează dacă persoana reprezintă IDBDC în proiect",
                 default=False,
             )
 
         if table_name == "com_echipe_proiect" and "functie_upt" in df.columns:
             cfg["functie_upt"] = st.column_config.TextColumn(
-                label="functie_upt",
+                label=_col_label_admin("functie_upt"),
                 help="Completat automat din det_resurse_umane",
                 disabled=True,
             )
@@ -486,10 +541,10 @@ def porneste_motorul(supabase):
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(
-                    label=c,
+                    label=_col_label_admin(c),
                     format="YYYY-MM-DD",
                     step=1,
-                    help="Format obligatoriu: YYYY-MM-DD (ISO 8601)",
+                    help="Click pentru a selecta data din calendar 📅",
                 )
 
         for c in df.columns:
@@ -497,7 +552,7 @@ def porneste_motorul(supabase):
                 continue
             if is_year_col(c):
                 cfg[c] = st.column_config.NumberColumn(
-                    label=c,
+                    label=_col_label_admin(c),
                     min_value=1900,
                     max_value=2100,
                     step=1,
