@@ -610,11 +610,12 @@ def fetch_distinct_values(_supabase: Client, table: str, column: str, limit: int
 
 @st.cache_data(show_spinner=False, ttl=600)
 def fetch_idbdc_people(_supabase: Client, limit: int = 2000) -> list[str]:
+    """Aduce toți membrii din com_echipe_proiect (nu doar reprezentanți)
+    pentru criteriul Director / Responsabil din Tab 2."""
     try:
         res = (
             _supabase.table("com_echipe_proiect")
             .select("nume_prenume")
-            .eq("reprezinta_idbdc", True)
             .limit(limit)
             .execute()
         )
@@ -699,17 +700,18 @@ def enrich_reprezentant_idbdc(supabase: Client, df: pd.DataFrame) -> pd.DataFram
     return df
 
 
-def ids_for_person(supabase: Client, person_name: str) -> list[str]:
+def ids_for_person(supabase: Client, person_name: str, only_reprezentant: bool = False) -> list[str]:
     if not person_name:
         return []
     try:
-        res = (
+        q = (
             supabase.table("com_echipe_proiect")
             .select("cod_identificare")
-            .eq("reprezinta_idbdc", True)
             .eq("nume_prenume", person_name)
-            .execute()
         )
+        if only_reprezentant:
+            q = q.eq("reprezinta_idbdc", True)
+        res = q.execute()
         return sorted({
             str(r.get("cod_identificare", "")).strip()
             for r in (res.data or [])
@@ -822,6 +824,42 @@ def render_fisa_completa(supabase: Client):
 
     # ── Informații generale ───────────────────────────────────────────────
     st.divider()
+
+    # ── Badge status validare ────────────────────────────────────────────
+    validat = None
+    status_confirmare = None
+    for t in ALL_BASE_TABLES:
+        rows_check = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=1)
+        if rows_check:
+            validat = rows_check[0].get("validat_idbdc")
+            status_confirmare = rows_check[0].get("status_confirmare")
+            break
+
+    if validat is True or str(validat).strip().upper() in ("TRUE", "DA", "1"):
+        badge_html = (
+            "<div style='display:inline-block;background:rgba(30,200,90,0.18);"
+            "border:1.5px solid rgba(30,200,90,0.60);border-radius:20px;"
+            "padding:4px 16px;margin-bottom:10px;'>"
+            "<span style='color:#80ffb0;font-weight:800;font-size:0.97rem;'>✅ Validat</span></div>"
+        )
+    else:
+        in_lucru = status_confirmare is True or str(status_confirmare).strip().upper() in ("TRUE", "DA", "1")
+        if in_lucru:
+            badge_html = (
+                "<div style='display:inline-block;background:rgba(255,180,0,0.15);"
+                "border:1.5px solid rgba(255,180,0,0.50);border-radius:20px;"
+                "padding:4px 16px;margin-bottom:10px;'>"
+                "<span style='color:#ffe066;font-weight:800;font-size:0.97rem;'>⏳ În lucru</span></div>"
+            )
+        else:
+            badge_html = (
+                "<div style='display:inline-block;background:rgba(255,255,255,0.08);"
+                "border:1.5px solid rgba(255,255,255,0.25);border-radius:20px;"
+                "padding:4px 16px;margin-bottom:10px;'>"
+                "<span style='color:rgba(255,255,255,0.65);font-weight:800;font-size:0.97rem;'>📝 Neconfirmat</span></div>"
+            )
+
+    st.markdown(badge_html, unsafe_allow_html=True)
     st.markdown("### 📌 Informații generale")
 
     for t in ALL_BASE_TABLES:
@@ -869,6 +907,104 @@ def render_fisa_completa(supabase: Client):
     with tab_ech:
         rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
         _render_echipa_compact(rows)
+
+    # ── Export fișă ───────────────────────────────────────────────────────
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.divider()
+    st.markdown(
+        "<div style='color:rgba(255,255,255,0.75);font-size:0.90rem;font-weight:700;"
+        "margin-bottom:6px;'>📤 Export fișă proiect</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Construim un DataFrame complet din toate tabelele pentru export
+    export_frames = {}
+    for t in ALL_BASE_TABLES:
+        rows_exp = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=50)
+        if rows_exp:
+            df_t = pd.DataFrame(rows_exp)
+            df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
+            df_t.columns = [_col_label(c) for c in df_t.columns]
+            export_frames[TABLE_LABELS.get(t, t)] = df_t
+
+    for com_label, com_table in [
+        ("💰 Financiar", "com_date_financiare"),
+        ("🧪 Tehnic", "com_aspecte_tehnice"),
+    ]:
+        rows_exp = _safe_select_eq(supabase, com_table, "cod_identificare", cod, limit=50)
+        if rows_exp:
+            df_t = pd.DataFrame(rows_exp)
+            df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
+            df_t.columns = [_col_label(c) for c in df_t.columns]
+            export_frames[com_label] = df_t
+
+    rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
+    if rows_ech:
+        df_ech = pd.DataFrame(rows_ech)
+        df_ech = df_ech[[c for c in df_ech.columns if c not in COLS_HIDDEN_FISA]]
+        df_ech.columns = [_col_label(c) for c in df_ech.columns]
+        export_frames["👥 Echipă"] = df_ech
+
+    ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
+
+    with ea1:
+        # Export CSV — toate secțiunile combinate
+        csv_parts = []
+        for section_label, df_sec in export_frames.items():
+            csv_parts.append(f"=== {section_label} ===")
+            csv_parts.append(df_sec.to_csv(index=False))
+            csv_parts.append("")
+        csv_bytes = "\n".join(csv_parts).encode("utf-8-sig")
+        st.download_button(
+            "⬇️ CSV",
+            data=csv_bytes,
+            file_name=f"fisa_{cod}.csv",
+            mime="text/csv",
+            key="fisa_csv",
+        )
+
+    with ea2:
+        # Export Excel — câte un sheet per secțiune
+        try:
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+                for section_label, df_sec in export_frames.items():
+                    sheet_name = section_label[:31].replace("/", "-").replace(":", "")
+                    df_sec.to_excel(writer, index=False, sheet_name=sheet_name)
+            buf.seek(0)
+            st.download_button(
+                "⬇️ Excel",
+                data=buf,
+                file_name=f"fisa_{cod}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="fisa_xlsx",
+            )
+        except Exception:
+            st.caption("Excel indisponibil")
+
+    with ea3:
+        # Export Print HTML
+        if st.button("🖨️ Print fișă", key="fisa_print"):
+            import streamlit.components.v1 as _comp
+            html_sections = []
+            for section_label, df_sec in export_frames.items():
+                html_sections.append(f"<h3>{_html.escape(section_label)}</h3>")
+                html_sections.append(df_sec.to_html(index=False, escape=True))
+            full_html = f"""
+            <html><head><meta charset="utf-8"/>
+            <style>body{{font-family:Arial;padding:20px;}}
+            h2{{color:#003366;}} h3{{color:#0b2a52;margin-top:20px;}}
+            table{{border-collapse:collapse;width:100%;margin-bottom:16px;}}
+            th,td{{border:1px solid #ccc;padding:5px;font-size:11px;}}
+            th{{background:#e8f0f8;}}
+            @media print{{button{{display:none;}}}}
+            </style></head><body>
+            <button onclick="window.print()">🖨️ Print</button>
+            <h2>Fișă proiect — {_html.escape(cod)}</h2>
+            {"".join(html_sections)}
+            </body></html>
+            """
+            _comp.html(full_html, height=700, scrolling=True)
 
 
 # =========================================================
@@ -1016,8 +1152,8 @@ def _count_results_estimate(supabase: Client, tables: list[str], criteriu: str,
                     res = supabase.table(t).select("cod_identificare", count="exact").eq(col_dep, valoare).limit(1).execute()
                     total += getattr(res, "count", 0) or 0
 
-        elif criteriu == "Director / Responsabil":
-            res = supabase.table("com_echipe_proiect").select("cod_identificare", count="exact").eq("reprezinta_idbdc", True).eq("nume_prenume", valoare).limit(1).execute()
+        elif criteriu == "Membru echipă (orice rol)":
+            res = supabase.table("com_echipe_proiect").select("cod_identificare", count="exact").eq("nume_prenume", valoare).limit(1).execute()
             total = getattr(res, "count", 0) or 0
 
         elif criteriu == "An de referință":
@@ -1110,7 +1246,7 @@ def render_explorare_criteriu(supabase: Client):
             [
                 "Status",
                 "Departament",
-                "Director / Responsabil",
+                "Membru echipă (orice rol)",
                 "An de referință",
                 "Cuvânt cheie (titlu / acronim)",
             ],
@@ -1122,8 +1258,8 @@ def render_explorare_criteriu(supabase: Client):
             valoare = st.selectbox("Status", [""] + status_list, key="ec_val_st")
         elif criteriu == "Departament":
             valoare = st.selectbox("Departament", [""] + dep_list, key="ec_val_dep")
-        elif criteriu == "Director / Responsabil":
-            valoare = st.selectbox("Director / Responsabil", [""] + persoane_list, key="ec_val_p")
+        elif criteriu == "Membru echipă (orice rol)":
+            valoare = st.selectbox("Membru echipă", [""] + persoane_list, key="ec_val_p")
         elif criteriu == "An de referință":
             valoare = st.selectbox("An de referință", [""] + ani_list, key="ec_val_an")
         else:
@@ -1196,8 +1332,8 @@ def render_explorare_criteriu(supabase: Client):
             if not df_t.empty:
                 df = pd.concat([df, df_t], ignore_index=True) if not df.empty else df_t
 
-    elif criteriu == "Director / Responsabil":
-        ids = ids_for_person(supabase, valoare)
+    elif criteriu == "Membru echipă (orice rol)":
+        ids = ids_for_person(supabase, valoare, only_reprezentant=False)
         if not ids:
             st.info("Nu s-au găsit înregistrări pentru persoana selectată.")
             return
