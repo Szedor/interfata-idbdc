@@ -159,17 +159,14 @@ def porneste_motorul(supabase):
         return "DA" if bool(v) else "NU"
 
     def is_row_effectively_empty(d: dict) -> bool:
-        for k, v in d.items():
-            if k in ("cod_identificare", "id_tehnic"):
-                continue
-            if v is None:
-                continue
-            if isinstance(v, str) and v.strip() == "":
-                continue
-            return False
-        return True
+        """Rândul e 'gol' doar dacă lipsește și cod_identificare."""
+        cod = d.get("cod_identificare")
+        if cod is None or (isinstance(cod, str) and cod.strip() == ""):
+            return True
+        return False
 
     def cleanup_payload(payload: dict) -> dict:
+        """Păstrează toate câmpurile cu valoare, plus întotdeauna cod_identificare."""
         out = {}
         for k, v in (payload or {}).items():
             if k == "id_tehnic":
@@ -179,6 +176,11 @@ def porneste_motorul(supabase):
                     continue
                 out[k] = v
                 continue
+            if k == "cod_identificare":
+                # cod_identificare se păstrează mereu dacă e prezent
+                if v is not None and str(v).strip():
+                    out[k] = str(v).strip()
+                continue
             if v is None:
                 continue
             if isinstance(v, str) and v.strip() == "":
@@ -187,18 +189,25 @@ def porneste_motorul(supabase):
         return out
 
     def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
+        """Insert dacă nu există, update dacă există — fără upsert (evităm dep. de UNIQUE constraint)."""
         try:
-            supabase.table(table_name).upsert(payload, on_conflict="cod_identificare").execute()
-            return
+            check = supabase.table(table_name).select("cod_identificare").eq("cod_identificare", cod).limit(1).execute()
+            exists = bool(check.data)
         except Exception:
-            pass
-        try:
-            upd = supabase.table(table_name).update(payload).eq("cod_identificare", cod).execute()
-            if upd.data:
+            exists = False
+
+        if exists:
+            try:
+                supabase.table(table_name).update(payload).eq("cod_identificare", cod).execute()
                 return
-        except Exception:
-            pass
-        supabase.table(table_name).insert(payload).execute()
+            except Exception as e:
+                raise Exception(f"Update eșuat pe {table_name}: {e}")
+        else:
+            try:
+                supabase.table(table_name).insert(payload).execute()
+                return
+            except Exception as e:
+                raise Exception(f"Insert eșuat pe {table_name}: {e}")
 
     def direct_save_all_tables(items: list, operator: str) -> tuple[bool, str]:
         if not items:
@@ -464,19 +473,19 @@ def porneste_motorul(supabase):
 
         # Etichete frumoase pentru coloane în data_editor
         COL_LABELS_ADMIN = {
-            "denumire_categorie":         "Categorie ▾",
-            "acronim_contracte_proiecte": "Acronim contract/proiect ▾",
-            "status_contract_proiect":    "Status ▾",
-            "cod_domeniu_fdi":            "Domeniu FDI ▾",
-            "natura_eveniment":           "Natura evenimentului ▾",
-            "format_eveniment":           "Format eveniment ▾",
-            "acronim_prop_intelect":      "Tip proprietate intelectuală ▾",
-            "nume_prenume":               "Nume și prenume ▾",
-            "status_personal":            "Status personal ▾",
-            "valuta":                     "Valută ▾",
-            "acronim_functie_upt":        "Funcție UPT ▾",
-            "acronim_departament":        "Departament ▾",
-            "cod_universitate":           "Universitate ▾",
+            "denumire_categorie":         "🔽 Categorie",
+            "acronim_contracte_proiecte": "🔽 Acronim contract/proiect",
+            "status_contract_proiect":    "🔽 Status",
+            "cod_domeniu_fdi":            "🔽 Domeniu FDI",
+            "natura_eveniment":           "🔽 Natura evenimentului",
+            "format_eveniment":           "🔽 Format eveniment",
+            "acronim_prop_intelect":      "🔽 Tip proprietate intelectuală",
+            "nume_prenume":               "🔽 Nume și prenume",
+            "status_personal":            "🔽 Status personal",
+            "valuta":                     "🔽 Valută",
+            "acronim_functie_upt":        "🔽 Funcție UPT",
+            "acronim_departament":        "🔽 Departament",
+            "cod_universitate":           "🔽 Universitate",
             "reprezinta_idbdc":           "Reprezintă IDBDC",
             "functie_upt":                "Funcție UPT (auto)",
             "cod_identificare":           "Cod identificare",
@@ -484,14 +493,14 @@ def porneste_motorul(supabase):
             "an_referinta":               "An referință",
             "an_inceput":                 "An început",
             "an_sfarsit":                 "An sfârșit",
-            "data_contract":              "Data contract 📅",
-            "data_inceput":               "Data început 📅",
-            "data_sfarsit":               "Data sfârșit 📅",
-            "data_semnare":               "Data semnare 📅",
-            "data_depunere":              "Data depunere 📅",
-            "data_acordare":              "Data acordare 📅",
-            "data_eveniment":             "Data eveniment 📅",
-            "data_start":                 "Data start 📅",
+            "data_contract":              "📅 Data contract",
+            "data_inceput":               "📅 Data început",
+            "data_sfarsit":               "📅 Data sfârșit",
+            "data_semnare":               "📅 Data semnare",
+            "data_depunere":              "📅 Data depunere",
+            "data_acordare":              "📅 Data acordare",
+            "data_eveniment":             "📅 Data eveniment",
+            "data_start":                 "📅 Data start",
             "titlul_proiect":             "Titlul proiectului",
             "denumire_beneficiar":        "Beneficiar",
             "derulat_prin":               "Derulat prin",
@@ -516,7 +525,7 @@ def porneste_motorul(supabase):
                 label=_col_label_admin(target_col),
                 options=options,
                 required=False,
-                help="Selectează din listă ▾",
+                help="🔽 Selectează din listă",
             )
 
         if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
@@ -544,7 +553,7 @@ def porneste_motorul(supabase):
                     label=_col_label_admin(c),
                     format="YYYY-MM-DD",
                     step=1,
-                    help="Click pentru a selecta data din calendar 📅",
+                    help="📅 Click pentru a selecta data din calendar",
                 )
 
         for c in df.columns:
