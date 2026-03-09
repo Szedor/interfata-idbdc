@@ -857,8 +857,6 @@ def porneste_motorul(supabase):
     # BLOCARE DUPĂ VALIDARE
     # ============================
 
-    lock_after_validate = st.toggle("🔒 Blochează editarea după validare", value=True)
-
     already_valid = False
     if len(base_full) > 0 and "validat_idbdc" in base_full.columns:
         try:
@@ -866,8 +864,43 @@ def porneste_motorul(supabase):
         except Exception:
             already_valid = False
 
-    if lock_after_validate and already_valid:
-        st.warning("Fișa este deja validată iar editarea este blocată. Deblochează dacă vrei modificare.")
+    # Cheia pentru starea toggle-ului în session_state
+    toggle_key = f"toggle_deblocat_{cod}"
+
+    # Dacă fișa tocmai a fost validată (sau e deja validată), implicitul toggle-ului e OFF (blocat)
+    # Utilizatorul poate muta manual pe ON (deblocat) dacă vrea să editeze după validare
+    if toggle_key not in st.session_state:
+        # Dacă e validată → implicit blocat (False = blocat)
+        st.session_state[toggle_key] = not already_valid if already_valid else True
+
+    # Toggle: OFF = Fișa este blocată | ON = Fișa este deblocată
+    deblocat = st.toggle(
+        "🔓 Fișa este deblocată" if st.session_state[toggle_key] else "🔒 Fișa este blocată",
+        value=st.session_state[toggle_key],
+        key=toggle_key,
+        help="OFF = Fișa este blocată (doar citire). ON = Fișa este deblocată (editare activă).",
+    )
+
+    editing_blocked = not deblocat
+
+    if already_valid and deblocat:
+        st.markdown(
+            "<div style='background:rgba(255,200,50,0.18);border:1px solid rgba(255,200,50,0.55);"
+            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
+            "<span style='color:#ffe066;font-weight:700;font-size:0.97rem;'>"
+            "⚠️ Fișa a fost validată. Editarea este activă — modificările vor anula validarea anterioară."
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
+    elif already_valid and not deblocat:
+        st.markdown(
+            "<div style='background:rgba(50,200,100,0.13);border:1px solid rgba(50,200,100,0.40);"
+            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
+            "<span style='color:#80ffb0;font-weight:700;font-size:0.97rem;'>"
+            "✅ Fișa este validată și blocată. Mută toggle-ul pe ON pentru a edita."
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
 
     # ============================
     # TAB-URI + EDITOR
@@ -897,7 +930,7 @@ def porneste_motorul(supabase):
                 hide_index=True,
                 num_rows=num_rows_mode,
                 column_config=col_cfg,
-                disabled=(lock_after_validate and already_valid),
+                disabled=editing_blocked,
                 key=editor_key,
             )
             edited_data[table_name] = edited
@@ -928,15 +961,54 @@ def porneste_motorul(supabase):
                 st.write(fmt_bool(r.get("validat_idbdc", False)))
 
     # ============================
-    # MESAJ PERSISTENT
+    # MESAJ PERSISTENT — mare, vizibil
     # ============================
 
     if "admin_msg" in st.session_state:
         msg_type, msg_text = st.session_state.pop("admin_msg")
         if msg_type == "success":
-            st.success(msg_text)
+            st.markdown(
+                f"""
+                <div style='
+                    background: rgba(30,180,80,0.22);
+                    border: 2px solid rgba(30,220,100,0.75);
+                    border-radius: 14px;
+                    padding: 18px 28px;
+                    margin: 12px 0 16px 0;
+                    text-align: center;
+                '>
+                    <span style='font-size:2.2rem;'>✅</span><br>
+                    <span style='color:#80ffb0;font-size:1.35rem;font-weight:900;letter-spacing:0.02em;'>
+                        {msg_text}
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         else:
-            st.error(msg_text)
+            # Separăm motivul tehnic de mesajul principal dacă există ":"
+            parts = str(msg_text).split(":", 1)
+            titlu_err = parts[0].strip()
+            detaliu_err = parts[1].strip() if len(parts) > 1 else ""
+            st.markdown(
+                f"""
+                <div style='
+                    background: rgba(220,50,50,0.20);
+                    border: 2px solid rgba(255,80,80,0.70);
+                    border-radius: 14px;
+                    padding: 18px 28px;
+                    margin: 12px 0 16px 0;
+                    text-align: center;
+                '>
+                    <span style='font-size:2.2rem;'>❌</span><br>
+                    <span style='color:#ffaaaa;font-size:1.35rem;font-weight:900;'>
+                        {titlu_err}
+                    </span>
+                    {"<br><span style='color:rgba(255,180,180,0.85);font-size:0.95rem;font-weight:600;margin-top:6px;display:block;'>Motiv: " + detaliu_err + "</span>" if detaliu_err else ""}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     # ============================
     # BUTOANE — după editori
@@ -945,7 +1017,7 @@ def porneste_motorul(supabase):
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     b1, b2, b3 = st.columns(3)
     with b1:
-        btn_save = st.button("💾 SALVARE (toată fișa)", disabled=(lock_after_validate and already_valid))
+        btn_save = st.button("💾 SALVARE (toată fișa)", disabled=editing_blocked)
     with b2:
         btn_validate = st.button("✅ VALIDARE (toată fișa)")
     with b3:
@@ -1020,13 +1092,13 @@ def porneste_motorul(supabase):
 
             ok, msg = direct_save_all_tables(items, operator)
             if ok:
-                st.session_state["admin_msg"] = ("success", msg)
+                st.session_state["admin_msg"] = ("success", "✅ Fișa a fost salvată")
             else:
-                st.session_state["admin_msg"] = ("error", f"Eroare la salvare: {msg}")
+                st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {msg}")
             st.rerun()
 
         except Exception as e:
-            st.session_state["admin_msg"] = ("error", f"Eroare la salvare: {e}")
+            st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {e}")
             st.rerun()
 
     # ============================
@@ -1038,12 +1110,14 @@ def porneste_motorul(supabase):
         try:
             ok, msg = direct_validate_all_tables(cod, table_names, operator)
             if ok:
-                st.session_state["admin_msg"] = ("success", msg)
+                # Blocare automată după validare reușită
+                st.session_state[toggle_key] = False
+                st.session_state["admin_msg"] = ("success", "✅ Fișa a fost validată")
             else:
-                st.session_state["admin_msg"] = ("error", f"Eroare la validare: {msg}")
+                st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi validată: {msg}")
             st.rerun()
         except Exception as e:
-            st.session_state["admin_msg"] = ("error", f"Eroare la validare: {e}")
+            st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi validată: {e}")
             st.rerun()
 
     # ============================
