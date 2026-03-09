@@ -682,7 +682,9 @@ def porneste_motorul(supabase):
         )
     with c2:
         if cat_admin == "Contracte":
-            tip_admin = st.selectbox("Tipul de contract", ["", "CEP", "TERTI"])
+            _rol_c2 = (st.session_state.get("operator_rol") or "").strip().upper()
+            _optiuni_contracte = ["", "CEP", "TERTI", "SPECIALE"] if _rol_c2 == "ADMIN" else ["", "CEP", "TERTI"]
+            tip_admin = st.selectbox("Tipul de contract", _optiuni_contracte)
         elif cat_admin == "Proiecte":
             tip_admin = st.selectbox("Tipul de proiect", ["", "FDI", "PNRR", "PNCDI", "INTERNATIONALE", "INTERREG", "NONEU"])
         else:
@@ -695,6 +697,7 @@ def porneste_motorul(supabase):
     map_baze = {
         "CEP": "base_contracte_cep",
         "TERTI": "base_contracte_terti",
+        "SPECIALE": "base_contracte_speciale",
         "FDI": "base_proiecte_fdi",
         "PNRR": "base_proiecte_pnrr",
         "INTERNATIONALE": "base_proiecte_internationale",
@@ -822,6 +825,7 @@ def porneste_motorul(supabase):
 
             col_cfg = build_column_config_for_table(table_name, df_show)
             num_rows_mode = "dynamic" if table_name in ("com_echipe_proiect", "com_date_financiare") else "fixed"
+            editor_key = f"editor_{table_name}_{cod}"
 
             edited = st.data_editor(
                 df_show,
@@ -830,6 +834,7 @@ def porneste_motorul(supabase):
                 num_rows=num_rows_mode,
                 column_config=col_cfg,
                 disabled=(lock_after_validate and already_valid),
+                key=editor_key,
             )
             edited_data[table_name] = edited
 
@@ -891,11 +896,43 @@ def porneste_motorul(supabase):
         try:
             items = []
             for _, table_name in tabele:
-                df_edit_visible = edited_data[table_name]
-                df_raw_original = st.session_state[state_key_raw(table_name)]
                 _, cols_real = loaded[table_name]
                 if not cols_real:
                     continue
+
+                # Reconstruim DataFrame-ul din starea editorului — supraviețuiește rerun-ului
+                editor_key = f"editor_{table_name}_{cod}"
+                editor_state = st.session_state.get(editor_key)
+                df_base = st.session_state[state_key(table_name)].copy()
+
+                if editor_state is not None and isinstance(editor_state, dict):
+                    edited_rows = editor_state.get("edited_rows", {})
+                    added_rows  = editor_state.get("added_rows", [])
+                    deleted_rows = editor_state.get("deleted_rows", [])
+
+                    # Aplicăm modificările pe rândurile existente
+                    for idx_str, changes in edited_rows.items():
+                        idx = int(idx_str)
+                        if idx < len(df_base):
+                            for col, val in changes.items():
+                                df_base.at[df_base.index[idx], col] = val
+
+                    # Adăugăm rânduri noi
+                    for new_row in added_rows:
+                        new_r = {c: None for c in df_base.columns}
+                        new_r.update(new_row)
+                        df_base = pd.concat([df_base, pd.DataFrame([new_r])], ignore_index=True)
+
+                    # Ștergem rândurile marcate
+                    if deleted_rows:
+                        df_base = df_base.drop(index=[i for i in deleted_rows if i < len(df_base)]).reset_index(drop=True)
+
+                    df_edit_visible = df_base
+                else:
+                    df_edit_visible = edited_data.get(table_name, df_base)
+
+                df_raw_original = st.session_state[state_key_raw(table_name)]
+
                 if df_edit_visible is None or len(df_edit_visible) == 0:
                     continue
 
