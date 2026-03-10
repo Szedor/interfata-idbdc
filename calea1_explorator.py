@@ -136,7 +136,7 @@ COL_LABELS = {
 COLS_HIDDEN_FISA = {
     "responsabil_idbdc", "observatii_idbdc",
     "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
-    "id_tehnic",
+    "nr_crt",
 }
 
 CARD_PRIORITY = [
