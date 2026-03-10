@@ -169,7 +169,7 @@ def porneste_motorul(supabase):
         """Păstrează toate câmpurile cu valoare, plus întotdeauna cod_identificare."""
         out = {}
         for k, v in (payload or {}).items():
-            if k == "id_tehnic":
+            if k == "nr_crt":
                 if v is None:
                     continue
                 if isinstance(v, str) and v.strip() == "":
@@ -575,8 +575,8 @@ def porneste_motorul(supabase):
     # ============================
 
     def _nomdet_detect_pk(cols: list[str]) -> str:
-        if "id_tehnic" in cols:
-            return "id_tehnic"
+        if "nr_crt" in cols:
+            return "nr_crt"
         return cols[0] if cols else ""
 
     def _nomdet_clean_payload(d: dict):
