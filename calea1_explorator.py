@@ -136,6 +136,7 @@ COL_LABELS = {
 COLS_HIDDEN_FISA = {
     "responsabil_idbdc", "observatii_idbdc",
     "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
+    "creat_de", "creat_la", "modificat_de", "modificat_la",
     "nr_crt",
 }
 
