@@ -59,8 +59,8 @@ TEXT_COL_CANDIDATES = [
     "descriere", "observatii", "cuvinte_cheie",
 ]
 
-YEAR_COL_CANDIDATES_CP  = ["an_referinta", "an_derulare", "data_incepere", "data_start", "data_inceput"]
-YEAR_COL_CANDIDATES_EV  = ["data_inceput", "data_eveniment", "data_start", "data"]
+YEAR_COL_CANDIDATES_CP  = ["an_referinta", "data_inceput"]
+YEAR_COL_CANDIDATES_EV  = ["data_inceput", "data_eveniment", "data"]
 YEAR_COL_CANDIDATES_PI  = ["data_oficiala_acordare", "data_acordare", "data"]
 
 # Toate tabelele base_*
@@ -1807,7 +1807,7 @@ def _render_ca_rezultate(supabase: Client):
         if c in available_cols:
             default_cols.append(c)
             break
-    for c in ["status_contract_proiect", "an_referinta", "data_incepere", "data_start"]:
+    for c in ["status_contract_proiect", "an_referinta", "data_inceput"]:
         if c in available_cols:
             default_cols.append(c)
             break
