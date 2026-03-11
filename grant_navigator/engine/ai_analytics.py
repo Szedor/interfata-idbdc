@@ -84,7 +84,14 @@ TABLES_WITH_DATES = [
     "base_proiecte_noneu",
 ]
 
-# Cuvinte cheie care indică întrebări despre perioade/durate
+# Câmpuri administrative — niciodată trimise la Claude ca context
+COLS_ADMIN_ONLY = {
+    "responsabil_idbdc", "observatii_idbdc",
+    "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
+    "creat_de", "creat_la", "modificat_de", "modificat_la",
+}
+
+
 DATE_KEYWORDS = [
     "activ", "active", "în derulare", "derulare", "implementare",
     "continuă", "continua", "anul curent", "anul viitor", "anul acesta",
@@ -219,15 +226,20 @@ def _detect_tables(question: str) -> list[str]:
 
 
 def _build_context(supabase: Client, tables: list[str]) -> str:
-    """Construiește contextul din datele reale."""
+    """Construiește contextul din datele reale, fără câmpuri administrative."""
     context_parts = []
     for table in tables:
         rows = safe_fetch(supabase, table, limit=200)
         if not rows:
             continue
+        # Eliminăm câmpurile administrative din fiecare rând
+        rows_clean = [
+            {k: v for k, v in r.items() if k not in COLS_ADMIN_ONLY}
+            for r in rows
+        ]
         label = table.replace("base_", "").replace("_", " ").upper()
-        context_parts.append(f"=== {label} ({len(rows)} înregistrări) ===")
-        context_parts.append(df_to_context(rows, max_rows=40))
+        context_parts.append(f"=== {label} ({len(rows_clean)} înregistrări) ===")
+        context_parts.append(df_to_context(rows_clean, max_rows=40))
     return "\n\n".join(context_parts) if context_parts else "(nicio dată relevantă găsită)"
 
 
