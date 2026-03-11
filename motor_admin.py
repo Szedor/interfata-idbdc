@@ -8,6 +8,15 @@ def porneste_motorul(supabase):
     # ============================
     # CONFIG
     # ============================
+    # Câmpuri vizibile și editabile DOAR de ADMIN
+    ADMIN_ONLY_COLS = {
+        "responsabil_idbdc", "observatii_idbdc",
+        "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
+        "creat_de", "creat_la", "modificat_de", "modificat_la",
+    }
+
+    is_admin = st.session_state.get("operator_rol") == "ADMIN"
+
     CONTROL_COLS = [
         "responsabil_idbdc",
         "observatii_idbdc",
@@ -133,7 +142,9 @@ def porneste_motorul(supabase):
         return base + "\n" + msg
 
     def hide_control_cols(df: pd.DataFrame) -> pd.DataFrame:
-        cols = [c for c in df.columns if c not in CONTROL_COLS]
+        if is_admin:
+            return df  # ADMIN vede toate coloanele
+        cols = [c for c in df.columns if c not in ADMIN_ONLY_COLS]
         return df[cols] if cols else df
 
     def merge_back_control_cols(df_edited: pd.DataFrame, df_original: pd.DataFrame) -> pd.DataFrame:
@@ -1067,8 +1078,8 @@ def porneste_motorul(supabase):
     # STATUS FIȘĂ
     # ============================
 
-    if len(base_full) > 0:
-        with st.expander("Status fișă", expanded=False):
+    if len(base_full) > 0 and st.session_state.get("operator_rol") == "ADMIN":
+        with st.expander("Status fișă (ADMIN)", expanded=False):
             r = base_full.iloc[0].to_dict()
             s1, s2, s3, s4, s5 = st.columns([1.2, 2.2, 1.0, 1.6, 1.0])
             with s1:
