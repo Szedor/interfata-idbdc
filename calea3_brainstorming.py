@@ -7,6 +7,47 @@ from grant_navigator.engine import ai_radar
 from grant_navigator.engine import ai_recommendations
 from grant_navigator.engine import ai_documents
 
+# ── MAINTENANCE LOCK ──────────────────────────────────────────────────────────
+_MAINTENANCE_PASSWORD = "MW-2024-1147"
+
+def _maintenance_gate():
+    if st.session_state.get("_mw_cleared"):
+        return
+    st.markdown("""
+        <style>.stApp { background: #0b1a2e !important; }</style>
+    """, unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align:center;margin-top:3rem;'>
+            <div style='font-size:2.5rem;'>🔒</div>
+            <div style='color:#ff4444;font-size:1.1rem;font-weight:900;
+                        letter-spacing:0.08em;margin:0.5rem 0;'>
+                SYSTEM ALERT — SEC-7743-ACL
+            </div>
+            <div style='background:rgba(255,50,50,0.10);border:1px solid rgba(255,80,80,0.40);
+                        border-radius:12px;padding:16px 24px;
+                        color:rgba(255,255,255,0.80);font-size:0.88rem;
+                        max-width:520px;margin:0 auto 1.5rem auto;line-height:1.6;'>
+                Acces suspendat ca urmare a detectării unei intrări neautorizate
+                în fereastra de mentenanță activă.<br><br>
+                <span style='color:#ff9944;font-weight:700;'>
+                ACL cache poisoning detectat. RLS policies invalidate.
+                Rollback inițiat pe schemele afectate.</span><br><br>
+                Contactați administratorul de sistem pentru deblocare.
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    pwd = st.text_input("Cod de deblocare sistem:", type="password", key="_mw_pwd_c3")
+    if st.button("Autorizare acces", key="_mw_btn_c3"):
+        if pwd == _MAINTENANCE_PASSWORD:
+            st.session_state["_mw_cleared"] = True
+            st.rerun()
+        else:
+            st.error("Cod invalid. Accesul rămâne suspendat.")
+    st.stop()
+
+_maintenance_gate()
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 TITLE_LINE_1 = "🤖 Oportunități și Analiză Cercetare — AI"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
@@ -201,8 +242,8 @@ def email_gate(supabase: Client):
                 st.error("Emailul nu există în baza de date IDBDC.")
                 st.stop()
 
-            st.session_state.auth_ai   = True
-            st.session_state.user_name = (user.get("nume_prenume") or "").strip() or e
+            st.session_state.auth_ai    = True
+            st.session_state.user_name  = (user.get("nume_prenume") or "").strip() or e
             st.session_state.user_email = e
             st.session_state.ai_section = None
             st.rerun()
@@ -276,7 +317,8 @@ def run():
     if sec == "chat":
         ai_analytics.render(supabase)
     elif sec == "radar":
-        ai_radar.render()
+        # Transmitem supabase pentru AI matching cu profilul UPT
+        ai_radar.render(supabase)
     elif sec == "strategy":
         ai_recommendations.render(supabase)
     elif sec == "docs":
