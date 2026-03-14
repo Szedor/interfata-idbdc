@@ -16,42 +16,139 @@ PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 # ── MAINTENANCE LOCK ──────────────────────────────────────────────────────────
 _MAINTENANCE_PASSWORD = "MW-2024-1147"
 
+# ── DATA ȚINTĂ LANSARE — modificați doar această linie ────────────────────────
+import datetime as _dt
+_LAUNCH_DATE = _dt.datetime(2026, 3, 25, 9, 0, 0)   # an, lună, zi, oră, min, sec
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
-    st.set_page_config(page_title="IDBDC – System Alert", layout="centered")
+    st.set_page_config(page_title="IDBDC – Curând disponibil", layout="centered")
+
+    now   = _dt.datetime.now()
+    delta = _LAUNCH_DATE - now
+    total_secs = max(int(delta.total_seconds()), 0)
+    days    = total_secs // 86400
+    hours   = (total_secs % 86400) // 3600
+    minutes = (total_secs % 3600) // 60
+    seconds = total_secs % 60
+
     st.markdown("""
         <style>
-        .stApp { background: #0b1a2e !important; }
+        .stApp { background: #06111f !important; }
+        button[kind="primary"], .stButton > button {
+            background: #1a4a8a !important;
+            color: #fff !important;
+            border: none !important;
+            border-radius: 8px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
-    st.markdown("""
-        <div style='text-align:center;margin-top:3rem;'>
-            <div style='font-size:2.5rem;'>🔒</div>
-            <div style='color:#ff4444;font-size:1.1rem;font-weight:900;
-                        letter-spacing:0.08em;margin:0.5rem 0;'>
-                SYSTEM ALERT — SEC-7743-ACL
+
+    st.markdown(f"""
+        <div style='text-align:center; margin-top:2.5rem; font-family:sans-serif;'>
+
+            <!-- Logo / titlu -->
+            <div style='font-size:2.8rem; margin-bottom:0.3rem;'>🔬</div>
+            <div style='color:#e8f0ff; font-size:1.25rem; font-weight:700;
+                        letter-spacing:0.04em; margin-bottom:0.2rem;'>
+                IDBDC — UPT
             </div>
-            <div style='background:rgba(255,50,50,0.10);border:1px solid rgba(255,80,80,0.40);
-                        border-radius:12px;padding:16px 24px;
-                        color:rgba(255,255,255,0.80);font-size:0.88rem;
-                        max-width:520px;margin:0 auto 1.5rem auto;line-height:1.6;'>
-                Acces suspendat ca urmare a detectării unei intrări neautorizate
-                în fereastra de mentenanță activă.<br><br>
-                <span style='color:#ff9944;font-weight:700;'>
-                ACL cache poisoning detectat. RLS policies invalidate.
-                Rollback inițiat pe schemele afectate.</span><br><br>
-                Contactați administratorul de sistem pentru deblocare.
+            <div style='color:#7fa8d8; font-size:0.82rem; margin-bottom:2rem;
+                        letter-spacing:0.06em; text-transform:uppercase;'>
+                Departamentul Cercetare · Dezvoltare · Inovare
             </div>
+
+            <!-- Card mesaj -->
+            <div style='background:rgba(26,74,138,0.18); border:1px solid rgba(100,160,255,0.25);
+                        border-radius:16px; padding:24px 32px;
+                        max-width:520px; margin:0 auto 2.2rem auto; line-height:1.7;'>
+                <div style='color:#c8deff; font-size:1.0rem; font-weight:600; margin-bottom:0.6rem;'>
+                    ⚙️ Platformă în pregătire finală
+                </div>
+                <div style='color:rgba(200,222,255,0.75); font-size:0.88rem;'>
+                    Echipa IDBDC finalizează încărcarea bazelor de date și ultimele ajustări.<br>
+                    Platforma va fi disponibilă integral la data afișată mai jos.<br><br>
+                    <span style='color:#90c0ff;'>
+                        Vă mulțumim pentru răbdare!
+                    </span>
+                </div>
+            </div>
+
+            <!-- Countdown -->
+            <div style='display:flex; justify-content:center; gap:16px; margin-bottom:2rem;
+                        flex-wrap:wrap;'>
+                <div style='background:rgba(255,255,255,0.06); border:1px solid rgba(100,160,255,0.20);
+                            border-radius:12px; padding:14px 20px; min-width:78px;'>
+                    <div id='cd-days' style='color:#60aaff; font-size:2.2rem; font-weight:800;
+                                line-height:1;'>{days:02d}</div>
+                    <div style='color:#7fa8d8; font-size:0.70rem; letter-spacing:0.08em;
+                                margin-top:4px; text-transform:uppercase;'>Zile</div>
+                </div>
+                <div style='background:rgba(255,255,255,0.06); border:1px solid rgba(100,160,255,0.20);
+                            border-radius:12px; padding:14px 20px; min-width:78px;'>
+                    <div id='cd-hours' style='color:#60aaff; font-size:2.2rem; font-weight:800;
+                                line-height:1;'>{hours:02d}</div>
+                    <div style='color:#7fa8d8; font-size:0.70rem; letter-spacing:0.08em;
+                                margin-top:4px; text-transform:uppercase;'>Ore</div>
+                </div>
+                <div style='background:rgba(255,255,255,0.06); border:1px solid rgba(100,160,255,0.20);
+                            border-radius:12px; padding:14px 20px; min-width:78px;'>
+                    <div id='cd-min' style='color:#60aaff; font-size:2.2rem; font-weight:800;
+                                line-height:1;'>{minutes:02d}</div>
+                    <div style='color:#7fa8d8; font-size:0.70rem; letter-spacing:0.08em;
+                                margin-top:4px; text-transform:uppercase;'>Minute</div>
+                </div>
+                <div style='background:rgba(255,255,255,0.06); border:1px solid rgba(100,160,255,0.20);
+                            border-radius:12px; padding:14px 20px; min-width:78px;'>
+                    <div id='cd-sec' style='color:#f0c060; font-size:2.2rem; font-weight:800;
+                                line-height:1;'>{seconds:02d}</div>
+                    <div style='color:#7fa8d8; font-size:0.70rem; letter-spacing:0.08em;
+                                margin-top:4px; text-transform:uppercase;'>Secunde</div>
+                </div>
+            </div>
+
+            <!-- Data țintă -->
+            <div style='color:rgba(140,180,255,0.55); font-size:0.78rem; margin-bottom:2rem;'>
+                Data estimată lansare:
+                <strong style='color:rgba(160,200,255,0.80);'>
+                    {_LAUNCH_DATE.strftime("%d %B %Y, ora %H:%M")}
+                </strong>
+            </div>
+
         </div>
+
+        <script>
+        (function() {{
+            var target = new Date("{_LAUNCH_DATE.strftime('%Y-%m-%dT%H:%M:%S')}").getTime();
+            function tick() {{
+                var now  = Date.now();
+                var diff = Math.max(0, Math.floor((target - now) / 1000));
+                var d = Math.floor(diff / 86400);
+                var h = Math.floor((diff % 86400) / 3600);
+                var m = Math.floor((diff % 3600) / 60);
+                var s = diff % 60;
+                var pad = function(n) {{ return n < 10 ? '0' + n : '' + n; }};
+                var el;
+                if ((el = document.getElementById('cd-days')))  el.textContent = pad(d);
+                if ((el = document.getElementById('cd-hours'))) el.textContent = pad(h);
+                if ((el = document.getElementById('cd-min')))   el.textContent = pad(m);
+                if ((el = document.getElementById('cd-sec')))   el.textContent = pad(s);
+            }}
+            setInterval(tick, 1000);
+            tick();
+        }})();
+        </script>
     """, unsafe_allow_html=True)
-    pwd = st.text_input("Cod de deblocare sistem:", type="password", key="_mw_pwd_c1")
+
+    pwd = st.text_input("Cod acces anticipat:", type="password", key="_mw_pwd_c1")
     if st.button("Autorizare acces", key="_mw_btn_c1"):
         if pwd == _MAINTENANCE_PASSWORD:
             st.session_state["_mw_cleared"] = True
             st.rerun()
         else:
-            st.error("Cod invalid. Accesul rămâne suspendat.")
+            st.error("Cod incorect.")
     st.stop()
 
 _maintenance_gate()
@@ -133,14 +230,14 @@ COM_TABLES = {
 
 COL_LABELS = {
     "abreviere_domeniu_fdi": "DOMENIUL FDI",
-    "acronim_contracte": "ACRONIM TIP PROIECTE",
+    "acronim_tip_contract": "ACRONIM TIP CONTRACT",
     "acronim_contracte_proiecte": "TIPUL DE CONTRACT SAU PROIECT",
     "acronim_departament": "ACRONIM DEPARTAMENT",
     "acronim_functie_upt": "ABREVIERE FUNCTIE UPT",
-    "acronim_proiect": "ACRONIM TIP PROIECTE",
-    "acronim_proiecte": "ACRONIM TIP PROIECTE",
+    "acronim_proiect": "ACRONIM PROIECT",
+    "acronim_tip_proiect": "ACRONIM TIP PROIECT",
     "acronim_prop_intelect": "FORME DE PROTECTIE A PROPRIETATII INDUSTRIALE",
-    "activitati_proiect": "ACTIVIATI",
+    "activitati_proiect": "ACTIVITATI",
     "an_referinta": "ANUL DE REFERINTA",
     "apel_pentru_propuneri": "APELUL PENTRU PROPUNERI",
     "autori": "AUTORI",
@@ -200,7 +297,7 @@ COL_LABELS = {
     "format_eveniment": "FORMATUL EVENIMENTULUI STIINTIFIC",
     "functia_specifica": "ROLUL IN CONTRACT/PROIECT",
     "functie_upt": "ABREVIERE FUNCTIE UPT",
-    "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA0",
+    "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA)",
     "institutii_organizare": "INSTITUTIILE ORGANIZATOARE",
     "interval_finantare": "TOTAL PROIECTE FINANTATE",
     "link_espacenet": "LINK ESPACENET",
@@ -266,6 +363,7 @@ CARD_PRIORITY = [
     "titlul_proiect", "titlu_proiect", "titlu", "titlu_eveniment", "titlu_lucrare",
     "denumire", "denumire_proiect", "obiect_contract",
     "acronim", "acronim_proiect", "acronim_contracte_proiecte",
+    "acronim_tip_contract", "acronim_tip_proiect",
     "denumire_categorie", "status_contract_proiect",
     "finantator", "coordonator", "director_proiect",
     "an", "an_referinta", "an_inceput", "an_sfarsit",
@@ -291,8 +389,29 @@ TABLE_LABELS = {
     "base_prop_intelect":           "💡 Proprietate Intelectuală",
 }
 
+# ── ETICHETE PER TABEL (suprascriu COL_LABELS global doar unde diferă) ────────
+COL_LABELS_PER_TABLE = {
+    # ── Contracte → TIPUL DE CONTRACT ─────────────────────────────────────────
+    "base_contracte_cep":      {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
+    "base_contracte_speciale": {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
+    "base_contracte_terti":    {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
+    # ── Proiecte → TIPUL DE PROIECT ───────────────────────────────────────────
+    "base_proiecte_fdi":            {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
+    "base_proiecte_internationale": {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
+    "base_proiecte_interreg":       {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
+    "base_proiecte_noneu":          {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
+    "base_proiecte_pncdi":          {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
+    "base_proiecte_pnrr":           {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
+    # ── Nomenclatoare ─────────────────────────────────────────────────────────
+    "nom_proiecte": {"denumire_completa": "DENUMIRE TIP PROIECTE"},
+}
+# ─────────────────────────────────────────────────────────────────────────────
 
-def _col_label(col: str) -> str:
+
+def _col_label(col: str, table: str = None) -> str:
+    if table and table in COL_LABELS_PER_TABLE:
+        if col in COL_LABELS_PER_TABLE[table]:
+            return COL_LABELS_PER_TABLE[table][col]
     return COL_LABELS.get(col, col.replace("_", " ").capitalize())
 
 
@@ -1384,9 +1503,15 @@ def _count_results_estimate(supabase: Client, tables: list[str], criteriu: str,
     return total
 
 
-def _apply_col_labels_and_sursa(df: pd.DataFrame) -> pd.DataFrame:
+def _apply_col_labels_and_sursa(df: pd.DataFrame, table: str = None) -> pd.DataFrame:
     """Aplică etichete frumoase coloanelor și înlocuiește _sursa cu label din TABLE_LABELS."""
     df = df.copy()
+
+    # Detectează tabelul din coloana _sursa dacă nu e furnizat explicit
+    if table is None and "_sursa" in df.columns:
+        valori_sursa = df["_sursa"].dropna().unique()
+        if len(valori_sursa) == 1:
+            table = valori_sursa[0]
 
     # Înlocuiește valoarea _sursa cu eticheta frumoasă și mută coloana prima
     if "_sursa" in df.columns:
@@ -1394,9 +1519,9 @@ def _apply_col_labels_and_sursa(df: pd.DataFrame) -> pd.DataFrame:
         cols = ["_sursa"] + [c for c in df.columns if c != "_sursa"]
         df = df[cols]
 
-    # Redenumește coloanele cu etichete din COL_LABELS
+    # Redenumește coloanele cu etichete din COL_LABELS (cu suport per-tabel)
     df.columns = [
-        "Categorie" if c == "_sursa" else _col_label(c)
+        "Categorie" if c == "_sursa" else _col_label(c, table)
         for c in df.columns
     ]
 
