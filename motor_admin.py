@@ -979,54 +979,7 @@ def porneste_motorul(supabase):
 
     base_full = st.session_state[state_key_raw(tabela_baza)]
 
-    # ============================
-    # BLOCARE DUPĂ VALIDARE
-    # ============================
-
-    already_valid = False
-    if len(base_full) > 0 and "validat_idbdc" in base_full.columns:
-        try:
-            already_valid = bool(base_full.loc[0, "validat_idbdc"])
-        except Exception:
-            already_valid = False
-
-    # Cheia pentru starea toggle-ului în session_state
-    toggle_key = f"toggle_deblocat_{cod}"
-
-    # Dacă fișa tocmai a fost validată (sau e deja validată), implicitul toggle-ului e OFF (blocat)
-    # Utilizatorul poate muta manual pe ON (deblocat) dacă vrea să editeze după validare
-    if toggle_key not in st.session_state:
-        # Dacă e validată → implicit blocat (False = blocat)
-        st.session_state[toggle_key] = not already_valid if already_valid else True
-
-    # Toggle: OFF = Fișa este blocată | ON = Fișa este deblocată
-    # Nu folosim value= — starea e controlată exclusiv prin session_state[toggle_key]
-    deblocat = st.toggle(
-        "🔓 Fișa este deblocată" if st.session_state[toggle_key] else "🔒 Fișa este blocată",
-        key=toggle_key,
-        help="OFF = Fișa este blocată (doar citire). ON = Fișa este deblocată (editare activă).",
-    )
-
-    editing_blocked = not deblocat
-
-    if already_valid and deblocat:
-        st.markdown(
-            "<div style='background:rgba(255,200,50,0.18);border:1px solid rgba(255,200,50,0.55);"
-            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
-            "<span style='color:#ffe066;font-weight:700;font-size:0.97rem;'>"
-            "⚠️ Fișa a fost validată. Editarea este activă — modificările vor anula validarea anterioară."
-            "</span></div>",
-            unsafe_allow_html=True,
-        )
-    elif already_valid and not deblocat:
-        st.markdown(
-            "<div style='background:rgba(50,200,100,0.13);border:1px solid rgba(50,200,100,0.40);"
-            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
-            "<span style='color:#80ffb0;font-weight:700;font-size:0.97rem;'>"
-            "✅ Fișa este validată și blocată. Mută toggle-ul pe ON pentru a edita."
-            "</span></div>",
-            unsafe_allow_html=True,
-        )
+    editing_blocked = False
 
     # ============================
     # EDITOR ECHIPA — doua zone separate
@@ -1367,8 +1320,6 @@ def porneste_motorul(supabase):
         try:
             ok, msg = direct_validate_all_tables(cod, table_names, operator)
             if ok:
-                # Blocare automată după validare reușită
-                st.session_state[toggle_key] = False
                 st.session_state["admin_msg"] = ("success", "✅ Fișa a fost validată")
             else:
                 st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi validată: {msg}")
