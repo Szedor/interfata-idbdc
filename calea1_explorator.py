@@ -133,14 +133,14 @@ COM_TABLES = {
 
 COL_LABELS = {
     "abreviere_domeniu_fdi": "DOMENIUL FDI",
-    "acronim_tip_contract": "ACRONIM TIP CONTRACT",
+    "acronim_contracte": "ACRONIM TIP PROIECTE",
     "acronim_contracte_proiecte": "TIPUL DE CONTRACT SAU PROIECT",
     "acronim_departament": "ACRONIM DEPARTAMENT",
     "acronim_functie_upt": "ABREVIERE FUNCTIE UPT",
-    "acronim_proiect": "ACRONIM PROIECT",
-    "acronim_tip_proiect": "ACRONIM TIP PROIECT",
+    "acronim_proiect": "ACRONIM TIP PROIECTE",
+    "acronim_proiecte": "ACRONIM TIP PROIECTE",
     "acronim_prop_intelect": "FORME DE PROTECTIE A PROPRIETATII INDUSTRIALE",
-    "activitati_proiect": "ACTIVITATI",
+    "activitati_proiect": "ACTIVIATI",
     "an_referinta": "ANUL DE REFERINTA",
     "apel_pentru_propuneri": "APELUL PENTRU PROPUNERI",
     "autori": "AUTORI",
@@ -200,7 +200,7 @@ COL_LABELS = {
     "format_eveniment": "FORMATUL EVENIMENTULUI STIINTIFIC",
     "functia_specifica": "ROLUL IN CONTRACT/PROIECT",
     "functie_upt": "ABREVIERE FUNCTIE UPT",
-    "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA)",
+    "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA0",
     "institutii_organizare": "INSTITUTIILE ORGANIZATOARE",
     "interval_finantare": "TOTAL PROIECTE FINANTATE",
     "link_espacenet": "LINK ESPACENET",
@@ -292,21 +292,21 @@ TABLE_LABELS = {
 }
 
 
-# ── ETICHETE PER TABEL (suprascriu COL_LABELS global doar unde diferă) ────────
+# ── ETICHETE PER TABEL ───────────────────────────────────────────────────────
 COL_LABELS_PER_TABLE = {
-    # ── Contracte → TIPUL DE CONTRACT ─────────────────────────────────────────
-    "base_contracte_cep":      {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
-    "base_contracte_speciale": {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
-    "base_contracte_terti":    {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
-    # ── Proiecte → TIPUL DE PROIECT ───────────────────────────────────────────
-    "base_proiecte_fdi":            {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_internationale": {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_interreg":       {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_noneu":          {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_pncdi":          {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_pnrr":           {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    # ── Nomenclatoare ─────────────────────────────────────────────────────────
-    "nom_proiecte":  {"denumire_completa": "DENUMIRE TIP PROIECTE"},
+    "base_contracte_cep": {
+        "cod_identificare":       "NR.CONTRACT",
+        "status_contract_proiect": "STATUS CONTRACT",
+        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+    },
+    "base_contracte_speciale": {
+        "cod_identificare":       "NR.CONTRACT",
+        "status_contract_proiect": "STATUS CONTRACT",
+    },
+    "base_contracte_terti": {
+        "cod_identificare":       "NR.CONTRACT",
+        "status_contract_proiect": "STATUS CONTRACT",
+    },
 }
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1410,11 +1410,11 @@ def _apply_col_labels_and_sursa(df: pd.DataFrame, table: str = None) -> pd.DataF
     """Aplică etichete frumoase coloanelor și înlocuiește _sursa cu label din TABLE_LABELS."""
     df = df.copy()
 
-    # Detectează tabelul din coloana _sursa dacă nu e furnizat explicit
+    # Detectează tabelul din _sursa dacă nu e dat explicit
     if table is None and "_sursa" in df.columns:
-        valori_sursa = df["_sursa"].dropna().unique()
-        if len(valori_sursa) == 1:
-            table = valori_sursa[0]
+        valori = df["_sursa"].dropna().unique()
+        if len(valori) == 1:
+            table = valori[0]
 
     # Înlocuiește valoarea _sursa cu eticheta frumoasă și mută coloana prima
     if "_sursa" in df.columns:
@@ -1422,7 +1422,7 @@ def _apply_col_labels_and_sursa(df: pd.DataFrame, table: str = None) -> pd.DataF
         cols = ["_sursa"] + [c for c in df.columns if c != "_sursa"]
         df = df[cols]
 
-    # Redenumește coloanele cu etichete din COL_LABELS (cu suport per-tabel)
+    # Redenumește coloanele cu etichete din COL_LABELS
     df.columns = [
         "Categorie" if c == "_sursa" else _col_label(c, table)
         for c in df.columns
