@@ -868,7 +868,7 @@ def porneste_motorul(supabase):
     with c1:
         cat_admin = st.selectbox(
             "Categoria de date",
-            ["", "Contracte", "Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"],
+            ["", "Contracte", "Proiecte", "Evenimente stiintifice", "Proprietate industriala"],
         )
     with c2:
         if cat_admin == "Contracte":
@@ -900,7 +900,7 @@ def porneste_motorul(supabase):
         tabela_baza = map_baze.get(tip_admin)
     elif cat_admin == "Evenimente stiintifice":
         tabela_baza = "base_evenimente_stiintifice"
-    elif cat_admin == "Proprietate intelectuala":
+    elif cat_admin == "Proprietate industriala":
         tabela_baza = "base_prop_intelect"
     else:
         tabela_baza = None
@@ -985,7 +985,19 @@ def porneste_motorul(supabase):
     # EDITOR ECHIPA — doua zone separate
     # ============================
 
-    def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name):
+    def _get_echipa_labels(tabela_baza: str) -> tuple[str, str, bool]:
+        """Returnează (titlu_zona1, titlu_zona2, are_zona1)."""
+        if "contracte" in tabela_baza:
+            return "Responsabil contract", "Membrii echipă de cercetare", True
+        elif tabela_baza in ("base_proiecte_pncdi", "base_proiecte_pnrr", "base_proiecte_fdi"):
+            return "Director proiect", "Membrii echipă de proiect", True
+        elif tabela_baza in ("base_proiecte_internationale", "base_proiecte_interreg", "base_proiecte_noneu"):
+            return "Manager proiect", "Membrii echipă de proiect", True
+        else:
+            # Evenimente stiintifice, Proprietate industriala
+            return "Persoana de contact", "", False
+
+    def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name, tabela_baza=""):
         """
         Randare editor echipa in doua zone:
         - Zona 1 (sus): reprezentanti IDBDC — editor mic fix, proeminent
@@ -993,6 +1005,9 @@ def porneste_motorul(supabase):
         Ambele zone folosesc dropdown pentru nume_prenume.
         La salvare, cele doua zone se reunesc intr-un singur DataFrame.
         """
+
+        # Titluri dinamice
+        titlu_z1, titlu_z2, are_zona1 = _get_echipa_labels(tabela_baza)
 
         # Incarcam lista de persoane pentru dropdown
         persoane_disponibile = load_dropdown_options("det_resurse_umane", "nume_prenume")
@@ -1008,7 +1023,7 @@ def porneste_motorul(supabase):
             )
 
         # Impartim df in reprezentanti si restul
-        if "reprezinta_idbdc" in df_show.columns:
+        if are_zona1 and "reprezinta_idbdc" in df_show.columns:
             mask_rep = df_show["reprezinta_idbdc"].apply(
                 lambda v: v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
             )
@@ -1018,36 +1033,62 @@ def porneste_motorul(supabase):
             df_rep  = pd.DataFrame(columns=df_show.columns)
             df_rest = df_show.copy()
 
-        # ── ZONA 1 — Reprezentanti IDBDC ──────────────────────────────────
-        st.markdown(
-            "<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
-            "border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            "<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
-            "⭐ Reprezentanți IDBDC</span> "
-            "<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>(director / responsabil proiect)</span>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        # ── ZONA 1 — Responsabil / Director / Manager / Persoana de contact ─
+        if are_zona1:
+            st.markdown(
+                f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
+                f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
+                f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>⭐ {titlu_z1}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            key_rep = f"editor_echipa_rep_{cod}"
+            edited_rep = st.data_editor(
+                df_rep,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="dynamic",
+                column_config=col_cfg_echipa,
+                disabled=editing_blocked,
+                key=key_rep,
+                height=min(200, 60 + max(1, len(df_rep)) * 38),
+            )
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        else:
+            # Cazul fara zona1 — toti membrii sunt "Persoana de contact"
+            st.markdown(
+                f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
+                f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
+                f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>⭐ {titlu_z1}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            key_rep = f"editor_echipa_rep_{cod}"
+            edited_rep = st.data_editor(
+                df_show,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="dynamic",
+                column_config=col_cfg_echipa,
+                disabled=editing_blocked,
+                key=key_rep,
+                height=min(300, 60 + max(1, len(df_show)) * 38),
+            )
+            # completam cod_identificare
+            if "cod_identificare" in edited_rep.columns:
+                edited_rep = edited_rep.copy()
+                edited_rep["cod_identificare"] = edited_rep["cod_identificare"].fillna(cod)
+                edited_rep["cod_identificare"] = edited_rep["cod_identificare"].astype(str).replace("nan", cod)
+            edited_data[table_name] = edited_rep
+            return
 
-        key_rep = f"editor_echipa_rep_{cod}"
-        edited_rep = st.data_editor(
-            df_rep,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="dynamic",
-            column_config=col_cfg_echipa,
-            disabled=editing_blocked,
-            key=key_rep,
-            height=min(200, 60 + max(1, len(df_rep)) * 38),
-        )
-
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-        # ── ZONA 2 — Restul echipei ────────────────────────────────────────
+        # ── ZONA 2 — Membrii echipă ────────────────────────────────────────
         nr_rest = len(df_rest)
         st.markdown(
             f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
-            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
-            f"👥 Membri echipă</span> "
+            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
+            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
+            f"👥 {titlu_z2}</span> "
             f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_rest} persoane</span>"
             f"</div>",
             unsafe_allow_html=True,
@@ -1092,7 +1133,7 @@ def porneste_motorul(supabase):
 
         df_reunited = pd.concat([edited_rep, edited_rest], ignore_index=True)
 
-        # Completam cod_identificare pentru randurile noi
+        # Completam cod_identificare pentru toate randurile
         if "cod_identificare" in df_reunited.columns:
             df_reunited["cod_identificare"] = df_reunited["cod_identificare"].fillna(cod)
             df_reunited["cod_identificare"] = df_reunited["cod_identificare"].astype(str).replace("nan", cod)
@@ -1131,7 +1172,7 @@ def porneste_motorul(supabase):
             if table_name == "com_echipe_proiect":
                 _render_echipa_editor(
                     df_show, col_cfg, cod, editing_blocked,
-                    edited_data, state_key, table_name,
+                    edited_data, state_key, table_name, tabela_baza,
                 )
                 continue
 
