@@ -1054,31 +1054,6 @@ def render_fisa_completa(supabase: Client):
         validat = rows_badge[0].get("validat_idbdc")
         status_confirmare = rows_badge[0].get("status_confirmare")
 
-    if validat is True or str(validat).strip().upper() in ("TRUE", "DA", "1"):
-        badge_html = (
-            "<div style='display:inline-block;background:rgba(30,200,90,0.18);"
-            "border:1.5px solid rgba(30,200,90,0.60);border-radius:20px;"
-            "padding:4px 16px;margin-bottom:10px;'>"
-            "<span style='color:#80ffb0;font-weight:800;font-size:0.97rem;'>✅ Validat</span></div>"
-        )
-    else:
-        in_lucru = status_confirmare is True or str(status_confirmare).strip().upper() in ("TRUE", "DA", "1")
-        if in_lucru:
-            badge_html = (
-                "<div style='display:inline-block;background:rgba(255,180,0,0.15);"
-                "border:1.5px solid rgba(255,180,0,0.50);border-radius:20px;"
-                "padding:4px 16px;margin-bottom:10px;'>"
-                "<span style='color:#ffe066;font-weight:800;font-size:0.97rem;'>⏳ În lucru</span></div>"
-            )
-        else:
-            badge_html = (
-                "<div style='display:inline-block;background:rgba(255,255,255,0.08);"
-                "border:1.5px solid rgba(255,255,255,0.25);border-radius:20px;"
-                "padding:4px 16px;margin-bottom:10px;'>"
-                "<span style='color:rgba(255,255,255,0.65);font-weight:800;font-size:0.97rem;'>📝 Neconfirmat</span></div>"
-            )
-
-    st.markdown(badge_html, unsafe_allow_html=True)
     st.markdown(
         f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
         f"letter-spacing:0.03em;margin-bottom:1rem;'>"
@@ -1098,19 +1073,17 @@ def render_fisa_completa(supabase: Client):
     # ── TAB GENERALE ──────────────────────────────────────────────────────
     with tab_gen:
         pin_key = f"fisa_pin_{cod}_generale"
+        rows_gen = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
+        if not rows_gen:
+            st.info("Nu există informații generale pentru acest contract/proiect.")
+        else:
+            for row in rows_gen:
+                _render_info_card(row)
         st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
-        if st.session_state[pin_key] or True:  # intotdeauna afisam cand suntem in tab
-            rows_gen = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
-            if not rows_gen:
-                st.info("Nu există informații generale pentru acest contract/proiect.")
-            else:
-                for row in rows_gen:
-                    _render_info_card(row)
 
     # ── TAB FINANCIAR ─────────────────────────────────────────────────────
     with tab_fin:
         pin_key = f"fisa_pin_{cod}_financiar"
-        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
         rows_fin = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
         if not rows_fin:
             st.info("Nu există date financiare pentru acest contract/proiect.")
@@ -1120,21 +1093,21 @@ def render_fisa_completa(supabase: Client):
             df_fin.columns = [_col_label(c, "com_date_financiare") for c in df_fin.columns]
             st.dataframe(df_fin, use_container_width=True, hide_index=True,
                          height=min(400, 60 + len(df_fin) * 35))
+        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── TAB ECHIPĂ ────────────────────────────────────────────────────────
     with tab_ech:
         pin_key = f"fisa_pin_{cod}_echipa"
-        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
         rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
         if not rows_ech:
-            st.info("Nu există membri echipă pentru acest contract/proiect.")
+            st.info("Nu există membri echipă pentru acest contract.")
         else:
             _render_echipa_compact(rows_ech)
+        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── TAB TEHNIC ────────────────────────────────────────────────────────
     with tab_teh:
         pin_key = f"fisa_pin_{cod}_tehnic"
-        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
         rows_teh = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
         if not rows_teh:
             st.info("Nu există aspecte tehnice pentru acest contract/proiect.")
@@ -1144,6 +1117,7 @@ def render_fisa_completa(supabase: Client):
             df_teh.columns = [_col_label(c, "com_aspecte_tehnice") for c in df_teh.columns]
             st.dataframe(df_teh, use_container_width=True, hide_index=True,
                          height=min(400, 60 + len(df_teh) * 35))
+        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── Secțiuni pinuite afișate permanent sub tab-uri ────────────────────
     pinuite = []
