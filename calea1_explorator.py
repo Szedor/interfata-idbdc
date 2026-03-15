@@ -1061,12 +1061,6 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
-    # ── Stare persistentă pentru casete "afișare permanentă" ─────────────
-    for tab_key in ["generale", "financiar", "echipa", "tehnic"]:
-        sk = f"fisa_pin_{cod}_{tab_key}"
-        if sk not in st.session_state:
-            st.session_state[sk] = False
-
     # ── 4 Tab-uri ─────────────────────────────────────────────────────────
     tab_gen, tab_fin, tab_ech, tab_teh = st.tabs(["Generale", "Financiar", "Echipă", "Tehnic"])
 
@@ -1079,7 +1073,6 @@ def render_fisa_completa(supabase: Client):
         else:
             for row in rows_gen:
                 _render_info_card(row)
-        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── TAB FINANCIAR ─────────────────────────────────────────────────────
     with tab_fin:
@@ -1090,7 +1083,6 @@ def render_fisa_completa(supabase: Client):
         else:
             for row in rows_fin:
                 _render_info_card(row)
-        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── TAB ECHIPĂ ────────────────────────────────────────────────────────
     with tab_ech:
@@ -1100,7 +1092,6 @@ def render_fisa_completa(supabase: Client):
             st.info("Nu există membri echipă pentru acest contract.")
         else:
             _render_echipa_compact(rows_ech)
-        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── TAB TEHNIC ────────────────────────────────────────────────────────
     with tab_teh:
@@ -1111,7 +1102,23 @@ def render_fisa_completa(supabase: Client):
         else:
             for row in rows_teh:
                 _render_info_card(row)
-        st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
+
+    # ── Casete "afișare permanentă" — după cele 4 tab-uri ────────────────
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:600;"
+        "margin-bottom:4px;'>📌 Bifează secțiunile pe care vrei să le vezi permanent:</div>",
+        unsafe_allow_html=True,
+    )
+    col_p1, col_p2, col_p3, col_p4, _ = st.columns([1, 1, 1, 1, 2])
+    with col_p1:
+        st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
+    with col_p2:
+        st.checkbox("Financiar", key=f"fisa_pin_{cod}_financiar")
+    with col_p3:
+        st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
+    with col_p4:
+        st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
 
     # ── Secțiuni pinuite afișate permanent sub tab-uri ────────────────────
     pinuite = []
