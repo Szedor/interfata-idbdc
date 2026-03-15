@@ -1114,7 +1114,7 @@ def render_fisa_completa(supabase: Client):
         else:
             df_fin = pd.DataFrame(rows)
             df_fin = df_fin[[c for c in df_fin.columns if c not in COLS_HIDDEN_FISA]]
-            df_fin.columns = [_col_label(c, "com_date_financiare") for c in df_fin.columns]
+            df_fin.columns = [_col_label(c) for c in df_fin.columns]
             st.dataframe(df_fin, use_container_width=True, hide_index=True,
                          height=min(400, 60 + len(df_fin) * 35))
 
@@ -1125,7 +1125,7 @@ def render_fisa_completa(supabase: Client):
         else:
             df_teh = pd.DataFrame(rows)
             df_teh = df_teh[[c for c in df_teh.columns if c not in COLS_HIDDEN_FISA]]
-            df_teh.columns = [_col_label(c, "com_aspecte_tehnice") for c in df_teh.columns]
+            df_teh.columns = [_col_label(c) for c in df_teh.columns]
             st.dataframe(df_teh, use_container_width=True, hide_index=True,
                          height=min(400, 60 + len(df_teh) * 35))
 
@@ -1149,7 +1149,7 @@ def render_fisa_completa(supabase: Client):
         if rows_exp:
             df_t = pd.DataFrame(rows_exp)
             df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
-            df_t.columns = [_col_label(c, t) for c in df_t.columns]
+            df_t.columns = [_col_label(c) for c in df_t.columns]
             export_frames[TABLE_LABELS.get(t, t)] = df_t
 
     for com_label, com_table in [
@@ -1160,14 +1160,14 @@ def render_fisa_completa(supabase: Client):
         if rows_exp:
             df_t = pd.DataFrame(rows_exp)
             df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
-            df_t.columns = [_col_label(c, com_table) for c in df_t.columns]
+            df_t.columns = [_col_label(c) for c in df_t.columns]
             export_frames[com_label] = df_t
 
     rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
     if rows_ech:
         df_ech = pd.DataFrame(rows_ech)
         df_ech = df_ech[[c for c in df_ech.columns if c not in COLS_HIDDEN_FISA]]
-        df_ech.columns = [_col_label(c, "com_echipe_proiect") for c in df_ech.columns]
+        df_ech.columns = [_col_label(c) for c in df_ech.columns]
         export_frames["👥 Echipă"] = df_ech
 
     ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
