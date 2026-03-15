@@ -1086,13 +1086,10 @@ def render_fisa_completa(supabase: Client):
         pin_key = f"fisa_pin_{cod}_financiar"
         rows_fin = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
         if not rows_fin:
-            st.info("Nu există date financiare pentru acest contract/proiect.")
+            st.info("Nu există date financiare pentru acest contract.")
         else:
-            df_fin = pd.DataFrame(rows_fin)
-            df_fin = df_fin[[c for c in df_fin.columns if c not in COLS_HIDDEN_FISA]]
-            df_fin.columns = [_col_label(c, "com_date_financiare") for c in df_fin.columns]
-            st.dataframe(df_fin, use_container_width=True, hide_index=True,
-                         height=min(400, 60 + len(df_fin) * 35))
+            for row in rows_fin:
+                _render_info_card(row)
         st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── TAB ECHIPĂ ────────────────────────────────────────────────────────
@@ -1110,13 +1107,10 @@ def render_fisa_completa(supabase: Client):
         pin_key = f"fisa_pin_{cod}_tehnic"
         rows_teh = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
         if not rows_teh:
-            st.info("Nu există aspecte tehnice pentru acest contract/proiect.")
+            st.info("Nu există aspecte tehnice pentru acest contract.")
         else:
-            df_teh = pd.DataFrame(rows_teh)
-            df_teh = df_teh[[c for c in df_teh.columns if c not in COLS_HIDDEN_FISA]]
-            df_teh.columns = [_col_label(c, "com_aspecte_tehnice") for c in df_teh.columns]
-            st.dataframe(df_teh, use_container_width=True, hide_index=True,
-                         height=min(400, 60 + len(df_teh) * 35))
+            for row in rows_teh:
+                _render_info_card(row)
         st.checkbox("Bifează pentru afișarea permanentă a informațiilor din această secțiune", key=pin_key)
 
     # ── Secțiuni pinuite afișate permanent sub tab-uri ────────────────────
@@ -1143,10 +1137,8 @@ def render_fisa_completa(supabase: Client):
             elif tab_key == "financiar":
                 rows = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
                 if rows:
-                    df = pd.DataFrame(rows)
-                    df = df[[c for c in df.columns if c not in COLS_HIDDEN_FISA]]
-                    df.columns = [_col_label(c, "com_date_financiare") for c in df.columns]
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    for row in rows:
+                        _render_info_card(row)
             elif tab_key == "echipa":
                 rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
                 if rows:
@@ -1154,10 +1146,8 @@ def render_fisa_completa(supabase: Client):
             elif tab_key == "tehnic":
                 rows = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
                 if rows:
-                    df = pd.DataFrame(rows)
-                    df = df[[c for c in df.columns if c not in COLS_HIDDEN_FISA]]
-                    df.columns = [_col_label(c, "com_aspecte_tehnice") for c in df.columns]
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    for row in rows:
+                        _render_info_card(row)
 
     # ── Export fișă ───────────────────────────────────────────────────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
