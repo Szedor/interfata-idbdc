@@ -87,7 +87,7 @@ CATEGORII = {
         "base_table": "base_evenimente_stiintifice",
         "tipuri": None,
     },
-    "Proprietate intelectuala": {
+    "Proprietate industriala": {
         "base_table": "base_prop_intelect",
         "tipuri": None,
     },
@@ -288,7 +288,7 @@ TABLE_LABELS = {
     "base_proiecte_interreg":       "🌍 Proiect INTERREG",
     "base_proiecte_noneu":          "🌍 Proiect NON-EU",
     "base_evenimente_stiintifice":  "🎓 Eveniment Științific",
-    "base_prop_intelect":           "💡 Proprietate Intelectuală",
+    "base_prop_intelect":           "💡 Proprietate Industrială",
 }
 
 
@@ -974,7 +974,7 @@ def make_printable_html(df: pd.DataFrame, title: str) -> str:
 def _get_year_candidates(categorie: str) -> list[str]:
     if categorie == "Evenimente stiintifice":
         return YEAR_COL_CANDIDATES_EV
-    elif categorie == "Proprietate intelectuala":
+    elif categorie == "Proprietate industriala":
         return YEAR_COL_CANDIDATES_PI
     else:
         return YEAR_COL_CANDIDATES_CP
@@ -1716,7 +1716,7 @@ def _build_filters(supabase: Client, categorie: str, prefix: str):
         with c5: result["fmt"]      = st.selectbox("Format", [""]+format_list, key=f"{prefix}_fmt")
         with c6: result["persoana"] = st.selectbox("Persoana contact", [""]+persoane, key=f"{prefix}_p")
 
-    elif categorie == "Proprietate intelectuala":
+    elif categorie == "Proprietate industriala":
         tip_pi_list = fetch_distinct_values(supabase, "nom_prop_intelect", "acronim_prop_intelect")
         dep_list    = fetch_distinct_values(supabase, "nom_departament", "acronim_departament")
         c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -1765,7 +1765,7 @@ def _apply_filters_to_query(q, cols: set, categorie: str, filters: dict, supabas
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
 
-    elif categorie == "Proprietate intelectuala":
+    elif categorie == "Proprietate industriala":
         tip_pi   = filters.get("tip_pi", "")
         dep      = filters.get("dep", "")
         persoana = filters.get("persoana", "")
