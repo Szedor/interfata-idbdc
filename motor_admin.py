@@ -1092,6 +1092,12 @@ def porneste_motorul(supabase):
 
         df_reunited = pd.concat([edited_rep, edited_rest], ignore_index=True)
 
+        # Completam cod_identificare pentru randurile noi
+        if "cod_identificare" in df_reunited.columns:
+            df_reunited["cod_identificare"] = df_reunited["cod_identificare"].fillna(cod)
+            df_reunited["cod_identificare"] = df_reunited["cod_identificare"].astype(str).replace("nan", cod)
+            df_reunited.loc[df_reunited["cod_identificare"].str.strip() == "", "cod_identificare"] = cod
+
         # Eliminam randuri fara nume (goale)
         if "nume_prenume" in df_reunited.columns:
             df_reunited = df_reunited[
