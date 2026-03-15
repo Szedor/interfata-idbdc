@@ -413,48 +413,48 @@ def porneste_motorul(supabase):
         DROPDOWN_MAP = {
             "base_contracte_cep": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_contracte_terti": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_contracte_speciale": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_fdi": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
                 "cod_domeniu_fdi": ("nom_domenii_fdi", "cod_domeniu_fdi"),
             },
             "base_proiecte_internationale": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_interreg": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_noneu": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_pncdi": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_pnrr": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_evenimente_stiintifice": {
@@ -516,10 +516,10 @@ def porneste_motorul(supabase):
             "data_sfarsit_valabilitate":  "📅 Data de sfarsit valabilitate",
             "data_apel":                  "📅 Data apelului",
             "abreviere_domeniu_fdi": "DOMENIUL FDI",
-            "acronim_tip_contract": "ACRONIM TIP CONTRACT",
-            "acronim_proiect": "ACRONIM PROIECT",
-            "acronim_tip_proiect": "ACRONIM TIP PROIECT",
-            "activitati_proiect": "ACTIVITATI",
+            "acronim_contracte": "ACRONIM TIP PROIECTE",
+            "acronim_proiect": "ACRONIM TIP PROIECTE",
+            "acronim_proiecte": "ACRONIM TIP PROIECTE",
+            "activitati_proiect": "ACTIVIATI",
             "an_referinta": "ANUL DE REFERINTA",
             "apel_pentru_propuneri": "APELUL PENTRU PROPUNERI",
             "autori": "AUTORI",
@@ -540,7 +540,6 @@ def porneste_motorul(supabase):
             "cost_total_proiect": "COST TOTAL PROIECT",
             "denumire_beneficiar": "DENUMIREA BENEFICIARULUI",
             "denumire_completa": "DENUMIRE TIP CONTRACT",
-            "acronim_contracte_proiecte": "TIPUL DE CONTRACT SAU PROIECT",
             "denumire_departament": "DENUMIRE DEPARTAMENT",
             "denumire_domeniu_fdi": "DENUMIREA DOMENIULUI FDI",
             "denumire_functie_upt": "DENUMIRE FUNCTIE UPT",
@@ -565,7 +564,7 @@ def porneste_motorul(supabase):
             "filtru_categorie": "FILTRU CATEGORIE",
             "filtru_proiect": "FILTRU PROIECT",
             "functia_specifica": "ROLUL IN CONTRACT/PROIECT",
-            "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA)",
+            "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA0",
             "institutii_organizare": "INSTITUTIILE ORGANIZATOARE",
             "interval_finantare": "TOTAL PROIECTE FINANTATE",
             "link_espacenet": "LINK ESPACENET",
@@ -614,7 +613,26 @@ def porneste_motorul(supabase):
             "website": "WEBSITE",
         }
 
-        def _col_label_admin(col: str) -> str:
+        COL_LABELS_ADMIN_PER_TABLE = {
+            "base_contracte_cep": {
+                "cod_identificare":        "NR.CONTRACT",
+                "status_contract_proiect": "STATUS CONTRACT",
+                "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+            },
+            "base_contracte_speciale": {
+                "cod_identificare":        "NR.CONTRACT",
+                "status_contract_proiect": "STATUS CONTRACT",
+            },
+            "base_contracte_terti": {
+                "cod_identificare":        "NR.CONTRACT",
+                "status_contract_proiect": "STATUS CONTRACT",
+            },
+        }
+
+        def _col_label_admin(col: str, table: str = None) -> str:
+            if table and table in COL_LABELS_ADMIN_PER_TABLE:
+                if col in COL_LABELS_ADMIN_PER_TABLE[table]:
+                    return COL_LABELS_ADMIN_PER_TABLE[table][col]
             return COL_LABELS_ADMIN.get(col, col.replace("_", " ").capitalize())
 
         rel = DROPDOWN_MAP.get(table_name, {})
@@ -658,7 +676,7 @@ def porneste_motorul(supabase):
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(
-                    label=_col_label_admin(c),
+                    label=_col_label_admin(c, table_name),
                     format="YYYY-MM-DD",
                     step=1,
                     help="📅 Click pentru a selecta data din calendar",
@@ -669,7 +687,7 @@ def porneste_motorul(supabase):
                 continue
             if is_year_col(c):
                 cfg[c] = st.column_config.NumberColumn(
-                    label=_col_label_admin(c),
+                    label=_col_label_admin(c, table_name),
                     min_value=1900,
                     max_value=2100,
                     step=1,
