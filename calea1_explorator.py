@@ -1061,49 +1061,7 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
-    # ── 4 Tab-uri ─────────────────────────────────────────────────────────
-    tab_gen, tab_fin, tab_ech, tab_teh = st.tabs(["Generale", "Financiar", "Echipă", "Tehnic"])
-
-    # ── TAB GENERALE ──────────────────────────────────────────────────────
-    with tab_gen:
-        pin_key = f"fisa_pin_{cod}_generale"
-        rows_gen = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
-        if not rows_gen:
-            st.info("Nu există informații generale pentru acest contract/proiect.")
-        else:
-            for row in rows_gen:
-                _render_info_card(row)
-
-    # ── TAB FINANCIAR ─────────────────────────────────────────────────────
-    with tab_fin:
-        pin_key = f"fisa_pin_{cod}_financiar"
-        rows_fin = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
-        if not rows_fin:
-            st.info("Nu există date financiare pentru acest contract.")
-        else:
-            for row in rows_fin:
-                _render_info_card(row)
-
-    # ── TAB ECHIPĂ ────────────────────────────────────────────────────────
-    with tab_ech:
-        pin_key = f"fisa_pin_{cod}_echipa"
-        rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
-        if not rows_ech:
-            st.info("Nu există membri echipă pentru acest contract.")
-        else:
-            _render_echipa_compact(rows_ech)
-
-    # ── TAB TEHNIC ────────────────────────────────────────────────────────
-    with tab_teh:
-        pin_key = f"fisa_pin_{cod}_tehnic"
-        rows_teh = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
-        if not rows_teh:
-            st.info("Nu există aspecte tehnice pentru acest contract.")
-        else:
-            for row in rows_teh:
-                _render_info_card(row)
-
-    # ── Casete pin — compact, sub tab-uri, pe un singur rând ─────────────
+    # ── Linie unică de control — fără tab-uri ────────────────────────────
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     _lbl, _p1, _p2, _p3, _p4, _ = st.columns([2.8, 1.0, 1.0, 1.0, 1.0, 3.2])
     with _lbl:
@@ -1113,49 +1071,76 @@ def render_fisa_completa(supabase: Client):
             unsafe_allow_html=True,
         )
     with _p1:
-        st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
+        pin_gen = st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
     with _p2:
-        st.checkbox("Financiar", key=f"fisa_pin_{cod}_financiar")
+        pin_fin = st.checkbox("Financiar", key=f"fisa_pin_{cod}_financiar")
     with _p3:
-        st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
+        pin_ech = st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
     with _p4:
-        st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
+        pin_teh = st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
 
-    # ── Secțiuni pinuite afișate permanent sub tab-uri ────────────────────
-    pinuite = []
-    for tab_key, tab_label in [("generale", "Generale"), ("financiar", "Financiar"),
-                                ("echipa", "Echipă"), ("tehnic", "Tehnic")]:
-        if st.session_state.get(f"fisa_pin_{cod}_{tab_key}", False):
-            pinuite.append((tab_key, tab_label))
-
-    if pinuite:
-        st.divider()
+    # ── Secțiuni afișate doar dacă sunt bifate ───────────────────────────
+    if not any([pin_gen, pin_fin, pin_ech, pin_teh]):
         st.markdown(
-            "<div style='color:rgba(255,255,255,0.75);font-size:0.90rem;font-weight:700;"
-            "margin-bottom:6px;'>📌 Secțiuni fixate</div>",
+            "<div style='color:rgba(255,255,255,0.35);font-size:0.82rem;"
+            "font-style:italic;margin-top:10px;'>Bifează o secțiune pentru a o afișa.</div>",
             unsafe_allow_html=True,
         )
-        for tab_key, tab_label in pinuite:
-            st.markdown(f"**{tab_label}**")
-            if tab_key == "generale":
-                rows = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
-                if rows:
-                    for row in rows:
-                        _render_info_card(row)
-            elif tab_key == "financiar":
-                rows = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
-                if rows:
-                    for row in rows:
-                        _render_info_card(row)
-            elif tab_key == "echipa":
-                rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
-                if rows:
-                    _render_echipa_compact(rows)
-            elif tab_key == "tehnic":
-                rows = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
-                if rows:
-                    for row in rows:
-                        _render_info_card(row)
+
+    if pin_gen:
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
+            "Generale</div>",
+            unsafe_allow_html=True,
+        )
+        rows = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
+        if not rows:
+            st.info("Nu există informații generale pentru acest contract/proiect.")
+        else:
+            for row in rows:
+                _render_info_card(row)
+
+    if pin_fin:
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
+            "Financiar</div>",
+            unsafe_allow_html=True,
+        )
+        rows = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
+        if not rows:
+            st.info("Nu există date financiare pentru acest contract.")
+        else:
+            for row in rows:
+                _render_info_card(row)
+
+    if pin_ech:
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
+            "Echipă</div>",
+            unsafe_allow_html=True,
+        )
+        rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
+        if not rows:
+            st.info("Nu există membri echipă pentru acest contract.")
+        else:
+            _render_echipa_compact(rows)
+
+    if pin_teh:
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
+            "Tehnic</div>",
+            unsafe_allow_html=True,
+        )
+        rows = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
+        if not rows:
+            st.info("Nu există aspecte tehnice pentru acest contract.")
+        else:
+            for row in rows:
+                _render_info_card(row)
 
     # ── Export fișă ───────────────────────────────────────────────────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
