@@ -1063,13 +1063,7 @@ def render_fisa_completa(supabase: Client):
 
     # ── Linie unică de control — fără tab-uri ────────────────────────────
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    _lbl, _p1, _p2, _p3, _p4, _ = st.columns([2.8, 1.0, 1.0, 1.0, 1.0, 3.2])
-    with _lbl:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.45);font-size:0.875rem;"
-            "padding-top:6px;font-style:italic;'>Fixează permanent în această consultare de cod:</div>",
-            unsafe_allow_html=True,
-        )
+    _p1, _p2, _p3, _p4, _lbl = st.columns([1.0, 1.0, 1.0, 1.0, 4.0])
     with _p1:
         pin_gen = st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
     with _p2:
@@ -1078,12 +1072,10 @@ def render_fisa_completa(supabase: Client):
         pin_ech = st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
     with _p4:
         pin_teh = st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
-
-    # ── Secțiuni afișate doar dacă sunt bifate ───────────────────────────
-    if not any([pin_gen, pin_fin, pin_ech, pin_teh]):
+    with _lbl:
         st.markdown(
-            "<div style='color:rgba(255,255,255,0.35);font-size:0.82rem;"
-            "font-style:italic;margin-top:10px;'>Bifează o secțiune pentru a o afișa.</div>",
+            "<div style='color:rgba(255,255,255,0.45);font-size:0.875rem;"
+            "padding-top:6px;font-style:italic;'>Bifează o secțiune pentru a o afișa.</div>",
             unsafe_allow_html=True,
         )
 
