@@ -87,7 +87,7 @@ CATEGORII = {
         "base_table": "base_evenimente_stiintifice",
         "tipuri": None,
     },
-    "Proprietate intelectuala": {
+    "Proprietate industriala": {
         "base_table": "base_prop_intelect",
         "tipuri": None,
     },
@@ -133,14 +133,14 @@ COM_TABLES = {
 
 COL_LABELS = {
     "abreviere_domeniu_fdi": "DOMENIUL FDI",
-    "acronim_tip_contract": "ACRONIM TIP CONTRACT",
+    "acronim_contracte": "ACRONIM TIP PROIECTE",
     "acronim_contracte_proiecte": "TIPUL DE CONTRACT SAU PROIECT",
     "acronim_departament": "ACRONIM DEPARTAMENT",
     "acronim_functie_upt": "ABREVIERE FUNCTIE UPT",
-    "acronim_proiect": "ACRONIM PROIECT",
-    "acronim_tip_proiect": "ACRONIM TIP PROIECT",
+    "acronim_proiect": "ACRONIM TIP PROIECTE",
+    "acronim_proiecte": "ACRONIM TIP PROIECTE",
     "acronim_prop_intelect": "FORME DE PROTECTIE A PROPRIETATII INDUSTRIALE",
-    "activitati_proiect": "ACTIVITATI",
+    "activitati_proiect": "ACTIVIATI",
     "an_referinta": "ANUL DE REFERINTA",
     "apel_pentru_propuneri": "APELUL PENTRU PROPUNERI",
     "autori": "AUTORI",
@@ -200,7 +200,7 @@ COL_LABELS = {
     "format_eveniment": "FORMATUL EVENIMENTULUI STIINTIFIC",
     "functia_specifica": "ROLUL IN CONTRACT/PROIECT",
     "functie_upt": "ABREVIERE FUNCTIE UPT",
-    "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA)",
+    "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA0",
     "institutii_organizare": "INSTITUTIILE ORGANIZATOARE",
     "interval_finantare": "TOTAL PROIECTE FINANTATE",
     "link_espacenet": "LINK ESPACENET",
@@ -288,25 +288,25 @@ TABLE_LABELS = {
     "base_proiecte_interreg":       "🌍 Proiect INTERREG",
     "base_proiecte_noneu":          "🌍 Proiect NON-EU",
     "base_evenimente_stiintifice":  "🎓 Eveniment Științific",
-    "base_prop_intelect":           "💡 Proprietate Intelectuală",
+    "base_prop_intelect":           "💡 Proprietate Industrială",
 }
 
 
-# ── ETICHETE PER TABEL (suprascriu COL_LABELS global doar unde diferă) ────────
+# ── ETICHETE PER TABEL ───────────────────────────────────────────────────────
 COL_LABELS_PER_TABLE = {
-    # ── Contracte → TIPUL DE CONTRACT ─────────────────────────────────────────
-    "base_contracte_cep":      {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
-    "base_contracte_speciale": {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
-    "base_contracte_terti":    {"acronim_contracte_proiecte": "TIPUL DE CONTRACT"},
-    # ── Proiecte → TIPUL DE PROIECT ───────────────────────────────────────────
-    "base_proiecte_fdi":            {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_internationale": {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_interreg":       {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_noneu":          {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_pncdi":          {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    "base_proiecte_pnrr":           {"acronim_contracte_proiecte": "TIPUL DE PROIECT"},
-    # ── Nomenclatoare ─────────────────────────────────────────────────────────
-    "nom_proiecte":  {"denumire_completa": "DENUMIRE TIP PROIECTE"},
+    "base_contracte_cep": {
+        "cod_identificare":       "NR.CONTRACT",
+        "status_contract_proiect": "STATUS CONTRACT",
+        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+    },
+    "base_contracte_speciale": {
+        "cod_identificare":       "NR.CONTRACT",
+        "status_contract_proiect": "STATUS CONTRACT",
+    },
+    "base_contracte_terti": {
+        "cod_identificare":       "NR.CONTRACT",
+        "status_contract_proiect": "STATUS CONTRACT",
+    },
 }
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -974,7 +974,7 @@ def make_printable_html(df: pd.DataFrame, title: str) -> str:
 def _get_year_candidates(categorie: str) -> list[str]:
     if categorie == "Evenimente stiintifice":
         return YEAR_COL_CANDIDATES_EV
-    elif categorie == "Proprietate intelectuala":
+    elif categorie == "Proprietate industriala":
         return YEAR_COL_CANDIDATES_PI
     else:
         return YEAR_COL_CANDIDATES_CP
@@ -992,11 +992,10 @@ def _resolve_base_table(categorie: str, tip: str) -> str | None:
 # =========================================================
 
 def render_fisa_completa(supabase: Client):
-    st.markdown("## 📄 Fișa completă a unui proiect")
+    st.markdown("## 📄 Fișă completă")
     st.markdown(
         "<div style='color:rgba(255,255,255,0.88);font-size:1.02rem;font-weight:600;"
-        "margin-bottom:0.85rem;'>Introduceți cod_identificare și vedeți toate datele "
-        "asociate: informații generale + completări financiare, tehnice și echipă.</div>",
+        "margin-bottom:0.85rem;'>Introduceți codul și consultați toate informațiile asociate.</div>",
         unsafe_allow_html=True,
     )
 
@@ -1009,13 +1008,15 @@ def render_fisa_completa(supabase: Client):
             placeholder="Ex: 998877 sau 26FDI26",
         ).strip()
 
-    # ── Indicator live ✅ / ❌ la typing (din 3 caractere) ────────────────
+    # ── Indicator live ✅ / ❌ ────────────────────────────────────────────
     cod_found = False
+    tabela_gasita = None
     if cod and len(cod) >= 3:
         for t in ALL_BASE_TABLES:
             rows_check = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=1)
             if rows_check:
                 cod_found = True
+                tabela_gasita = t
                 break
         with c2:
             if cod_found:
@@ -1029,243 +1030,152 @@ def render_fisa_completa(supabase: Client):
                     unsafe_allow_html=True,
                 )
 
-    # ── Stare: cod prea scurt sau negăsit ────────────────────────────────
     if not cod or len(cod) < 3:
         st.info("Introduceți codul identificare (minim 3 caractere).", icon="ℹ️")
         st.button("📄 Afișează fișa", key="fisa_go_disabled", disabled=True)
         return
 
-    # ── Buton explicit (fallback) — dacă codul există, fișa se afișează
-    # automat fără să fie necesar butonul; butonul forțează reîncărcarea
     go = st.button("📄 Afișează fișa", key="fisa_go")
 
-    if not cod_found and not go:
+    if not cod_found:
         st.warning("Codul introdus nu a fost găsit în nicio tabelă de bază.")
         return
 
-    if not cod_found and go:
-        st.warning("Codul introdus nu a fost găsit în nicio tabelă de bază.")
-        return
-
-    # ── Informații generale ───────────────────────────────────────────────
+    # ── Titlu dinamic ─────────────────────────────────────────────────────
     st.divider()
+    titlu_fisa = TABLE_LABELS.get(tabela_gasita, "Fișă")
+    titlu_fisa_curat = titlu_fisa.split(" ", 1)[-1] if " " in titlu_fisa else titlu_fisa
 
-    # ── Badge status validare ────────────────────────────────────────────
+    # Badge validare
     validat = None
     status_confirmare = None
-    for t in ALL_BASE_TABLES:
-        rows_check = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=1)
-        if rows_check:
-            validat = rows_check[0].get("validat_idbdc")
-            status_confirmare = rows_check[0].get("status_confirmare")
-            break
+    rows_badge = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=1)
+    if rows_badge:
+        validat = rows_badge[0].get("validat_idbdc")
+        status_confirmare = rows_badge[0].get("status_confirmare")
 
-    if validat is True or str(validat).strip().upper() in ("TRUE", "DA", "1"):
-        badge_html = (
-            "<div style='display:inline-block;background:rgba(30,200,90,0.18);"
-            "border:1.5px solid rgba(30,200,90,0.60);border-radius:20px;"
-            "padding:4px 16px;margin-bottom:10px;'>"
-            "<span style='color:#80ffb0;font-weight:800;font-size:0.97rem;'>✅ Validat</span></div>"
-        )
-    else:
-        in_lucru = status_confirmare is True or str(status_confirmare).strip().upper() in ("TRUE", "DA", "1")
-        if in_lucru:
-            badge_html = (
-                "<div style='display:inline-block;background:rgba(255,180,0,0.15);"
-                "border:1.5px solid rgba(255,180,0,0.50);border-radius:20px;"
-                "padding:4px 16px;margin-bottom:10px;'>"
-                "<span style='color:#ffe066;font-weight:800;font-size:0.97rem;'>⏳ În lucru</span></div>"
-            )
-        else:
-            badge_html = (
-                "<div style='display:inline-block;background:rgba(255,255,255,0.08);"
-                "border:1.5px solid rgba(255,255,255,0.25);border-radius:20px;"
-                "padding:4px 16px;margin-bottom:10px;'>"
-                "<span style='color:rgba(255,255,255,0.65);font-weight:800;font-size:0.97rem;'>📝 Neconfirmat</span></div>"
-            )
-
-    st.markdown(badge_html, unsafe_allow_html=True)
-    st.markdown("### 📌 Informații generale")
-
-    for t in ALL_BASE_TABLES:
-        rows = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=50)
-        if not rows:
-            continue
-        label = TABLE_LABELS.get(t, t)
-        st.markdown(
-            f"<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;"
-            f"font-weight:700;text-transform:uppercase;letter-spacing:0.06em;"
-            f"margin-bottom:4px;margin-top:10px;'>{label}</div>",
-            unsafe_allow_html=True,
-        )
-        for row in rows:
-            _render_info_card(row)
-
-    # ── Completări ────────────────────────────────────────────────────────
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-
-    # ── Bara secțiuni cu checkbox pin integrat ────────────────────────────
     st.markdown(
-        """
-        <style>
-        div[data-testid="stHorizontalBlock"] .pin-label {
-            font-size: 0.88rem;
-            font-weight: 700;
-            color: rgba(255,255,255,0.85);
-            margin-right: 2px;
-        }
-        </style>
-        """,
+        f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
+        f"letter-spacing:0.03em;margin-bottom:1rem;'>"
+        f"INFORMAȚII {titlu_fisa_curat.upper()}</div>",
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        "<div style='color:rgba(255,255,255,0.50);font-size:0.78rem;font-weight:700;"
-        "text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;'>"
-        "🧩 Completări — selectează secțiunea · bifează pentru a o fixa permanent</div>",
-        unsafe_allow_html=True,
-    )
+    # ── 4 Tab-uri ─────────────────────────────────────────────────────────
+    tab_gen, tab_fin, tab_ech, tab_teh = st.tabs(["Generale", "Financiar", "Echipă", "Tehnic"])
 
-    pin_col1, pin_col2, pin_col3, pin_col4 = st.columns(4)
-
-    pin_gen_key = f"pin_gen_{cod}"
-    pin_fin_key = f"pin_fin_{cod}"
-    pin_ech_key = f"pin_ech_{cod}"
-    pin_teh_key = f"pin_teh_{cod}"
-
-    with pin_col1:
-        pin_gen = st.checkbox("📌 Generale", key=pin_gen_key)
-    with pin_col2:
-        pin_fin = st.checkbox("📌 Financiar", key=pin_fin_key)
-    with pin_col3:
-        pin_ech = st.checkbox("📌 Echipă", key=pin_ech_key)
-    with pin_col4:
-        pin_teh = st.checkbox("📌 Tehnic", key=pin_teh_key)
-
-    # ── Tab-uri pentru navigare ───────────────────────────────────────────
-    tab_fin, tab_teh, tab_ech = st.tabs(list(COM_TABLES.keys()))
-
-    with tab_fin:
-        rows = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
-        if not rows:
-            st.info("Nu există date financiare pentru acest cod.")
+    # ── TAB GENERALE ──────────────────────────────────────────────────────
+    with tab_gen:
+        pin_key = f"fisa_pin_{cod}_generale"
+        rows_gen = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
+        if not rows_gen:
+            st.info("Nu există informații generale pentru acest contract/proiect.")
         else:
-            df_fin = pd.DataFrame(rows)
-            df_fin = df_fin[[c for c in df_fin.columns if c not in COLS_HIDDEN_FISA]]
-            df_fin.columns = [_col_label(c, "com_date_financiare") for c in df_fin.columns]
-            st.dataframe(df_fin, use_container_width=True, hide_index=True,
-                         height=min(400, 60 + len(df_fin) * 35))
-
-    with tab_teh:
-        rows = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
-        if not rows:
-            st.info("Nu există aspecte tehnice pentru acest cod.")
-        else:
-            df_teh = pd.DataFrame(rows)
-            df_teh = df_teh[[c for c in df_teh.columns if c not in COLS_HIDDEN_FISA]]
-            df_teh.columns = [_col_label(c, "com_aspecte_tehnice") for c in df_teh.columns]
-            st.dataframe(df_teh, use_container_width=True, hide_index=True,
-                         height=min(400, 60 + len(df_teh) * 35))
-
-    with tab_ech:
-        rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
-        _render_echipa_compact(rows)
-
-    # ── Secțiuni fixate (pin) — apar mereu sub tab-uri dacă sunt bifate ──
-    any_pinned = pin_gen or pin_fin or pin_ech or pin_teh
-
-    if any_pinned:
-        st.markdown(
-            "<div style='margin-top:16px;border-top:1px solid rgba(255,255,255,0.15);"
-            "padding-top:12px;color:rgba(255,255,255,0.50);font-size:0.78rem;font-weight:700;"
-            "text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;'>"
-            "📌 Secțiuni fixate</div>",
-            unsafe_allow_html=True,
-        )
-
-    if pin_gen:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.70);font-size:0.85rem;font-weight:700;"
-            "margin-bottom:6px;'>📋 Generale</div>",
-            unsafe_allow_html=True,
-        )
-        for t in ALL_BASE_TABLES:
-            rows_g = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=50)
-            if not rows_g:
-                continue
-            label = TABLE_LABELS.get(t, t)
-            st.markdown(
-                f"<div style='color:rgba(255,255,255,0.50);font-size:0.78rem;font-weight:700;"
-                f"text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;"
-                f"margin-top:8px;'>{label}</div>",
-                unsafe_allow_html=True,
-            )
-            for row in rows_g:
+            for row in rows_gen:
                 _render_info_card(row)
 
-    if pin_fin:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.70);font-size:0.85rem;font-weight:700;"
-            "margin-top:10px;margin-bottom:6px;'>💰 Financiar</div>",
-            unsafe_allow_html=True,
-        )
-        rows_f = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
-        if not rows_f:
-            st.info("Nu există date financiare pentru acest cod.")
+    # ── TAB FINANCIAR ─────────────────────────────────────────────────────
+    with tab_fin:
+        pin_key = f"fisa_pin_{cod}_financiar"
+        rows_fin = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
+        if not rows_fin:
+            st.info("Nu există date financiare pentru acest contract.")
         else:
-            df_fp = pd.DataFrame(rows_f)
-            df_fp = df_fp[[c for c in df_fp.columns if c not in COLS_HIDDEN_FISA]]
-            df_fp.columns = [_col_label(c, "com_date_financiare") for c in df_fp.columns]
-            st.dataframe(df_fp, use_container_width=True, hide_index=True,
-                         height=min(400, 60 + len(df_fp) * 35))
+            for row in rows_fin:
+                _render_info_card(row)
 
-    if pin_ech:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.70);font-size:0.85rem;font-weight:700;"
-            "margin-top:10px;margin-bottom:6px;'>👥 Echipă</div>",
-            unsafe_allow_html=True,
-        )
-        rows_e = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
-        _render_echipa_compact(rows_e)
-
-    if pin_teh:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.70);font-size:0.85rem;font-weight:700;"
-            "margin-top:10px;margin-bottom:6px;'>🧪 Tehnic</div>",
-            unsafe_allow_html=True,
-        )
-        rows_t = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
-        if not rows_t:
-            st.info("Nu există aspecte tehnice pentru acest cod.")
+    # ── TAB ECHIPĂ ────────────────────────────────────────────────────────
+    with tab_ech:
+        pin_key = f"fisa_pin_{cod}_echipa"
+        rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
+        if not rows_ech:
+            st.info("Nu există membri echipă pentru acest contract.")
         else:
-            df_tp = pd.DataFrame(rows_t)
-            df_tp = df_tp[[c for c in df_tp.columns if c not in COLS_HIDDEN_FISA]]
-            df_tp.columns = [_col_label(c, "com_aspecte_tehnice") for c in df_tp.columns]
-            st.dataframe(df_tp, use_container_width=True, hide_index=True,
-                         height=min(400, 60 + len(df_tp) * 35))
+            _render_echipa_compact(rows_ech)
+
+    # ── TAB TEHNIC ────────────────────────────────────────────────────────
+    with tab_teh:
+        pin_key = f"fisa_pin_{cod}_tehnic"
+        rows_teh = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
+        if not rows_teh:
+            st.info("Nu există aspecte tehnice pentru acest contract.")
+        else:
+            for row in rows_teh:
+                _render_info_card(row)
+
+    # ── Casete "afișare permanentă" — după cele 4 tab-uri ────────────────
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:600;"
+        "margin-bottom:4px;'>📌 Bifează secțiunile pe care vrei să le vezi permanent:</div>",
+        unsafe_allow_html=True,
+    )
+    col_p1, col_p2, col_p3, col_p4, _ = st.columns([1, 1, 1, 1, 2])
+    with col_p1:
+        st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
+    with col_p2:
+        st.checkbox("Financiar", key=f"fisa_pin_{cod}_financiar")
+    with col_p3:
+        st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
+    with col_p4:
+        st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
+
+    # ── Secțiuni pinuite afișate permanent sub tab-uri ────────────────────
+    pinuite = []
+    for tab_key, tab_label in [("generale", "Generale"), ("financiar", "Financiar"),
+                                ("echipa", "Echipă"), ("tehnic", "Tehnic")]:
+        if st.session_state.get(f"fisa_pin_{cod}_{tab_key}", False):
+            pinuite.append((tab_key, tab_label))
+
+    if pinuite:
+        st.divider()
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.75);font-size:0.90rem;font-weight:700;"
+            "margin-bottom:6px;'>📌 Secțiuni fixate</div>",
+            unsafe_allow_html=True,
+        )
+        for tab_key, tab_label in pinuite:
+            st.markdown(f"**{tab_label}**")
+            if tab_key == "generale":
+                rows = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
+                if rows:
+                    for row in rows:
+                        _render_info_card(row)
+            elif tab_key == "financiar":
+                rows = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
+                if rows:
+                    for row in rows:
+                        _render_info_card(row)
+            elif tab_key == "echipa":
+                rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
+                if rows:
+                    _render_echipa_compact(rows)
+            elif tab_key == "tehnic":
+                rows = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
+                if rows:
+                    for row in rows:
+                        _render_info_card(row)
 
     # ── Export fișă ───────────────────────────────────────────────────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     st.divider()
     st.markdown(
         "<div style='color:rgba(255,255,255,0.75);font-size:0.90rem;font-weight:700;"
-        "margin-bottom:6px;'>📤 Export fișă proiect</div>",
+        "margin-bottom:6px;'>📤 Export fișă</div>",
         unsafe_allow_html=True,
     )
 
-    # Construim un DataFrame complet din toate tabelele pentru export
     export_frames = {}
-    for t in ALL_BASE_TABLES:
-        rows_exp = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=50)
-        if rows_exp:
-            df_t = pd.DataFrame(rows_exp)
-            df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
-            df_t.columns = [_col_label(c, t) for c in df_t.columns]
-            export_frames[TABLE_LABELS.get(t, t)] = df_t
+    rows_exp = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
+    if rows_exp:
+        df_t = pd.DataFrame(rows_exp)
+        df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
+        df_t.columns = [_col_label(c, tabela_gasita) for c in df_t.columns]
+        export_frames["Generale"] = df_t
 
     for com_label, com_table in [
-        ("💰 Financiar", "com_date_financiare"),
-        ("🧪 Tehnic", "com_aspecte_tehnice"),
+        ("Financiar", "com_date_financiare"),
+        ("Tehnic", "com_aspecte_tehnice"),
     ]:
         rows_exp = _safe_select_eq(supabase, com_table, "cod_identificare", cod, limit=50)
         if rows_exp:
@@ -1279,12 +1189,11 @@ def render_fisa_completa(supabase: Client):
         df_ech = pd.DataFrame(rows_ech)
         df_ech = df_ech[[c for c in df_ech.columns if c not in COLS_HIDDEN_FISA]]
         df_ech.columns = [_col_label(c, "com_echipe_proiect") for c in df_ech.columns]
-        export_frames["👥 Echipă"] = df_ech
+        export_frames["Echipă"] = df_ech
 
     ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
 
     with ea1:
-        # Export CSV — toate secțiunile combinate
         csv_parts = []
         for section_label, df_sec in export_frames.items():
             csv_parts.append(f"=== {section_label} ===")
@@ -1300,7 +1209,6 @@ def render_fisa_completa(supabase: Client):
         )
 
     with ea2:
-        # Export Excel — câte un sheet per secțiune
         try:
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -1319,7 +1227,6 @@ def render_fisa_completa(supabase: Client):
             st.caption("Excel indisponibil")
 
     with ea3:
-        # Export Print HTML
         if st.button("🖨️ Print fișă", key="fisa_print"):
             import streamlit.components.v1 as _comp
             html_sections = []
@@ -1336,7 +1243,7 @@ def render_fisa_completa(supabase: Client):
             @media print{{button{{display:none;}}}}
             </style></head><body>
             <button onclick="window.print()">🖨️ Print</button>
-            <h2>Fișă proiect — {_html.escape(cod)}</h2>
+            <h2>Fișă — {_html.escape(cod)}</h2>
             {"".join(html_sections)}
             </body></html>
             """
@@ -1521,11 +1428,11 @@ def _apply_col_labels_and_sursa(df: pd.DataFrame, table: str = None) -> pd.DataF
     """Aplică etichete frumoase coloanelor și înlocuiește _sursa cu label din TABLE_LABELS."""
     df = df.copy()
 
-    # Detectează tabelul din coloana _sursa dacă nu e furnizat explicit
+    # Detectează tabelul din _sursa dacă nu e dat explicit
     if table is None and "_sursa" in df.columns:
-        valori_sursa = df["_sursa"].dropna().unique()
-        if len(valori_sursa) == 1:
-            table = valori_sursa[0]
+        valori = df["_sursa"].dropna().unique()
+        if len(valori) == 1:
+            table = valori[0]
 
     # Înlocuiește valoarea _sursa cu eticheta frumoasă și mută coloana prima
     if "_sursa" in df.columns:
@@ -1533,7 +1440,7 @@ def _apply_col_labels_and_sursa(df: pd.DataFrame, table: str = None) -> pd.DataF
         cols = ["_sursa"] + [c for c in df.columns if c != "_sursa"]
         df = df[cols]
 
-    # Redenumește coloanele cu etichete din COL_LABELS (cu suport per-tabel)
+    # Redenumește coloanele cu etichete din COL_LABELS
     df.columns = [
         "Categorie" if c == "_sursa" else _col_label(c, table)
         for c in df.columns
@@ -1827,7 +1734,7 @@ def _build_filters(supabase: Client, categorie: str, prefix: str):
         with c5: result["fmt"]      = st.selectbox("Format", [""]+format_list, key=f"{prefix}_fmt")
         with c6: result["persoana"] = st.selectbox("Persoana contact", [""]+persoane, key=f"{prefix}_p")
 
-    elif categorie == "Proprietate intelectuala":
+    elif categorie == "Proprietate industriala":
         tip_pi_list = fetch_distinct_values(supabase, "nom_prop_intelect", "acronim_prop_intelect")
         dep_list    = fetch_distinct_values(supabase, "nom_departament", "acronim_departament")
         c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -1876,7 +1783,7 @@ def _apply_filters_to_query(q, cols: set, categorie: str, filters: dict, supabas
             if "cod_identificare" in cols:
                 q = q.in_("cod_identificare", ids)
 
-    elif categorie == "Proprietate intelectuala":
+    elif categorie == "Proprietate industriala":
         tip_pi   = filters.get("tip_pi", "")
         dep      = filters.get("dep", "")
         persoana = filters.get("persoana", "")
