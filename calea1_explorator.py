@@ -1054,29 +1054,12 @@ def render_fisa_completa(supabase: Client):
         validat = rows_badge[0].get("validat_idbdc")
         status_confirmare = rows_badge[0].get("status_confirmare")
 
-    # ── Titlu + casete pin pe același rând ───────────────────────────────
-    _hdr, _c1, _c2, _c3, _c4, _hint = st.columns([3.2, 0.8, 0.8, 0.8, 0.8, 2.0])
-    with _hdr:
-        st.markdown(
-            f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
-            f"letter-spacing:0.03em;padding-top:4px;'>"
-            f"INFORMAȚII {titlu_fisa_curat.upper()}</div>",
-            unsafe_allow_html=True,
-        )
-    with _c1:
-        st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
-    with _c2:
-        st.checkbox("Financiar", key=f"fisa_pin_{cod}_financiar")
-    with _c3:
-        st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
-    with _c4:
-        st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
-    with _hint:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.40);font-size:0.78rem;"
-            "padding-top:10px;font-style:italic;'>bifează pentru a fixa permanent</div>",
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
+        f"letter-spacing:0.03em;margin-bottom:1rem;'>"
+        f"INFORMAȚII {titlu_fisa_curat.upper()}</div>",
+        unsafe_allow_html=True,
+    )
 
     # ── 4 Tab-uri ─────────────────────────────────────────────────────────
     tab_gen, tab_fin, tab_ech, tab_teh = st.tabs(["Generale", "Financiar", "Echipă", "Tehnic"])
@@ -1120,7 +1103,23 @@ def render_fisa_completa(supabase: Client):
             for row in rows_teh:
                 _render_info_card(row)
 
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    # ── Casete pin — compact, sub tab-uri, pe un singur rând ─────────────
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    _lbl, _p1, _p2, _p3, _p4 = st.columns([1.5, 1, 1, 1, 1])
+    with _lbl:
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.45);font-size:0.80rem;"
+            "padding-top:8px;font-style:italic;'>fixează permanent:</div>",
+            unsafe_allow_html=True,
+        )
+    with _p1:
+        st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
+    with _p2:
+        st.checkbox("Financiar", key=f"fisa_pin_{cod}_financiar")
+    with _p3:
+        st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
+    with _p4:
+        st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
 
     # ── Secțiuni pinuite afișate permanent sub tab-uri ────────────────────
     pinuite = []
