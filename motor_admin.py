@@ -413,48 +413,48 @@ def porneste_motorul(supabase):
         DROPDOWN_MAP = {
             "base_contracte_cep": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_contracte_terti": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_contracte_speciale": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_contracte"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_fdi": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
                 "cod_domeniu_fdi": ("nom_domenii_fdi", "cod_domeniu_fdi"),
             },
             "base_proiecte_internationale": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_interreg": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_noneu": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_pncdi": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_proiecte_pnrr": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_proiecte"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
             "base_evenimente_stiintifice": {
@@ -516,10 +516,10 @@ def porneste_motorul(supabase):
             "data_sfarsit_valabilitate":  "📅 Data de sfarsit valabilitate",
             "data_apel":                  "📅 Data apelului",
             "abreviere_domeniu_fdi": "DOMENIUL FDI",
-            "acronim_contracte": "ACRONIM TIP PROIECTE",
-            "acronim_proiect": "ACRONIM TIP PROIECTE",
-            "acronim_proiecte": "ACRONIM TIP PROIECTE",
-            "activitati_proiect": "ACTIVIATI",
+            "acronim_tip_contract": "ACRONIM TIP CONTRACT",
+            "acronim_proiect": "ACRONIM PROIECT",
+            "acronim_tip_proiect": "ACRONIM TIP PROIECT",
+            "activitati_proiect": "ACTIVITATI",
             "an_referinta": "ANUL DE REFERINTA",
             "apel_pentru_propuneri": "APELUL PENTRU PROPUNERI",
             "autori": "AUTORI",
@@ -540,6 +540,7 @@ def porneste_motorul(supabase):
             "cost_total_proiect": "COST TOTAL PROIECT",
             "denumire_beneficiar": "DENUMIREA BENEFICIARULUI",
             "denumire_completa": "DENUMIRE TIP CONTRACT",
+            "acronim_contracte_proiecte": "TIPUL DE CONTRACT SAU PROIECT",
             "denumire_departament": "DENUMIRE DEPARTAMENT",
             "denumire_domeniu_fdi": "DENUMIREA DOMENIULUI FDI",
             "denumire_functie_upt": "DENUMIRE FUNCTIE UPT",
@@ -564,7 +565,7 @@ def porneste_motorul(supabase):
             "filtru_categorie": "FILTRU CATEGORIE",
             "filtru_proiect": "FILTRU PROIECT",
             "functia_specifica": "ROLUL IN CONTRACT/PROIECT",
-            "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA0",
+            "id_proiect_contract_sursa": "ID PROIECT (CONTRACT SURSA)",
             "institutii_organizare": "INSTITUTIILE ORGANIZATOARE",
             "interval_finantare": "TOTAL PROIECTE FINANTATE",
             "link_espacenet": "LINK ESPACENET",
@@ -613,26 +614,7 @@ def porneste_motorul(supabase):
             "website": "WEBSITE",
         }
 
-        COL_LABELS_ADMIN_PER_TABLE = {
-            "base_contracte_cep": {
-                "cod_identificare":        "NR.CONTRACT",
-                "status_contract_proiect": "STATUS CONTRACT",
-                "titlul_proiect":          "OBIECTUL CONTRACTULUI",
-            },
-            "base_contracte_speciale": {
-                "cod_identificare":        "NR.CONTRACT",
-                "status_contract_proiect": "STATUS CONTRACT",
-            },
-            "base_contracte_terti": {
-                "cod_identificare":        "NR.CONTRACT",
-                "status_contract_proiect": "STATUS CONTRACT",
-            },
-        }
-
-        def _col_label_admin(col: str, table: str = None) -> str:
-            if table and table in COL_LABELS_ADMIN_PER_TABLE:
-                if col in COL_LABELS_ADMIN_PER_TABLE[table]:
-                    return COL_LABELS_ADMIN_PER_TABLE[table][col]
+        def _col_label_admin(col: str) -> str:
             return COL_LABELS_ADMIN.get(col, col.replace("_", " ").capitalize())
 
         rel = DROPDOWN_MAP.get(table_name, {})
@@ -676,7 +658,7 @@ def porneste_motorul(supabase):
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(
-                    label=_col_label_admin(c, table_name),
+                    label=_col_label_admin(c),
                     format="YYYY-MM-DD",
                     step=1,
                     help="📅 Click pentru a selecta data din calendar",
@@ -687,12 +669,22 @@ def porneste_motorul(supabase):
                 continue
             if is_year_col(c):
                 cfg[c] = st.column_config.NumberColumn(
-                    label=_col_label_admin(c, table_name),
+                    label=_col_label_admin(c),
                     min_value=1900,
                     max_value=2100,
                     step=1,
                     format="%d",
                 )
+
+        # Etichete frumoase pentru toate coloanele rămase (text simplu)
+        for c in df.columns:
+            if c in cfg:
+                continue
+            if c in CONTROL_COLS:
+                continue
+            cfg[c] = st.column_config.TextColumn(
+                label=_col_label_admin(c),
+            )
 
         return cfg
 
@@ -868,7 +860,7 @@ def porneste_motorul(supabase):
     with c1:
         cat_admin = st.selectbox(
             "Categoria de date",
-            ["", "Contracte", "Proiecte", "Evenimente stiintifice", "Proprietate industriala"],
+            ["", "Contracte", "Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"],
         )
     with c2:
         if cat_admin == "Contracte":
@@ -900,7 +892,7 @@ def porneste_motorul(supabase):
         tabela_baza = map_baze.get(tip_admin)
     elif cat_admin == "Evenimente stiintifice":
         tabela_baza = "base_evenimente_stiintifice"
-    elif cat_admin == "Proprietate industriala":
+    elif cat_admin == "Proprietate intelectuala":
         tabela_baza = "base_prop_intelect"
     else:
         tabela_baza = None
@@ -979,25 +971,60 @@ def porneste_motorul(supabase):
 
     base_full = st.session_state[state_key_raw(tabela_baza)]
 
-    editing_blocked = False
+    # ============================
+    # BLOCARE DUPĂ VALIDARE
+    # ============================
+
+    already_valid = False
+    if len(base_full) > 0 and "validat_idbdc" in base_full.columns:
+        try:
+            already_valid = bool(base_full.loc[0, "validat_idbdc"])
+        except Exception:
+            already_valid = False
+
+    # Cheia pentru starea toggle-ului în session_state
+    toggle_key = f"toggle_deblocat_{cod}"
+
+    # Dacă fișa tocmai a fost validată (sau e deja validată), implicitul toggle-ului e OFF (blocat)
+    # Utilizatorul poate muta manual pe ON (deblocat) dacă vrea să editeze după validare
+    if toggle_key not in st.session_state:
+        # Dacă e validată → implicit blocat (False = blocat)
+        st.session_state[toggle_key] = not already_valid if already_valid else True
+
+    # Toggle: OFF = Fișa este blocată | ON = Fișa este deblocată
+    # Nu folosim value= — starea e controlată exclusiv prin session_state[toggle_key]
+    deblocat = st.toggle(
+        "🔓 Fișa este deblocată" if st.session_state[toggle_key] else "🔒 Fișa este blocată",
+        key=toggle_key,
+        help="OFF = Fișa este blocată (doar citire). ON = Fișa este deblocată (editare activă).",
+    )
+
+    editing_blocked = not deblocat
+
+    if already_valid and deblocat:
+        st.markdown(
+            "<div style='background:rgba(255,200,50,0.18);border:1px solid rgba(255,200,50,0.55);"
+            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
+            "<span style='color:#ffe066;font-weight:700;font-size:0.97rem;'>"
+            "⚠️ Fișa a fost validată. Editarea este activă — modificările vor anula validarea anterioară."
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
+    elif already_valid and not deblocat:
+        st.markdown(
+            "<div style='background:rgba(50,200,100,0.13);border:1px solid rgba(50,200,100,0.40);"
+            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
+            "<span style='color:#80ffb0;font-weight:700;font-size:0.97rem;'>"
+            "✅ Fișa este validată și blocată. Mută toggle-ul pe ON pentru a edita."
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
 
     # ============================
     # EDITOR ECHIPA — doua zone separate
     # ============================
 
-    def _get_echipa_labels(tabela_baza: str) -> tuple[str, str, bool]:
-        """Returnează (titlu_zona1, titlu_zona2, are_zona1)."""
-        if "contracte" in tabela_baza:
-            return "Responsabil contract", "Membrii echipă de cercetare", True
-        elif tabela_baza in ("base_proiecte_pncdi", "base_proiecte_pnrr", "base_proiecte_fdi"):
-            return "Director proiect", "Membrii echipă de proiect", True
-        elif tabela_baza in ("base_proiecte_internationale", "base_proiecte_interreg", "base_proiecte_noneu"):
-            return "Manager proiect", "Membrii echipă de proiect", True
-        else:
-            # Evenimente stiintifice, Proprietate industriala
-            return "Persoana de contact", "", False
-
-    def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name, tabela_baza=""):
+    def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name):
         """
         Randare editor echipa in doua zone:
         - Zona 1 (sus): reprezentanti IDBDC — editor mic fix, proeminent
@@ -1005,9 +1032,6 @@ def porneste_motorul(supabase):
         Ambele zone folosesc dropdown pentru nume_prenume.
         La salvare, cele doua zone se reunesc intr-un singur DataFrame.
         """
-
-        # Titluri dinamice
-        titlu_z1, titlu_z2, are_zona1 = _get_echipa_labels(tabela_baza)
 
         # Incarcam lista de persoane pentru dropdown
         persoane_disponibile = load_dropdown_options("det_resurse_umane", "nume_prenume")
@@ -1023,7 +1047,7 @@ def porneste_motorul(supabase):
             )
 
         # Impartim df in reprezentanti si restul
-        if are_zona1 and "reprezinta_idbdc" in df_show.columns:
+        if "reprezinta_idbdc" in df_show.columns:
             mask_rep = df_show["reprezinta_idbdc"].apply(
                 lambda v: v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
             )
@@ -1033,62 +1057,36 @@ def porneste_motorul(supabase):
             df_rep  = pd.DataFrame(columns=df_show.columns)
             df_rest = df_show.copy()
 
-        # ── ZONA 1 — Responsabil / Director / Manager / Persoana de contact ─
-        if are_zona1:
-            st.markdown(
-                f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
-                f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
-                f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>⭐ {titlu_z1}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-            key_rep = f"editor_echipa_rep_{cod}"
-            edited_rep = st.data_editor(
-                df_rep,
-                use_container_width=True,
-                hide_index=True,
-                num_rows="dynamic",
-                column_config=col_cfg_echipa,
-                disabled=editing_blocked,
-                key=key_rep,
-                height=min(200, 60 + max(1, len(df_rep)) * 38),
-            )
-            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        else:
-            # Cazul fara zona1 — toti membrii sunt "Persoana de contact"
-            st.markdown(
-                f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
-                f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
-                f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>⭐ {titlu_z1}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-            key_rep = f"editor_echipa_rep_{cod}"
-            edited_rep = st.data_editor(
-                df_show,
-                use_container_width=True,
-                hide_index=True,
-                num_rows="dynamic",
-                column_config=col_cfg_echipa,
-                disabled=editing_blocked,
-                key=key_rep,
-                height=min(300, 60 + max(1, len(df_show)) * 38),
-            )
-            # completam cod_identificare
-            if "cod_identificare" in edited_rep.columns:
-                edited_rep = edited_rep.copy()
-                edited_rep["cod_identificare"] = edited_rep["cod_identificare"].fillna(cod)
-                edited_rep["cod_identificare"] = edited_rep["cod_identificare"].astype(str).replace("nan", cod)
-            edited_data[table_name] = edited_rep
-            return
+        # ── ZONA 1 — Reprezentanti IDBDC ──────────────────────────────────
+        st.markdown(
+            "<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
+            "border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            "<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
+            "⭐ Reprezentanți IDBDC</span> "
+            "<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>(director / responsabil proiect)</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
-        # ── ZONA 2 — Membrii echipă ────────────────────────────────────────
+        key_rep = f"editor_echipa_rep_{cod}"
+        edited_rep = st.data_editor(
+            df_rep,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            column_config=col_cfg_echipa,
+            disabled=editing_blocked,
+            key=key_rep,
+            height=min(200, 60 + max(1, len(df_rep)) * 38),
+        )
+
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+        # ── ZONA 2 — Restul echipei ────────────────────────────────────────
         nr_rest = len(df_rest)
         st.markdown(
             f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
-            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
-            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
-            f"👥 {titlu_z2}</span> "
+            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
+            f"👥 Membri echipă</span> "
             f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_rest} persoane</span>"
             f"</div>",
             unsafe_allow_html=True,
@@ -1133,12 +1131,6 @@ def porneste_motorul(supabase):
 
         df_reunited = pd.concat([edited_rep, edited_rest], ignore_index=True)
 
-        # Completam cod_identificare pentru toate randurile
-        if "cod_identificare" in df_reunited.columns:
-            df_reunited["cod_identificare"] = df_reunited["cod_identificare"].fillna(cod)
-            df_reunited["cod_identificare"] = df_reunited["cod_identificare"].astype(str).replace("nan", cod)
-            df_reunited.loc[df_reunited["cod_identificare"].str.strip() == "", "cod_identificare"] = cod
-
         # Eliminam randuri fara nume (goale)
         if "nume_prenume" in df_reunited.columns:
             df_reunited = df_reunited[
@@ -1172,7 +1164,7 @@ def porneste_motorul(supabase):
             if table_name == "com_echipe_proiect":
                 _render_echipa_editor(
                     df_show, col_cfg, cod, editing_blocked,
-                    edited_data, state_key, table_name, tabela_baza,
+                    edited_data, state_key, table_name,
                 )
                 continue
 
@@ -1270,12 +1262,10 @@ def porneste_motorul(supabase):
     # ============================
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    b1, b2, b3 = st.columns(3)
+    b1, b2 = st.columns(2)
     with b1:
         btn_save = st.button("💾 SALVARE (toată fișa)", disabled=editing_blocked)
     with b2:
-        btn_validate = st.button("✅ VALIDARE (toată fișa)")
-    with b3:
         btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
     # ============================
@@ -1356,23 +1346,6 @@ def porneste_motorul(supabase):
 
         except Exception as e:
             st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {e}")
-            st.rerun()
-
-    # ============================
-    # VALIDARE
-    # ============================
-
-    if btn_validate:
-        operator = st.session_state.operator_identificat
-        try:
-            ok, msg = direct_validate_all_tables(cod, table_names, operator)
-            if ok:
-                st.session_state["admin_msg"] = ("success", "✅ Fișa a fost validată")
-            else:
-                st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi validată: {msg}")
-            st.rerun()
-        except Exception as e:
-            st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi validată: {e}")
             st.rerun()
 
     # ============================
