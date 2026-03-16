@@ -1105,11 +1105,11 @@ def render_fisa_completa(supabase: Client):
 
     # ── Casete pin — compact, sub tab-uri, pe un singur rând ─────────────
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    _lbl, _p1, _p2, _p3, _p4 = st.columns([1.5, 1, 1, 1, 1])
+    _lbl, _p1, _p2, _p3, _p4, _ = st.columns([3.2, 0.7, 0.7, 0.7, 0.7, 4.0])
     with _lbl:
         st.markdown(
             "<div style='color:rgba(255,255,255,0.45);font-size:0.80rem;"
-            "padding-top:8px;font-style:italic;'>fixează permanent:</div>",
+            "padding-top:8px;font-style:italic;'>Fixează permanent în această consultare de cod:</div>",
             unsafe_allow_html=True,
         )
     with _p1:
