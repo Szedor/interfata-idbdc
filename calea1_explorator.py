@@ -318,53 +318,74 @@ def _col_label(col: str, table: str = None) -> str:
     return COL_LABELS.get(col, col.replace("_", " ").capitalize())
 
 
-def _render_info_card(row: dict):
-    """Afișează un rând ca un card vizual cu câmpuri etichetate, în 2 coloane."""
-    priority_set = {c: i for i, c in enumerate(CARD_PRIORITY)}
-    visible_cols = [
-        c for c in row.keys()
-        if c not in COLS_HIDDEN_FISA
-        and row[c] is not None
-        and str(row[c]).strip() not in ("", "None", "nan")
-    ]
-    visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
-
-    if not visible_cols:
-        st.info("Nu există câmpuri completate pentru această înregistrare.")
+def _render_sectiune_tabel(section_label: str, rows: list[dict], table: str = None):
+    """
+    Afișează o secțiune completă ca un tabel cu 3 coloane:
+      Col 1 (~10%): numele secțiunii — o singură dată, aliniat sus
+      Col 2 (~23%): eticheta câmpului
+      Col 3 (~67%): valoarea efectivă
+    Fără spațiu între rândurile din aceeași secțiune.
+    """
+    if not rows:
         return
 
-    pairs = [
-        (visible_cols[i], visible_cols[i + 1] if i + 1 < len(visible_cols) else None)
-        for i in range(0, len(visible_cols), 2)
-    ]
+    priority_set = {c: i for i, c in enumerate(CARD_PRIORITY)}
+
+    # Colectăm toate perechile (coloana, valoare) din toate rândurile secțiunii
+    all_items = []
+    for row in rows:
+        visible_cols = [
+            c for c in row.keys()
+            if c not in COLS_HIDDEN_FISA
+            and row[c] is not None
+            and str(row[c]).strip() not in ("", "None", "nan")
+        ]
+        visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
+        for c in visible_cols:
+            all_items.append((_col_label(c, table), _html.escape(str(row[c]))))
+
+    if not all_items:
+        st.info(f"Nu există câmpuri completate pentru secțiunea {section_label}.")
+        return
+
+    # Construim HTML-ul complet ca un singur bloc — fără componente Streamlit separate
+    rows_html = ""
+    for i, (label, value) in enumerate(all_items):
+        # Prima linie din secțiune primește numele secțiunii în col 1
+        if i == 0:
+            sec_cell = (
+                f"<td rowspan='{len(all_items)}' style='"
+                f"vertical-align:top;"
+                f"padding:6px 10px 6px 0;"
+                f"width:10%;'>"
+                f"<span style='color:rgba(255,255,255,0.45);font-size:0.74rem;"
+                f"font-weight:800;text-transform:uppercase;letter-spacing:0.07em;"
+                f"white-space:nowrap;'>{_html.escape(section_label)}</span>"
+                f"</td>"
+            )
+        else:
+            sec_cell = ""
+
+        rows_html += (
+            f"<tr>"
+            f"{sec_cell}"
+            f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
+            f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;"
+            f"font-weight:700;text-transform:uppercase;letter-spacing:0.04em;'>"
+            f"{label}</span></td>"
+            f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
+            f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>"
+            f"{value}</span></td>"
+            f"</tr>"
+        )
 
     st.markdown(
-        "<div style='background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);"
-        "border-radius:14px;padding:16px 20px;margin-bottom:12px;'>",
+        f"<table style='width:100%;border-collapse:collapse;"
+        f"margin-bottom:0;'>"
+        f"{rows_html}"
+        f"</table>",
         unsafe_allow_html=True,
     )
-    for left_col, right_col in pairs:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(
-                f"<div style='margin-bottom:8px;'>"
-                f"<span style='color:rgba(255,255,255,0.55);font-size:0.78rem;font-weight:600;"
-                f"text-transform:uppercase;letter-spacing:0.04em;'>{_col_label(left_col)}</span><br>"
-                f"<span style='color:#ffffff;font-size:0.97rem;font-weight:700;'>{_html.escape(str(row[left_col]))}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-        with c2:
-            if right_col:
-                st.markdown(
-                    f"<div style='margin-bottom:8px;'>"
-                    f"<span style='color:rgba(255,255,255,0.55);font-size:0.78rem;font-weight:600;"
-                    f"text-transform:uppercase;letter-spacing:0.04em;'>{_col_label(right_col)}</span><br>"
-                    f"<span style='color:#ffffff;font-size:0.97rem;font-weight:700;'>{_html.escape(str(row[right_col]))}</span>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_echipa_compact(rows: list[dict]):
@@ -1063,7 +1084,7 @@ def render_fisa_completa(supabase: Client):
 
     # ── Linie unică de control — fără tab-uri ────────────────────────────
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    _p1, _p2, _p3, _p4, _lbl = st.columns([1.0, 1.0, 1.0, 1.0, 4.0])
+    _p1, _p2, _p3, _p4, _lbl = st.columns([0.7, 0.7, 0.7, 0.7, 5.2])
     with _p1:
         pin_gen = st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
     with _p2:
@@ -1075,64 +1096,58 @@ def render_fisa_completa(supabase: Client):
     with _lbl:
         st.markdown(
             "<div style='color:rgba(255,255,255,0.45);font-size:0.875rem;"
-            "padding-top:6px;font-style:italic;'>Bifează o secțiune pentru a o afișa.</div>",
+            "padding-top:6px;font-style:italic;'>Bifează o secțiune pentru a afișa informațiile existente în aceasta.</div>",
             unsafe_allow_html=True,
         )
 
+    # ── Wrapper comun pentru toate secțiunile bifate ──────────────────────
+    sectiuni_active = []
     if pin_gen:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
-            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
-            "Generale</div>",
-            unsafe_allow_html=True,
-        )
-        rows = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
-        if not rows:
-            st.info("Nu există informații generale pentru acest contract/proiect.")
-        else:
-            for row in rows:
-                _render_info_card(row)
-
+        sectiuni_active.append(("Generale", tabela_gasita, "generale"))
     if pin_fin:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
-            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
-            "Financiar</div>",
-            unsafe_allow_html=True,
-        )
-        rows = _safe_select_eq(supabase, "com_date_financiare", "cod_identificare", cod, limit=50)
-        if not rows:
-            st.info("Nu există date financiare pentru acest contract.")
-        else:
-            for row in rows:
-                _render_info_card(row)
-
+        sectiuni_active.append(("Financiar", "com_date_financiare", "financiar"))
     if pin_ech:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
-            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
-            "Echipă</div>",
-            unsafe_allow_html=True,
-        )
-        rows = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
-        if not rows:
-            st.info("Nu există membri echipă pentru acest contract.")
-        else:
-            _render_echipa_compact(rows)
-
+        sectiuni_active.append(("Echipă", "com_echipe_proiect", "echipa"))
     if pin_teh:
+        sectiuni_active.append(("Tehnic", "com_aspecte_tehnice", "tehnic"))
+
+    if sectiuni_active:
         st.markdown(
-            "<div style='color:rgba(255,255,255,0.60);font-size:0.82rem;font-weight:700;"
-            "text-transform:uppercase;letter-spacing:0.06em;margin-top:14px;margin-bottom:4px;'>"
-            "Tehnic</div>",
+            "<div style='background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);"
+            "border-radius:14px;padding:14px 20px 6px 20px;margin-top:12px;'>",
             unsafe_allow_html=True,
         )
-        rows = _safe_select_eq(supabase, "com_aspecte_tehnice", "cod_identificare", cod, limit=50)
-        if not rows:
-            st.info("Nu există aspecte tehnice pentru acest contract.")
-        else:
-            for row in rows:
-                _render_info_card(row)
+
+        for idx, (sec_label, sec_table, sec_key) in enumerate(sectiuni_active):
+            # Separator vizual între secțiuni (rând gol + linie)
+            if idx > 0:
+                st.markdown(
+                    "<div style='height:18px;border-top:1px solid rgba(255,255,255,0.12);"
+                    "margin:8px 0 10px 0;'></div>",
+                    unsafe_allow_html=True,
+                )
+
+            if sec_key == "echipa":
+                # Titlu secțiune echipă — același stil ca col 1 din tabel
+                st.markdown(
+                    f"<div style='color:rgba(255,255,255,0.45);font-size:0.74rem;"
+                    f"font-weight:800;text-transform:uppercase;letter-spacing:0.07em;"
+                    f"margin-bottom:6px;'>{_html.escape(sec_label)}</div>",
+                    unsafe_allow_html=True,
+                )
+                rows = _safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=2000)
+                if not rows:
+                    st.info("Nu există membri echipă pentru acest contract.")
+                else:
+                    _render_echipa_compact(rows)
+            else:
+                rows = _safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=50)
+                if not rows:
+                    st.info(f"Nu există informații pentru secțiunea {sec_label}.")
+                else:
+                    _render_sectiune_tabel(sec_label, rows, sec_table)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # ── Export fișă ───────────────────────────────────────────────────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
