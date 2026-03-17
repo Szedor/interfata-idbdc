@@ -1068,6 +1068,28 @@ def porneste_motorul(supabase):
 
     # Toggle: OFF = Fișa este blocată | ON = Fișa este deblocată
     # Nu folosim value= — starea e controlată exclusiv prin session_state[toggle_key]
+    # CSS dinamic: roșu = blocat, verde = deblocat
+    _toggle_color = "#22c55e" if st.session_state[toggle_key] else "#ef4444"
+    st.markdown(
+        f"""
+        <style>
+        /* Bara de sub comutator (track) */
+        div[data-testid="stToggle"] input:checked + div,
+        div[data-testid="stToggle"] input:checked ~ div[data-baseweb="toggle"] > div {{
+            background-color: #22c55e !important;
+        }}
+        div[data-testid="stToggle"] input:not(:checked) + div,
+        div[data-testid="stToggle"] input:not(:checked) ~ div[data-baseweb="toggle"] > div {{
+            background-color: #ef4444 !important;
+        }}
+        div[data-baseweb="toggle"] > div {{
+            background-color: {_toggle_color} !important;
+            border-color: {_toggle_color} !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     deblocat = st.toggle(
         "🔓 Fișa este deblocată" if st.session_state[toggle_key] else "🔒 Fișa este blocată",
         key=toggle_key,
