@@ -207,6 +207,191 @@ def render_export_auth(supabase: Client, tab_key: str = "tab") -> bool:
     return False
 
 
+
+# =========================================================
+# HELPERS COMUNI — Tab 2, Tab 3
+# =========================================================
+
+@st.cache_data(show_spinner=False, ttl=600)
+def get_table_columns(_supabase: Client, table_name: str) -> list[str]:
+    try:
+        res = _supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
+        return [r["column_name"] for r in (res.data or []) if r.get("column_name")]
+    except Exception:
+        return []
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def fetch_distinct_values(_supabase: Client, table: str, column: str, limit: int = 2000) -> list[str]:
+    try:
+        res = _supabase.table(table).select(column).limit(limit).execute()
+        vals = []
+        for r in (res.data or []):
+            v = r.get(column)
+            if v is None:
+                continue
+            s = str(v).strip()
+            if s and s not in vals:
+                vals.append(s)
+        return sorted(vals)
+    except Exception:
+        return []
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def fetch_idbdc_people(_supabase: Client, limit: int = 2000) -> list[str]:
+    try:
+        res = (
+            _supabase.table("com_echipe_proiect")
+            .select("nume_prenume")
+            .limit(limit)
+            .execute()
+        )
+        vals = []
+        for r in (res.data or []):
+            v = r.get("nume_prenume")
+            if v is None:
+                continue
+            s = str(v).strip()
+            if s and s not in vals:
+                vals.append(s)
+        return sorted(vals)
+    except Exception:
+        return []
+
+
+def _safe_select_eq(supabase: Client, table: str, col: str, value: str, limit: int = 2000) -> list[dict]:
+    try:
+        res = supabase.table(table).select("*").eq(col, value).limit(limit).execute()
+        return res.data or []
+    except Exception:
+        return []
+
+
+def apply_keyword_filter(q, cols: set, keyword: str):
+    if not keyword:
+        return q
+    for c in TEXT_COL_CANDIDATES:
+        if c in cols:
+            return q.ilike(c, f"%{keyword}%")
+    if "cod_identificare" in cols:
+        return q.ilike("cod_identificare", f"%{keyword}%")
+    return q
+
+
+def apply_year_range_filter(q, col: str, y_from: int, y_to: int):
+    import datetime as dt
+    c = (col or "").lower()
+    if c.startswith("data_") or c.startswith("dt_") or c.endswith("_data") or c in ("data",):
+        start = dt.datetime(int(y_from), 1, 1)
+        end   = dt.datetime(int(y_to) + 1, 1, 1) - dt.timedelta(seconds=1)
+        return q.gte(col, start.isoformat()).lte(col, end.isoformat())
+    return q.gte(col, int(y_from)).lte(col, int(y_to))
+
+
+def apply_year_range_best_effort(q, cols: set, candidates: list, y_from: int, y_to: int):
+    for c in candidates:
+        if c in cols:
+            return apply_year_range_filter(q, c, y_from, y_to)
+    return q
+
+
+def enrich_reprezentant_idbdc(supabase: Client, df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["reprezentant_idbdc"] = ""
+    if "cod_identificare" not in df.columns:
+        return df
+    ids = sorted({str(x).strip() for x in df["cod_identificare"].dropna().astype(str).tolist() if str(x).strip()})
+    if not ids:
+        return df
+    try:
+        res_team = (
+            supabase.table("com_echipe_proiect")
+            .select("cod_identificare,nume_prenume,reprezinta_idbdc")
+            .eq("reprezinta_idbdc", True)
+            .in_("cod_identificare", ids)
+            .execute()
+        )
+        rep = {}
+        for r in (res_team.data or []):
+            cid  = str(r.get("cod_identificare", "")).strip()
+            nume = str(r.get("nume_prenume", "")).strip()
+            if not cid or not nume:
+                continue
+            rep.setdefault(cid, [])
+            if nume not in rep[cid]:
+                rep[cid].append(nume)
+        df["reprezentant_idbdc"] = df["cod_identificare"].astype(str).map(
+            lambda x: ", ".join(rep.get(str(x).strip(), []))
+        )
+    except Exception:
+        pass
+    return df
+
+
+def ids_for_person(supabase: Client, person_name: str, only_reprezentant: bool = False) -> list[str]:
+    if not person_name:
+        return []
+    try:
+        q = (
+            supabase.table("com_echipe_proiect")
+            .select("cod_identificare")
+            .eq("nume_prenume", person_name)
+        )
+        if only_reprezentant:
+            q = q.eq("reprezinta_idbdc", True)
+        res = q.execute()
+        return sorted({
+            str(r.get("cod_identificare", "")).strip()
+            for r in (res.data or [])
+            if str(r.get("cod_identificare", "")).strip()
+        })
+    except Exception:
+        return []
+
+
+def make_printable_html(df: pd.DataFrame, title: str) -> str:
+    import html as _html
+    safe_title = _html.escape(title)
+    table_html = df.to_html(index=False, escape=True)
+    return f"""
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <title>{safe_title}</title>
+        <style>
+            body {{ font-family: Arial; padding:20px; }}
+            table {{ border-collapse: collapse; width:100%; }}
+            th, td {{ border:1px solid #ccc; padding:6px; font-size:12px; }}
+            th {{ background:#f0f0f0; }}
+            @media print {{ button {{ display:none; }} }}
+        </style>
+    </head>
+    <body>
+        <button onclick="window.print()">Print</button>
+        <h2>{safe_title}</h2>
+        {table_html}
+    </body>
+    </html>
+    """
+
+
+def _get_year_candidates(categorie: str) -> list[str]:
+    if categorie == "Evenimente stiintifice":
+        return YEAR_COL_CANDIDATES_EV
+    elif categorie == "Proprietate industriala":
+        return YEAR_COL_CANDIDATES_PI
+    else:
+        return YEAR_COL_CANDIDATES_CP
+
+
+def _resolve_base_table(categorie: str, tip: str):
+    cat = CATEGORII.get(categorie, {})
+    if cat.get("tipuri"):
+        return cat["tipuri"].get(tip)
+    return cat.get("base_table")
+
+
 # =========================================================
 # TAB 2 — EXPLORARE DUPĂ CRITERIU
 # =========================================================
