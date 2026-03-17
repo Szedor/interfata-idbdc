@@ -962,6 +962,174 @@ def _render_ca_rezultate(supabase: Client):
                 html_doc = make_printable_html(df_final, f"IDBDC – {search_label}")
                 components.html(html_doc, height=700, scrolling=True)
 
+
+# =========================================================
+# GATE + STIL + HEADER
+# =========================================================
+
+def hide_streamlit_chrome():
+    st.markdown(
+        """
+        <style>
+          header { visibility: hidden; height: 0px; }
+          #MainMenu { visibility: hidden; }
+          footer { visibility: hidden; height: 0px; }
+          [data-testid="stToolbar"] { display: none !important; }
+          [data-testid="stDecoration"] { display: none !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_style_full_blue():
+    st.markdown(
+        f"""
+        <style>
+          .stApp {{ background: {ACADEMIC_BLUE} !important; }}
+          div.block-container {{ padding-top: 1.1rem; padding-bottom: 1.0rem; max-width: 1550px; }}
+          .idbdc-header {{ text-align: center; margin-top: 0.2rem; margin-bottom: 0.9rem; }}
+          .idbdc-title-1 {{ font-size: 2.05rem; font-weight: 900; line-height: 1.15; color: #ffffff; margin: 0; }}
+          .idbdc-title-2 {{ font-size: 1.86rem; font-weight: 800; line-height: 1.2; color: rgba(255,255,255,0.95); margin: 0.35rem 0 0 0; }}
+          label, .stMarkdown, .stCaption, .stText {{ color: #ffffff !important; }}
+          [data-testid="stMarkdownContainer"] p {{ color: #ffffff !important; }}
+          [data-testid="stCaptionContainer"] {{ color: rgba(255,255,255,0.88) !important; }}
+          .stTextInput > div > div, .stTextInput > div > div > input, .stTextInput input,
+          .stTextInput input:hover, .stTextInput input:focus, .stTextInput input:active,
+          .stTextInput input:focus-visible, .stTextInput > div > div:hover,
+          .stTextInput > div > div:focus-within, .stTextInput [data-baseweb="input"],
+          .stTextInput [data-baseweb="input"]:hover, .stTextInput [data-baseweb="input"]:focus-within {{
+            background: #1a3a5c !important; background-color: #1a3a5c !important;
+            color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;
+            border-radius: 10px !important; font-weight: 600 !important;
+            border: 1px solid rgba(255,255,255,0.30) !important; caret-color: #ffffff !important;
+          }}
+          .stTextInput input:-webkit-autofill, .stTextInput input:-webkit-autofill:hover,
+          .stTextInput input:-webkit-autofill:focus {{
+            -webkit-box-shadow: 0 0 0px 1000px #1a3a5c inset !important;
+            -webkit-text-fill-color: #ffffff !important; caret-color: #ffffff !important;
+          }}
+          .stTextInput input::placeholder {{
+            color: rgba(255,255,255,0.50) !important;
+            -webkit-text-fill-color: rgba(255,255,255,0.50) !important; opacity: 1 !important;
+          }}
+          .stNumberInput > div > div, .stNumberInput > div > div > input, .stNumberInput input,
+          .stNumberInput input:hover, .stNumberInput input:focus, .stNumberInput input:active,
+          .stNumberInput [data-baseweb="input"], .stNumberInput [data-baseweb="input"]:hover,
+          .stNumberInput [data-baseweb="input"]:focus-within {{
+            background: #1a3a5c !important; background-color: #1a3a5c !important;
+            color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;
+            border-radius: 10px !important; font-weight: 600 !important; caret-color: #ffffff !important;
+          }}
+          .stSelectbox > div > div, .stSelectbox [data-baseweb="select"],
+          .stSelectbox [data-baseweb="select"] > div, .stSelectbox [data-baseweb="select"] > div > div,
+          .stSelectbox [data-baseweb="select"] > div > div > div,
+          .stSelectbox [data-baseweb="select"] span, .stSelectbox [data-baseweb="select"] input,
+          .stSelectbox [data-baseweb="select"] svg {{
+            background: #1a3a5c !important; color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important; border-radius: 10px !important; font-weight: 600 !important;
+          }}
+          .stMultiSelect > div > div, .stMultiSelect [data-baseweb="select"] > div,
+          .stMultiSelect [data-baseweb="select"] span, .stMultiSelect [data-baseweb="select"] input {{
+            background: #1a3a5c !important; color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important; border-radius: 10px !important;
+          }}
+          [data-baseweb="popover"], [data-baseweb="popover"] *, [data-baseweb="menu"],
+          [data-baseweb="menu"] *, [role="listbox"], [role="listbox"] *, [role="option"] {{
+            background-color: #ffffff !important; color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important;
+          }}
+          [role="option"]:hover, [role="option"][aria-selected="true"] {{
+            background-color: #dce6f5 !important;
+          }}
+          .stButton > button {{
+            border-radius: 10px !important; font-weight: 900 !important;
+            background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important;
+            border: 1px solid rgba(255,255,255,0.55) !important; opacity: 1 !important;
+          }}
+          .stButton > button p {{ color: #0b1f3a !important; -webkit-text-fill-color: #0b1f3a !important; }}
+          .stButton > button:hover {{
+            border: 1px solid rgba(255,255,255,0.90) !important; color: #0b1f3a !important;
+            -webkit-text-fill-color: #0b1f3a !important; opacity: 1 !important;
+          }}
+          [data-testid="stTabs"] {{ margin-top: 0.15rem; }}
+          h1, h2, h3 {{ color: #ffffff !important; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_style_gate():
+    st.markdown(
+        f"""
+        <style>
+          .stApp {{ background: {ACADEMIC_BLUE} !important; }}
+          div.block-container {{ padding-top: 4.0rem; padding-bottom: 2.0rem; }}
+          .gate-box {{
+            background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 18px; padding: 26px 22px 18px 22px; box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+          }}
+          .gate-title {{ text-align: center; font-size: 1.45rem; font-weight: 900; color: #ffffff; margin: 0 0 0.35rem 0; }}
+          .gate-subtitle {{ text-align: center; color: rgba(255,255,255,0.92); font-size: 1.02rem; font-weight: 600; margin: 0 0 1.1rem 0; }}
+          .stTextInput label {{ color: #ffffff !important; font-weight: 800 !important; }}
+          .stTextInput input {{ background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; border-radius: 12px !important; }}
+          .stButton > button {{ width: 100%; border-radius: 12px; font-weight: 900; background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; opacity: 1 !important; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_header():
+    import html as _html
+    st.markdown(
+        f"""
+        <div class="idbdc-header">
+          <div class="idbdc-title-1">{_html.escape(TITLE_LINE_1)}</div>
+          <div class="idbdc-title-2">{_html.escape(TITLE_LINE_2)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def gate():
+    if not GATE_ENABLED:
+        st.session_state.autorizat_consultare = True
+        return
+
+    if not PASSWORD_CONSULTARE:
+        hide_streamlit_chrome()
+        apply_style_gate()
+        st.error("Config lipsă: setează PASSWORD_CONSULTARE în Streamlit Cloud → Settings → Secrets.")
+        st.stop()
+
+    if "autorizat_consultare" not in st.session_state:
+        st.session_state.autorizat_consultare = False
+
+    if not st.session_state.autorizat_consultare:
+        hide_streamlit_chrome()
+        apply_style_gate()
+
+        left, mid, right = st.columns([1.8, 1.0, 1.8])
+        with mid:
+            st.markdown('<div class="gate-box">', unsafe_allow_html=True)
+            st.markdown('<div class="gate-title">🛡️ Acces securizat</div>', unsafe_allow_html=True)
+            st.markdown('<div class="gate-subtitle">Interogare baze de date – DCDI</div>', unsafe_allow_html=True)
+            parola = st.text_input("Parola acces:", type="password")
+            if st.button("Autorizare acces"):
+                if parola == PASSWORD_CONSULTARE:
+                    st.session_state.autorizat_consultare = True
+                    st.rerun()
+                else:
+                    st.error("Parolă greșită.")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.stop()
+
+
 # =========================================================
 # MAIN
 # =========================================================
