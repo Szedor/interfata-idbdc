@@ -676,7 +676,15 @@ def porneste_motorul(supabase):
                     format="%d",
                 )
 
-        # Etichete frumoase pentru toate coloanele rămase (text simplu)
+        # nr_crt este INTEGER — NumberColumn, doar citire
+        if "nr_crt" in df.columns and "nr_crt" not in cfg:
+            cfg["nr_crt"] = st.column_config.NumberColumn(
+                label="NR.CRT.",
+                disabled=True,
+                format="%d",
+            )
+
+        # Etichete frumoase pentru toate coloanele ramase (text simplu)
         for c in df.columns:
             if c in cfg:
                 continue
