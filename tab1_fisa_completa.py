@@ -590,7 +590,7 @@ def render_fisa_completa(supabase: Client):
         df_ech.columns = [_col_label(c, "com_echipe_proiect") for c in df_ech.columns]
         export_frames["Echipă"] = df_ech
 
-    ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
+    ea1, ea2, ea3, ea4 = st.columns([1.0, 1.0, 1.0, 1.0])
 
     with ea1:
         csv_parts = []
@@ -599,8 +599,9 @@ def render_fisa_completa(supabase: Client):
             csv_parts.append(df_sec.to_csv(index=False))
             csv_parts.append("")
         st.download_button(
-            "⬇️ CSV", data="\n".join(csv_parts).encode("utf-8-sig"),
+            "⬇️ Export fișă (CSV)", data="\n".join(csv_parts).encode("utf-8-sig"),
             file_name=f"fisa_{cod}.csv", mime="text/csv", key="fisa_csv",
+            use_container_width=True,
         )
 
     with ea2:
@@ -612,15 +613,128 @@ def render_fisa_completa(supabase: Client):
                     df_sec.to_excel(writer, index=False, sheet_name=sheet_name)
             buf.seek(0)
             st.download_button(
-                "⬇️ Excel", data=buf, file_name=f"fisa_{cod}.xlsx",
+                "⬇️ Download fișă (Excel)", data=buf, file_name=f"fisa_{cod}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="fisa_xlsx",
+                key="fisa_xlsx", use_container_width=True,
             )
         except Exception:
             st.caption("Excel indisponibil")
 
     with ea3:
-        if st.button("🖨️ Print fișă", key="fisa_print"):
+        try:
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import cm
+            from reportlab.lib.colors import HexColor
+
+            pdf_buf = io.BytesIO()
+            doc = SimpleDocTemplate(
+                pdf_buf, pagesize=A4,
+                leftMargin=1.8*cm, rightMargin=1.8*cm,
+                topMargin=1.8*cm, bottomMargin=1.8*cm,
+            )
+            styles = getSampleStyleSheet()
+            style_title = ParagraphStyle("T", parent=styles["Title"],
+                fontName="Helvetica-Bold", fontSize=13, textColor=colors.white, leading=18)
+            style_sub = ParagraphStyle("S", parent=styles["Normal"],
+                fontName="Helvetica-Bold", fontSize=9, textColor=colors.white)
+            style_sec = ParagraphStyle("SC", parent=styles["Normal"],
+                fontName="Helvetica-Bold", fontSize=7.5, textColor=HexColor("#5A7FA8"))
+            style_label = ParagraphStyle("L", parent=styles["Normal"],
+                fontName="Helvetica-Bold", fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
+            style_val = ParagraphStyle("V", parent=styles["Normal"],
+                fontName="Helvetica", fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
+            style_head = ParagraphStyle("H", parent=styles["Normal"],
+                fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)
+
+            BLUE_DARK  = HexColor("#0B2A52")
+            BLUE_MED   = HexColor("#1A4A7A")
+            BLUE_ROW   = HexColor("#EEF4FB")
+            col_w = [2.5*cm, 5.5*cm, 9.44*cm]
+
+            story = []
+            hdr = Table([[Paragraph("IDBDC — UPT", style_title),
+                          Paragraph("Departamentul Cercetare Dezvoltare Inovare", style_sub)]],
+                        colWidths=[5*cm, 12.44*cm])
+            hdr.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,-1),BLUE_DARK),
+                ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10),
+                ("LEFTPADDING",(0,0),(0,0),14),("LEFTPADDING",(1,0),(1,0),8),
+            ]))
+            story.append(hdr)
+            story.append(Spacer(1, 0.2*cm))
+            sub = Table([[Paragraph(f"Fișă completă  ·  Cod: {_html.escape(cod)}", style_sub)]],
+                        colWidths=[17.44*cm])
+            sub.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
+                ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+                ("LEFTPADDING",(0,0),(-1,-1),14),
+            ]))
+            story.append(sub)
+            story.append(Spacer(1, 0.3*cm))
+
+            antet = Table([[Paragraph("SECȚIUNEA",style_head),
+                            Paragraph("CÂMP",style_head),
+                            Paragraph("VALOARE",style_head)]], colWidths=col_w)
+            antet.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
+                ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+                ("LEFTPADDING",(0,0),(-1,-1),5),
+                ("GRID",(0,0),(-1,-1),0.3,HexColor("#6A9CC8")),
+            ]))
+            story.append(antet)
+
+            for df_sec_name, df_sec in export_frames.items():
+                rows_data = []
+                for r_idx, (_, row) in enumerate(df_sec.iterrows()):
+                    bg = BLUE_ROW if r_idx % 2 == 0 else colors.white
+                    for c_idx, col_name in enumerate(df_sec.columns):
+                        val = str(row[col_name]) if row[col_name] is not None else ""
+                        label = col_name
+                        rows_data.append((df_sec_name if c_idx == 0 and r_idx == 0 else "",
+                                          label, val, bg))
+
+                tbl_data = [[Paragraph(r[0], style_sec),
+                             Paragraph(r[1], style_label),
+                             Paragraph(r[2].replace("\n","<br/>"), style_val)]
+                            for r in rows_data]
+                if not tbl_data:
+                    continue
+                tbl = Table(tbl_data, colWidths=col_w)
+                cmds = [
+                    ("VALIGN",(0,0),(-1,-1),"TOP"),
+                    ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
+                    ("LEFTPADDING",(0,0),(-1,-1),5),
+                    ("GRID",(0,0),(-1,-1),0.3,HexColor("#C5D8EC")),
+                    ("LINEABOVE",(0,0),(-1,0),1.2,BLUE_MED),
+                ]
+                for i, r in enumerate(rows_data):
+                    cmds.append(("BACKGROUND",(0,i),(-1,i), r[3]))
+                tbl.setStyle(TableStyle(cmds))
+                story.append(tbl)
+
+            story.append(Spacer(1, 0.5*cm))
+            story.append(Paragraph(
+                "Document generat automat — IDBDC UPT  ·  Uz intern",
+                ParagraphStyle("F", parent=styles["Normal"],
+                    fontName="Helvetica", fontSize=7,
+                    textColor=HexColor("#8AADCC"), alignment=1)
+            ))
+            doc.build(story)
+            pdf_buf.seek(0)
+            st.download_button(
+                "⬇️ Download fișă (PDF)", data=pdf_buf,
+                file_name=f"fisa_{cod}.pdf", mime="application/pdf",
+                key="fisa_pdf", use_container_width=True,
+            )
+        except ImportError:
+            st.caption("PDF indisponibil (reportlab lipsă)")
+
+    with ea4:
+        if st.button("🖨️ Print fișă (PDF / Excel / Word)", key="fisa_print", use_container_width=True):
             html_sections = []
             for section_label, df_sec in export_frames.items():
                 html_sections.append(f"<h3>{_html.escape(section_label)}</h3>")
