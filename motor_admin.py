@@ -614,7 +614,74 @@ def porneste_motorul(supabase):
             "website": "WEBSITE",
         }
 
-        def _col_label_admin(col: str) -> str:
+        # Etichete specifice per tabel — suprascriu COL_LABELS_ADMIN
+        COL_LABELS_PER_TABLE_ADMIN = {
+            "base_contracte_cep": {
+                "cod_identificare":        "NR.CONTRACT",
+                "status_contract_proiect": "STATUS CONTRACT",
+                "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+            },
+            "base_contracte_terti": {
+                "cod_identificare":        "NR.CONTRACT",
+                "status_contract_proiect": "STATUS CONTRACT",
+                "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+            },
+            "base_proiecte_fdi": {
+                "cod_identificare":        "ID PROIECT FDI",
+                "status_contract_proiect": "STATUS PROIECT",
+                "titlul_proiect":          "TITLUL PROIECTULUI",
+                "suma_solicitata_fdi":     "SUMA SOLICITATA",
+                "cofinantare_upt_fdi":     "COFINANTARE UPT",
+            },
+            "base_proiecte_pncdi": {
+                "cod_identificare":        "NR.CONTRACT / COD PROIECT",
+                "status_contract_proiect": "STATUS PROIECT",
+                "titlul_proiect":          "TITLUL PROIECTULUI",
+            },
+            "base_proiecte_pnrr": {
+                "cod_identificare":        "COD PROIECT PNRR",
+                "status_contract_proiect": "STATUS PROIECT",
+                "titlul_proiect":          "TITLUL PROIECTULUI",
+            },
+            "base_proiecte_internationale": {
+                "cod_identificare":        "COD / NR. PROIECT",
+                "status_contract_proiect": "STATUS PROIECT",
+                "titlul_proiect":          "TITLUL PROIECTULUI",
+                "rol_upt":                 "ROL UPT IN PROIECT",
+            },
+            "base_proiecte_interreg": {
+                "cod_identificare":        "COD PROIECT INTERREG",
+                "status_contract_proiect": "STATUS PROIECT",
+                "titlul_proiect":          "TITLUL PROIECTULUI",
+                "rol_upt":                 "ROL UPT IN PROIECT",
+            },
+            "base_proiecte_noneu": {
+                "cod_identificare":        "COD / NR. PROIECT",
+                "status_contract_proiect": "STATUS PROIECT",
+                "titlul_proiect":          "TITLUL PROIECTULUI",
+                "rol_upt":                 "ROL UPT IN PROIECT",
+            },
+            "base_evenimente_stiintifice": {
+                "cod_identificare":  "COD EVENIMENT",
+                "titlul_eveniment":  "TITLUL EVENIMENTULUI",
+                "natura_eveniment":  "NATURA EVENIMENTULUI",
+                "format_eveniment":  "FORMATUL EVENIMENTULUI",
+                "loc_desfasurare":   "LOCUL DE DESFASURARE",
+            },
+            "base_prop_intelect": {
+                "cod_identificare":       "NR. CERERE / BREVET",
+                "acronim_prop_intelect":  "FORMA DE PROTECTIE",
+                "titlul_proiect":         "TITLUL INVENTIEI / LUCRARII",
+                "data_depozit_cerere":    "DATA DEPUNERE LA OSIM",
+                "data_oficiala_acordare": "DATA ACORDARE",
+                "numar_oficial_acordare": "NR. OFICIAL ACORDARE",
+            },
+        }
+
+        def _col_label_admin(col: str, tbl: str = None) -> str:
+            if tbl and tbl in COL_LABELS_PER_TABLE_ADMIN:
+                if col in COL_LABELS_PER_TABLE_ADMIN[tbl]:
+                    return COL_LABELS_PER_TABLE_ADMIN[tbl][col]
             return COL_LABELS_ADMIN.get(col, col.replace("_", " ").capitalize())
 
         rel = DROPDOWN_MAP.get(table_name, {})
@@ -630,7 +697,7 @@ def porneste_motorul(supabase):
             if not options:
                 continue
             cfg[target_col] = st.column_config.SelectboxColumn(
-                label=_col_label_admin(target_col),
+                label=_col_label_admin(target_col, table_name),
                 options=options,
                 required=False,
                 help="🔽 Selectează din listă",
@@ -641,14 +708,14 @@ def porneste_motorul(supabase):
                 lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
             cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
-                label=_col_label_admin("reprezinta_idbdc"),
+                label=_col_label_admin("reprezinta_idbdc", table_name),
                 help="Bifează dacă persoana reprezintă IDBDC în proiect",
                 default=False,
             )
 
         if table_name == "com_echipe_proiect" and "functie_upt" in df.columns:
             cfg["functie_upt"] = st.column_config.TextColumn(
-                label=_col_label_admin("functie_upt"),
+                label=_col_label_admin("functie_upt", table_name),
                 help="Completat automat din det_resurse_umane",
                 disabled=True,
             )
@@ -658,7 +725,7 @@ def porneste_motorul(supabase):
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(
-                    label=_col_label_admin(c),
+                    label=_col_label_admin(c, table_name),
                     format="YYYY-MM-DD",
                     step=1,
                     help="📅 Click pentru a selecta data din calendar",
@@ -669,7 +736,7 @@ def porneste_motorul(supabase):
                 continue
             if is_year_col(c):
                 cfg[c] = st.column_config.NumberColumn(
-                    label=_col_label_admin(c),
+                    label=_col_label_admin(c, table_name),
                     min_value=1900,
                     max_value=2100,
                     step=1,
@@ -691,7 +758,7 @@ def porneste_motorul(supabase):
             if c in CONTROL_COLS:
                 continue
             cfg[c] = st.column_config.TextColumn(
-                label=_col_label_admin(c),
+                label=_col_label_admin(c, table_name),
             )
 
         return cfg
