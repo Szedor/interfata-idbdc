@@ -337,10 +337,67 @@ def _render_sectiune_tabel(section_label: str, rows: list[dict], table: str = No
     )
 
 
-def _render_echipa_compact(rows: list[dict]):
+def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
+    """
+    Afișează echipa în două zone:
+    - Reprezentant (responsabil contract / director proiect)
+    - Membrii echipă — în format text inline, comprimat, cu selector de câmpuri afișate
+
+    [7]+[8] Membrii afișați inline: Nume, Rol, Status · Nume, Rol ·  ...
+    [5] Fără coloana reprezinta_idbdc, fără câmpuri goale
+    [6] Etichete adaptate la context
+    """
     if not rows:
-        st.info("Nu exista echipa pentru acest cod.")
+        st.info("Nu există echipă înregistrată pentru această fișă.")
         return
+
+    # Câmpuri disponibile în tabelă (cu date) — excludem tehnice și goale
+    CAMPURI_ASCUNSE = {
+        "reprezinta_idbdc", "cod_identificare", "nr_crt",
+        "responsabil_idbdc", "observatii_idbdc", "status_confirmare",
+        "data_ultimei_modificari", "validat_idbdc",
+        "creat_de", "creat_la", "modificat_de", "modificat_la",
+        "functie_upt",  # afișat deja prin acronim_functie_upt
+    }
+
+    # Câmpuri cu date (cel puțin un rând nenul) din toate rândurile
+    campuri_cu_date = []
+    toate_campuri_posibile = [
+        "nume_prenume", "functia_specifica", "acronim_functie_upt",
+        "status_personal", "data_inceput_rol", "data_sfarsit_rol",
+    ]
+    for c in toate_campuri_posibile:
+        if any(r.get(c) for r in rows):
+            campuri_cu_date.append(c)
+
+    ETICHETE_ECH = {
+        "nume_prenume":       "Nume",
+        "functia_specifica":  "Rol",
+        "acronim_functie_upt": "Funcție UPT",
+        "status_personal":    "Status",
+        "data_inceput_rol":   "De la",
+        "data_sfarsit_rol":   "Până la",
+    }
+
+    # Selector câmpuri afișate — [7]
+    ctx_key = cod_ctx or str(id(rows))
+    sel_key = f"ech_campuri_{ctx_key}"
+    if sel_key not in st.session_state:
+        # Default: Nume + Rol
+        st.session_state[sel_key] = ["nume_prenume", "functia_specifica"]
+
+    with st.expander("⚙️ Câmpuri afișate în lista echipei", expanded=False):
+        cols_sel = st.columns(len(campuri_cu_date) or 1)
+        selectie = []
+        for i, c in enumerate(campuri_cu_date):
+            checked = c in st.session_state[sel_key]
+            if cols_sel[i].checkbox(ETICHETE_ECH.get(c, c), value=checked, key=f"ech_chk_{ctx_key}_{c}"):
+                selectie.append(c)
+        st.session_state[sel_key] = selectie if selectie else ["nume_prenume"]
+
+    campuri_activi = [c for c in campuri_cu_date if c in st.session_state[sel_key]]
+    if not campuri_activi:
+        campuri_activi = ["nume_prenume"]
 
     def sort_key(r):
         rep = r.get("reprezinta_idbdc")
@@ -349,90 +406,102 @@ def _render_echipa_compact(rows: list[dict]):
 
     rows_sorted = sorted(rows, key=sort_key)
 
-    def _member_html(r, is_rep):
-        nume    = _html.escape(str(r.get("nume_prenume") or "—").strip())
-        functie = str(r.get("functie_upt") or r.get("acronim_functie_upt") or "").strip()
-        status  = str(r.get("status_personal") or "").strip()
-        icon    = "⭐" if is_rep else "👤"
-        extra   = []
-        if functie:
-            extra.append(_html.escape(functie))
-        if status:
-            extra.append(_html.escape(status))
-        extra_str = (
-            f" <span style='color:rgba(255,255,255,0.55);font-size:0.82rem;'>"
-            f"— {' · '.join(extra)}</span>"
-            if extra else ""
-        )
-        weight = "800" if is_rep else "500"
-        bg     = "rgba(255,255,255,0.10)" if is_rep else "rgba(255,255,255,0.04)"
-        border = "rgba(255,255,255,0.50)" if is_rep else "rgba(255,255,255,0.15)"
-        return (
-            f"<div style='padding:5px 10px;margin-bottom:3px;background:{bg};"
-            f"border-radius:8px;border-left:3px solid {border};'>"
-            f"<span style='font-weight:{weight};color:#ffffff;'>{icon} {nume}</span>"
-            f"{extra_str}</div>"
-        )
-
     reprezentanti = [r for r in rows_sorted
                      if r.get("reprezinta_idbdc") is True
                      or str(r.get("reprezinta_idbdc", "")).strip().upper() in ("TRUE", "DA", "1")]
-    membri        = [r for r in rows_sorted
-                     if r.get("reprezinta_idbdc") is not True
-                     and str(r.get("reprezinta_idbdc", "")).strip().upper() not in ("TRUE", "DA", "1")]
+    membri = [r for r in rows_sorted
+              if r.get("reprezinta_idbdc") is not True
+              and str(r.get("reprezinta_idbdc", "")).strip().upper() not in ("TRUE", "DA", "1")]
 
-    total = len(rows_sorted)
-    nr_membri = len(membri)
+    nr_total = len(rows_sorted)
 
     st.markdown(
-        f"<div style='color:rgba(255,255,255,0.65);font-size:0.85rem;margin-bottom:8px;'>"
-        f"{total} membri în echipă</div>",
+        f"<div style='color:rgba(255,255,255,0.65);font-size:0.83rem;margin-bottom:6px;'>"
+        f"{nr_total} persoane înregistrate în echipă</div>",
         unsafe_allow_html=True,
     )
 
+    def _format_membru(r, campuri):
+        parts = []
+        for c in campuri:
+            v = str(r.get(c) or "").strip()
+            if v:
+                parts.append(_html.escape(v))
+        return ", ".join(parts)
+
+    # ── Reprezentant ─────────────────────────────────────────────────────
     if reprezentanti:
         st.markdown(
-            "<div style='color:rgba(255,255,255,0.50);font-size:0.78rem;font-weight:700;"
+            "<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
             "text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;'>"
-            "⭐ Reprezentant IDBDC</div>",
+            "⭐ Responsabil contract / Director proiect</div>",
             unsafe_allow_html=True,
         )
-        st.markdown("\n".join([_member_html(r, True) for r in reprezentanti]), unsafe_allow_html=True)
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        for r in reprezentanti:
+            txt = _format_membru(r, campuri_activi)
+            st.markdown(
+                f"<div style='padding:5px 12px;margin-bottom:3px;"
+                f"background:rgba(255,255,255,0.10);border-radius:8px;"
+                f"border-left:3px solid rgba(255,220,80,0.70);'>"
+                f"<span style='font-weight:800;color:#ffffff;'>⭐ {txt}</span></div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     if not membri:
         return
 
+    # ── Membrii echipă — format inline [8] ───────────────────────────────
     st.markdown(
-        f"<div style='color:rgba(255,255,255,0.50);font-size:0.78rem;font-weight:700;"
-        f"text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;'>"
-        f"👥 Membri echipă ({nr_membri})</div>",
+        f"<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
+        f"text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;'>"
+        f"👥 Membrii echipă ({len(membri)})</div>",
         unsafe_allow_html=True,
     )
 
-    PREVIEW = 4
-    show_all_key = f"echipa_show_all_{id(rows)}"
+    PREVIEW = 8
+    show_all_key = f"echipa_show_all_{ctx_key}"
     if show_all_key not in st.session_state:
         st.session_state[show_all_key] = False
 
-    if st.session_state[show_all_key]:
-        filter_key = f"echipa_filter_{id(rows)}"
+    def _build_inline_html(lista, campuri):
+        """[8] Fiecare membru: câmpuri separate prin virgulă · separator între membri"""
+        parts = []
+        for r in lista:
+            txt = _format_membru(r, campuri)
+            if txt:
+                parts.append(txt)
+        return "  ·  ".join(parts)
+
+    membri_display = membri if st.session_state[show_all_key] else membri[:PREVIEW]
+
+    if st.session_state[show_all_key] and len(membri) > PREVIEW:
+        filter_key = f"echipa_filter_{ctx_key}"
         filtru = st.text_input(
-            "Cauta in echipa", value="", key=filter_key,
-            placeholder="Filtreaza dupa nume...", label_visibility="collapsed",
+            "Cauta", value="", key=filter_key,
+            placeholder="Filtrează după nume...", label_visibility="collapsed",
         ).strip().lower()
-        membri_filtered = [r for r in membri if not filtru or filtru in str(r.get("nume_prenume") or "").lower()]
-        st.markdown("\n".join([_member_html(r, False) for r in membri_filtered]), unsafe_allow_html=True)
-        if st.button("▲ Restrânge lista", key=f"echipa_collapse_{id(rows)}", use_container_width=False):
-            st.session_state[show_all_key] = False
-            st.rerun()
-    else:
-        st.markdown("\n".join([_member_html(r, False) for r in membri[:PREVIEW]]), unsafe_allow_html=True)
-        if nr_membri > PREVIEW:
-            ramasi = nr_membri - PREVIEW
+        if filtru:
+            membri_display = [r for r in membri if filtru in str(r.get("nume_prenume") or "").lower()]
+
+    inline_text = _build_inline_html(membri_display, campuri_activi)
+    st.markdown(
+        f"<div style='background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);"
+        f"border-radius:10px;padding:10px 14px;line-height:1.9;font-size:0.88rem;color:rgba(255,255,255,0.88);'>"
+        f"{inline_text}</div>",
+        unsafe_allow_html=True,
+    )
+
+    if len(membri) > PREVIEW:
+        ramasi = len(membri) - PREVIEW
+        if st.session_state[show_all_key]:
+            if st.button("▲ Restrânge lista", key=f"echipa_collapse_{ctx_key}", use_container_width=False):
+                st.session_state[show_all_key] = False
+                st.rerun()
+        else:
             if st.button(
-                f"▼ Arată toți cei {nr_membri} membri  (+{ramasi} ascunși)",
-                key=f"echipa_expand_{id(rows)}", use_container_width=False,
+                f"▼ Arată toți cei {len(membri)} membri  (+{ramasi} ascunși)",
+                key=f"echipa_expand_{ctx_key}", use_container_width=False,
             ):
                 st.session_state[show_all_key] = True
                 st.rerun()
@@ -472,7 +541,7 @@ def render_fisa_completa(supabase: Client):
                     "<div style='margin-top:28px;font-size:1.4rem;' title='Cod găsit'>✅</div>",
                     unsafe_allow_html=True,
                 )
-            else:
+            elif cod and len(cod) >= 3:
                 st.markdown(
                     "<div style='margin-top:28px;font-size:1.4rem;' title='Cod negăsit'>❌</div>",
                     unsafe_allow_html=True,
@@ -480,10 +549,17 @@ def render_fisa_completa(supabase: Client):
 
     if not cod or len(cod) < 3:
         st.info("Introduceți codul identificare (minim 3 caractere).", icon="ℹ️")
-        st.button("📄 Afișează fișa", key="fisa_go_disabled", disabled=True)
         return
 
-    st.button("📄 Afișează fișa", key="fisa_go")
+    if cod_found:
+        st.markdown(
+            "<div style='background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.45);"
+            "border-radius:10px;padding:7px 14px;margin-bottom:4px;display:inline-block;'>"
+            "<span style='color:#4ade80;font-weight:700;font-size:0.92rem;'>"
+            "✅ Înregistrarea este confirmată — fișa este disponibilă și pregătită pentru consultare."
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
 
     if not cod_found:
         st.warning("Codul introdus nu a fost găsit în nicio tabelă de bază.")
@@ -549,7 +625,7 @@ def render_fisa_completa(supabase: Client):
                 if not rows:
                     st.info("Nu există membri echipă pentru acest contract.")
                 else:
-                    _render_echipa_compact(rows)
+                    _render_echipa_compact(rows, cod_ctx=cod)
             else:
                 rows = _safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=50)
                 if not rows:
@@ -586,7 +662,12 @@ def render_fisa_completa(supabase: Client):
     rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
     if rows_ech:
         df_ech = pd.DataFrame(rows_ech)
-        df_ech = df_ech[[c for c in df_ech.columns if c not in COLS_HIDDEN_FISA]]
+        # [5] Excludem reprezinta_idbdc si campurile tehnice/ascunse
+        COLS_HIDE_ECH = COLS_HIDDEN_FISA | {"reprezinta_idbdc", "functie_upt"}
+        df_ech = df_ech[[c for c in df_ech.columns if c not in COLS_HIDE_ECH]]
+        # [5] Excludem coloanele complet goale
+        df_ech = df_ech.dropna(axis=1, how="all")
+        df_ech = df_ech.loc[:, ~(df_ech == "").all()]
         df_ech.columns = [_col_label(c, "com_echipe_proiect") for c in df_ech.columns]
         export_frames["Echipă"] = df_ech
 
@@ -699,7 +780,7 @@ def render_fisa_completa(supabase: Client):
 
                 tbl_data = [[Paragraph(r[0], style_sec),
                              Paragraph(r[1], style_label),
-                             Paragraph(r[2].replace("\n","<br/>"), style_val)]
+                             Paragraph(r[2].replace("\n","<br/>").encode("ascii","replace").decode("ascii"), style_val)]
                             for r in rows_data]
                 if not tbl_data:
                     continue
