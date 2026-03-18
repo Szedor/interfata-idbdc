@@ -8,7 +8,6 @@ def porneste_motorul(supabase):
     # ============================
     # CONFIG
     # ============================
-    # Câmpuri vizibile și editabile DOAR de ADMIN
     ADMIN_ONLY_COLS = {
         "responsabil_idbdc", "observatii_idbdc",
         "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
@@ -45,6 +44,9 @@ def porneste_motorul(supabase):
     }
 
     STATIC_OPTIONS = {"VALUTA_3": ["LEI", "EUR", "USD"]}
+
+    # Tabele baza pentru contracte — folosit pentru override etichete
+    TABELE_CONTRACTE = {"base_contracte_cep", "base_contracte_terti", "base_contracte_speciale"}
 
     # ============================
     # HELPERS
@@ -119,7 +121,6 @@ def porneste_motorul(supabase):
                 df[c] = None
         df = df[cols]
 
-        # Forțăm tipul corect pentru coloanele date — explicit datetime.date sau None
         import datetime as _dt
         for c in df.columns:
             if is_date_col(c):
@@ -157,7 +158,7 @@ def porneste_motorul(supabase):
 
     def hide_control_cols(df: pd.DataFrame) -> pd.DataFrame:
         if is_admin:
-            return df  # ADMIN vede toate coloanele
+            return df
         cols = [c for c in df.columns if c not in ADMIN_ONLY_COLS]
         return df[cols] if cols else df
 
@@ -184,14 +185,12 @@ def porneste_motorul(supabase):
         return "DA" if bool(v) else "NU"
 
     def is_row_effectively_empty(d: dict) -> bool:
-        """Rândul e 'gol' doar dacă lipsește și cod_identificare."""
         cod = d.get("cod_identificare")
         if cod is None or (isinstance(cod, str) and cod.strip() == ""):
             return True
         return False
 
     def cleanup_payload(payload: dict) -> dict:
-        """Păstrează toate câmpurile cu valoare, plus întotdeauna cod_identificare."""
         out = {}
         for k, v in (payload or {}).items():
             if k == "nr_crt":
@@ -202,7 +201,6 @@ def porneste_motorul(supabase):
                 out[k] = v
                 continue
             if k == "cod_identificare":
-                # cod_identificare se păstrează mereu dacă e prezent
                 if v is not None and str(v).strip():
                     out[k] = str(v).strip()
                 continue
@@ -214,7 +212,6 @@ def porneste_motorul(supabase):
         return out
 
     def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
-        """Insert dacă nu există, update dacă există — fără upsert (evităm dep. de UNIQUE constraint)."""
         try:
             check = supabase.table(table_name).select("cod_identificare").eq("cod_identificare", cod).limit(1).execute()
             exists = bool(check.data)
@@ -423,7 +420,11 @@ def porneste_motorul(supabase):
                     df.at[idx, "functie_upt"] = functie
         return df
 
-    def build_column_config_for_table(table_name: str, df: pd.DataFrame):
+    def build_column_config_for_table(table_name: str, df: pd.DataFrame, tabela_baza_ctx: str = None):
+        """
+        tabela_baza_ctx: tabela de baza activa (ex: 'base_contracte_cep') — pentru override etichete
+        in tabelele auxiliare (com_echipe_proiect, com_date_financiare, etc.)
+        """
         DROPDOWN_MAP = {
             "base_contracte_cep": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
@@ -496,9 +497,7 @@ def porneste_motorul(supabase):
             },
         }
 
-        # Etichete frumoase pentru coloane în data_editor
         COL_LABELS_ADMIN = {
-            # Dropdown-uri — emoji 🔽 important pentru editor
             "denumire_categorie":         "🔽 CATEGORIE",
             "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT SAU PROIECT",
             "status_contract_proiect":    "🔽 STATUS CONTRACT/PROIECT",
@@ -514,7 +513,6 @@ def porneste_motorul(supabase):
             "cod_universitate":           "🔽 COD UNIVERSITATE",
             "reprezinta_idbdc":           "Reprezinta contractul/proiectul",
             "functie_upt":                "Abreviere functie UPT (auto)",
-            # Date — emoji 📅
             "data_contract":              "📅 DATA CONTRACTULUI",
             "data_inceput":               "📅 DATA DE INCEPUT",
             "data_sfarsit":               "📅 DATA DE SFARSIT",
@@ -554,7 +552,6 @@ def porneste_motorul(supabase):
             "cost_total_proiect": "COST TOTAL PROIECT",
             "denumire_beneficiar": "DENUMIREA BENEFICIARULUI",
             "denumire_completa": "DENUMIRE TIP CONTRACT",
-            "acronim_contracte_proiecte": "TIPUL DE CONTRACT SAU PROIECT",
             "denumire_departament": "DENUMIRE DEPARTAMENT",
             "denumire_domeniu_fdi": "DENUMIREA DOMENIULUI FDI",
             "denumire_functie_upt": "DENUMIRE FUNCTIE UPT",
@@ -628,50 +625,58 @@ def porneste_motorul(supabase):
             "website": "WEBSITE",
         }
 
-        # Etichete specifice per tabel — suprascriu COL_LABELS_ADMIN
+        # Override etichete pentru tabela de baza
         COL_LABELS_PER_TABLE_ADMIN = {
             "base_contracte_cep": {
-                "cod_identificare":        "NR.CONTRACT",
-                "status_contract_proiect": "STATUS CONTRACT",
-                "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+                "cod_identificare":           "NR. CONTRACT",
+                "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT",
+                "status_contract_proiect":    "🔽 STATUS CONTRACT",
+                "titlul_proiect":             "OBIECTUL CONTRACTULUI",
             },
             "base_contracte_terti": {
-                "cod_identificare":        "NR.CONTRACT",
-                "status_contract_proiect": "STATUS CONTRACT",
-                "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+                "cod_identificare":           "NR. CONTRACT",
+                "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT",
+                "status_contract_proiect":    "🔽 STATUS CONTRACT",
+                "titlul_proiect":             "OBIECTUL CONTRACTULUI",
+            },
+            "base_contracte_speciale": {
+                "cod_identificare":           "NR. CONTRACT",
+                "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT",
+                "status_contract_proiect":    "🔽 STATUS CONTRACT",
+                "titlul_proiect":             "OBIECTUL CONTRACTULUI",
             },
             "base_proiecte_fdi": {
                 "cod_identificare":        "ID PROIECT FDI",
-                "status_contract_proiect": "STATUS PROIECT",
+                "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
                 "suma_solicitata_fdi":     "SUMA SOLICITATA",
                 "cofinantare_upt_fdi":     "COFINANTARE UPT",
             },
             "base_proiecte_pncdi": {
                 "cod_identificare":        "NR.CONTRACT / COD PROIECT",
-                "status_contract_proiect": "STATUS PROIECT",
+                "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
             },
             "base_proiecte_pnrr": {
                 "cod_identificare":        "COD PROIECT PNRR",
-                "status_contract_proiect": "STATUS PROIECT",
+                "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
             },
             "base_proiecte_internationale": {
                 "cod_identificare":        "COD / NR. PROIECT",
-                "status_contract_proiect": "STATUS PROIECT",
+                "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
                 "rol_upt":                 "ROL UPT IN PROIECT",
             },
             "base_proiecte_interreg": {
                 "cod_identificare":        "COD PROIECT INTERREG",
-                "status_contract_proiect": "STATUS PROIECT",
+                "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
                 "rol_upt":                 "ROL UPT IN PROIECT",
             },
             "base_proiecte_noneu": {
                 "cod_identificare":        "COD / NR. PROIECT",
-                "status_contract_proiect": "STATUS PROIECT",
+                "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
                 "rol_upt":                 "ROL UPT IN PROIECT",
             },
@@ -692,10 +697,23 @@ def porneste_motorul(supabase):
             },
         }
 
+        # [FIX-6] Override etichete in tabele auxiliare pe baza contextului (contract vs proiect)
+        # ctx = tabela_baza_ctx sau table_name insusi
+        ctx = tabela_baza_ctx or table_name
+        is_contract_ctx = ctx in TABELE_CONTRACTE
+
         def _col_label_admin(col: str, tbl: str = None) -> str:
+            # 1. Override per tabela de baza (cel mai specific)
             if tbl and tbl in COL_LABELS_PER_TABLE_ADMIN:
                 if col in COL_LABELS_PER_TABLE_ADMIN[tbl]:
                     return COL_LABELS_PER_TABLE_ADMIN[tbl][col]
+            # 2. Override contextual pentru tabele auxiliare (echipa, financiar, etc.)
+            if is_contract_ctx and tbl not in COL_LABELS_PER_TABLE_ADMIN:
+                if col == "cod_identificare":
+                    return "NR. CONTRACT"
+                if col == "functia_specifica":
+                    return "ROLUL IN CONTRACT"
+            # 3. Label generic
             return COL_LABELS_ADMIN.get(col, col.replace("_", " ").capitalize())
 
         rel = DROPDOWN_MAP.get(table_name, {})
@@ -721,11 +739,13 @@ def porneste_motorul(supabase):
             df["reprezinta_idbdc"] = df["reprezinta_idbdc"].apply(
                 lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
-            cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
-                label=_col_label_admin("reprezinta_idbdc", table_name),
-                help="Bifează dacă persoana reprezintă IDBDC în proiect",
-                default=False,
-            )
+            # [FIX-6iv] Ascundem coloana reprezinta_idbdc pentru contracte
+            if not is_contract_ctx:
+                cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
+                    label=_col_label_admin("reprezinta_idbdc", table_name),
+                    help="Bifează dacă persoana reprezintă IDBDC în proiect",
+                    default=False,
+                )
 
         if table_name == "com_echipe_proiect" and "functie_upt" in df.columns:
             cfg["functie_upt"] = st.column_config.TextColumn(
@@ -757,7 +777,6 @@ def porneste_motorul(supabase):
                     format="%d",
                 )
 
-        # nr_crt este INTEGER — NumberColumn, doar citire
         if "nr_crt" in df.columns and "nr_crt" not in cfg:
             cfg["nr_crt"] = st.column_config.NumberColumn(
                 label="NR.CRT.",
@@ -765,7 +784,6 @@ def porneste_motorul(supabase):
                 format="%d",
             )
 
-        # Coloane numerice (INTEGER/FLOAT) — NumberColumn
         for c in df.columns:
             if c in cfg:
                 continue
@@ -777,7 +795,6 @@ def porneste_motorul(supabase):
                     step=1,
                 )
 
-        # Etichete frumoase pentru toate coloanele ramase (text simplu)
         for c in df.columns:
             if c in cfg:
                 continue
@@ -1015,7 +1032,7 @@ def porneste_motorul(supabase):
     st.markdown("**Acțiune**")
     actiune = st.radio(
         label="",
-        options=["Modificare date existente", "Introducere noutate"],
+        options=["Modificare / completare fișă existentă", "Fișă nouă"],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -1030,16 +1047,37 @@ def porneste_motorul(supabase):
         tabele = [
             ("Date de bază", tabela_baza),
             ("Date financiare", "com_date_financiare"),
-            ("Echipa", "com_echipe_proiect"),
+            ("Echipă", "com_echipe_proiect"),
             ("Aspecte tehnice", "com_aspecte_tehnice"),
         ]
     else:
         tabele = [
             ("Date de bază", tabela_baza),
-            ("Echipa", "com_echipe_proiect"),
+            ("Echipă", "com_echipe_proiect"),
         ]
 
     table_names = [t for _, t in tabele]
+
+    # ============================
+    # [FIX-4] Curățare session_state la schimbarea codului
+    # ============================
+
+    _prev_cod_key = "admin_prev_cod"
+    _prev_tabela_key = "admin_prev_tabela"
+    prev_cod = st.session_state.get(_prev_cod_key)
+    prev_tabela = st.session_state.get(_prev_tabela_key)
+
+    if prev_cod != cod or prev_tabela != tabela_baza:
+        # Cod sau categoria s-a schimbat — ștergem datele vechi din session_state
+        for _, tn in tabele:
+            for k in (f"df_admin__{tn}", f"df_admin_raw__{tn}",
+                      f"editor_{tn}_{prev_cod}", f"editor_echipa_rep_{prev_cod}",
+                      f"editor_echipa_rest_{prev_cod}", f"echipa_filter_{prev_cod}",
+                      f"toggle_deblocat_{prev_cod}"):
+                if k in st.session_state:
+                    del st.session_state[k]
+        st.session_state[_prev_cod_key] = cod
+        st.session_state[_prev_tabela_key] = tabela_baza
 
     # ============================
     # ÎNCĂRCARE
@@ -1057,14 +1095,28 @@ def porneste_motorul(supabase):
         exists_map[table_name] = exista
 
     base_exists = exists_map.get(tabela_baza, False)
-    if actiune == "Modificare date existente" and not base_exists:
-        st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Introducere noutate» dacă vrei să creezi.")
+    if actiune == "Modificare / completare fișă existentă" and not base_exists:
+        st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Fișă nouă» dacă vrei să creezi.")
         return
 
     for _, table_name in tabele:
         df, cols = loaded[table_name]
         if df.empty and cols:
             df_full = prepare_empty_single_row(cols, cod)
+            # [FIX-5] Propagare automată categorie + tip din selectoare pentru tabele de baza
+            if table_name == tabela_baza and cat_admin == "Contracte":
+                # Completăm denumire_categorie din nomenclator dacă câmpul e gol
+                if "denumire_categorie" in df_full.columns:
+                    opts = load_dropdown_options("nom_categorie", "denumire_categorie")
+                    # Preluăm prima opțiune care conține tipul (CEP/TERTI/SPECIALE) — fallback la None
+                    match = next((o for o in opts if tip_admin.upper() in o.upper()), None)
+                    if match:
+                        df_full.at[0, "denumire_categorie"] = match
+                if "acronim_contracte_proiecte" in df_full.columns:
+                    opts = load_dropdown_options("nom_contracte", "acronim_tip_contract")
+                    match = next((o for o in opts if tip_admin.upper() in o.upper()), None)
+                    if match:
+                        df_full.at[0, "acronim_contracte_proiecte"] = match
         else:
             df_full = df.copy()
         st.session_state[state_key_raw(table_name)] = df_full.copy()
@@ -1081,14 +1133,10 @@ def porneste_motorul(supabase):
     if toggle_key not in st.session_state:
         st.session_state[toggle_key] = True
 
-    # Toggle: OFF = Fișa este blocată | ON = Fișa este deblocată
-    # Nu folosim value= — starea e controlată exclusiv prin session_state[toggle_key]
-    # CSS dinamic: roșu = blocat, verde = deblocat
     _toggle_color = "#22c55e" if st.session_state[toggle_key] else "#ef4444"
     st.markdown(
         f"""
         <style>
-        /* Bara de sub comutator (track) */
         div[data-testid="stToggle"] input:checked + div,
         div[data-testid="stToggle"] input:checked ~ div[data-baseweb="toggle"] > div {{
             background-color: #22c55e !important;
@@ -1133,23 +1181,26 @@ def porneste_motorul(supabase):
         )
 
     # ============================
-    # EDITOR ECHIPA — doua zone separate
+    # EDITOR ECHIPĂ — două zone separate
     # ============================
 
     def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name):
         """
-        Randare editor echipa in doua zone:
-        - Zona 1 (sus): reprezentanti IDBDC — editor mic fix, proeminent
-        - Zona 2 (jos): restul echipei — editor dinamic cu inaltime fixa + scroll intern
-        Ambele zone folosesc dropdown pentru nume_prenume.
-        La salvare, cele doua zone se reunesc intr-un singur DataFrame.
+        Zona 1 (sus): Reprezentant responsabil contract / director proiect
+        Zona 2 (jos): Membrii echipă
+        La salvare cele două zone se reunesc.
         """
+        # [FIX-6iv] Pentru contracte: scoatem coloana reprezinta_idbdc din df_show
+        is_contract = tabela_baza in TABELE_CONTRACTE
+        if is_contract and "reprezinta_idbdc" in df_show.columns:
+            df_show = df_show.drop(columns=["reprezinta_idbdc"])
 
-        # Incarcam lista de persoane pentru dropdown
         persoane_disponibile = load_dropdown_options("det_resurse_umane", "nume_prenume")
 
-        # Inlocuim SelectboxColumn pentru nume_prenume cu lista completa
         col_cfg_echipa = dict(col_cfg)
+        if "reprezinta_idbdc" in col_cfg_echipa and is_contract:
+            del col_cfg_echipa["reprezinta_idbdc"]
+
         if "nume_prenume" in df_show.columns:
             col_cfg_echipa["nume_prenume"] = st.column_config.SelectboxColumn(
                 label="🔽 NUME SI PRENUME",
@@ -1158,24 +1209,40 @@ def porneste_motorul(supabase):
                 help="🔽 Selectează persoana din lista angajaților",
             )
 
-        # Impartim df in reprezentanti si restul
-        if "reprezinta_idbdc" in df_show.columns:
+        # [FIX-2] cod_identificare dezactivat în echipă (se completează automat)
+        if "cod_identificare" in df_show.columns:
+            col_cfg_echipa["cod_identificare"] = st.column_config.TextColumn(
+                label="NR. CONTRACT" if is_contract else "NR.CONTRACT/ID PROIECT",
+                disabled=True,
+            )
+
+        # Împărțim df în reprezentanți și restul (doar dacă nu e contract)
+        if not is_contract and "reprezinta_idbdc" in df_show.columns:
             mask_rep = df_show["reprezinta_idbdc"].apply(
                 lambda v: v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
             )
-            df_rep   = df_show[mask_rep].copy().reset_index(drop=True)
-            df_rest  = df_show[~mask_rep].copy().reset_index(drop=True)
+            df_rep  = df_show[mask_rep].copy().reset_index(drop=True)
+            df_rest = df_show[~mask_rep].copy().reset_index(drop=True)
         else:
-            df_rep  = pd.DataFrame(columns=df_show.columns)
+            # Pentru contracte: primul tabel = toți membrii (fără împărțire)
+            # Zona 1 = rândul cu reprezinta_idbdc=True (sau primul rând dacă nu există coloana)
+            df_rep  = df_show.head(0).copy()  # gol — va fi populat manual
             df_rest = df_show.copy()
 
-        # ── ZONA 1 — Reprezentanti IDBDC ──────────────────────────────────
+        # ── ZONA 1 ─────────────────────────────────────────────────────────
+        # Titlu adaptat la context
+        if is_contract:
+            zona1_titlu = "⭐ Reprezentant: responsabil contract"
+            zona1_subtitlu = ""
+        else:
+            zona1_titlu = "⭐ Reprezentant: director proiect / responsabil contract / persoana de contact"
+            zona1_subtitlu = ""
+
         st.markdown(
-            "<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
-            "border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            "<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
-            "⭐ Reprezentanți IDBDC</span> "
-            "<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>(director / responsabil proiect)</span>"
-            "</div>",
+            f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
+            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
+            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>{zona1_titlu}</span>"
+            f"</div>",
             unsafe_allow_html=True,
         )
 
@@ -1193,18 +1260,17 @@ def porneste_motorul(supabase):
 
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-        # ── ZONA 2 — Restul echipei ────────────────────────────────────────
+        # ── ZONA 2 ─────────────────────────────────────────────────────────
         nr_rest = len(df_rest)
         st.markdown(
             f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
-            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>"
-            f"👥 Membri echipă</span> "
+            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
+            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>👥 Membrii echipă</span> "
             f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_rest} persoane</span>"
             f"</div>",
             unsafe_allow_html=True,
         )
 
-        # Filtru rapid text deasupra editorului
         filter_key = f"echipa_filter_{cod}"
         filtru = st.text_input(
             "🔍 Filtrează după nume",
@@ -1232,24 +1298,24 @@ def porneste_motorul(supabase):
             height=400,
         )
 
-        # ── Reunim cele doua zone pentru salvare ──────────────────────────
-        # Forțam reprezinta_idbdc corect pentru fiecare zona
-        if "reprezinta_idbdc" in edited_rep.columns:
+        # ── Reunim pentru salvare ──────────────────────────────────────────
+        if not is_contract and "reprezinta_idbdc" in edited_rep.columns:
             edited_rep = edited_rep.copy()
             edited_rep["reprezinta_idbdc"] = True
-        if "reprezinta_idbdc" in edited_rest.columns:
+        if not is_contract and "reprezinta_idbdc" in edited_rest.columns:
             edited_rest = edited_rest.copy()
             edited_rest["reprezinta_idbdc"] = False
 
         df_reunited = pd.concat([edited_rep, edited_rest], ignore_index=True)
 
-        # Eliminam randuri fara nume (goale)
         if "nume_prenume" in df_reunited.columns:
             df_reunited = df_reunited[
                 df_reunited["nume_prenume"].notna() &
                 (df_reunited["nume_prenume"].astype(str).str.strip() != "")
             ].reset_index(drop=True)
 
+        # [FIX-3] Salvăm rezultatul și în session_state pentru a supraviețui rerun-ului
+        st.session_state[f"echipa_reunited_{cod}"] = df_reunited
         edited_data[table_name] = df_reunited
 
     # ============================
@@ -1270,9 +1336,8 @@ def porneste_motorul(supabase):
                 cols.insert(idx, "valuta")
                 df_show = df_show[cols]
 
-            col_cfg = build_column_config_for_table(table_name, df_show)
+            col_cfg = build_column_config_for_table(table_name, df_show, tabela_baza_ctx=tabela_baza)
 
-            # ── Editor special pentru echipa: doua zone separate ──────────
             if table_name == "com_echipe_proiect":
                 _render_echipa_editor(
                     df_show, col_cfg, cod, editing_blocked,
@@ -1317,7 +1382,7 @@ def porneste_motorul(supabase):
                 st.write(r.get("data_ultimei_modificari", "") or "-")
 
     # ============================
-    # MESAJ PERSISTENT — mare, vizibil
+    # MESAJ PERSISTENT
     # ============================
 
     if "admin_msg" in st.session_state:
@@ -1342,7 +1407,6 @@ def porneste_motorul(supabase):
                 unsafe_allow_html=True,
             )
         else:
-            # Separăm motivul tehnic de mesajul principal dacă există ":"
             parts = str(msg_text).split(":", 1)
             titlu_err = parts[0].strip()
             detaliu_err = parts[1].strip() if len(parts) > 1 else ""
@@ -1367,7 +1431,7 @@ def porneste_motorul(supabase):
             )
 
     # ============================
-    # BUTOANE — după editori
+    # BUTOANE
     # ============================
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
@@ -1390,19 +1454,21 @@ def porneste_motorul(supabase):
                 if not cols_real:
                     continue
 
-                # Reconstruim DataFrame-ul din starea editorului — supraviețuiește rerun-ului
                 df_base = st.session_state[state_key(table_name)].copy()
 
-                # Pentru echipa: _render_echipa_editor a reunit deja cele doua zone in edited_data
                 if table_name == "com_echipe_proiect":
-                    df_edit_visible = edited_data.get(table_name, df_base)
+                    # [FIX-3] Citim din session_state — supraviețuiește rerun-ului
+                    df_edit_visible = st.session_state.get(
+                        f"echipa_reunited_{cod}",
+                        edited_data.get(table_name, df_base)
+                    )
                 else:
                     editor_key = f"editor_{table_name}_{cod}"
                     editor_state = st.session_state.get(editor_key)
 
                     if editor_state is not None and isinstance(editor_state, dict):
-                        edited_rows = editor_state.get("edited_rows", {})
-                        added_rows  = editor_state.get("added_rows", [])
+                        edited_rows  = editor_state.get("edited_rows", {})
+                        added_rows   = editor_state.get("added_rows", [])
                         deleted_rows = editor_state.get("deleted_rows", [])
 
                         for idx_str, changes in edited_rows.items():
