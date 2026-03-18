@@ -1047,24 +1047,13 @@ def porneste_motorul(supabase):
     base_full = st.session_state[state_key_raw(tabela_baza)]
 
     # ============================
-    # BLOCARE DUPĂ VALIDARE
+    # BLOCARE / DEBLOCARE FIȘĂ
     # ============================
 
-    already_valid = False
-    if len(base_full) > 0 and "validat_idbdc" in base_full.columns:
-        try:
-            already_valid = bool(base_full.loc[0, "validat_idbdc"])
-        except Exception:
-            already_valid = False
-
-    # Cheia pentru starea toggle-ului în session_state
     toggle_key = f"toggle_deblocat_{cod}"
 
-    # Dacă fișa tocmai a fost validată (sau e deja validată), implicitul toggle-ului e OFF (blocat)
-    # Utilizatorul poate muta manual pe ON (deblocat) dacă vrea să editeze după validare
     if toggle_key not in st.session_state:
-        # Dacă e validată → implicit blocat (False = blocat)
-        st.session_state[toggle_key] = not already_valid if already_valid else True
+        st.session_state[toggle_key] = True
 
     # Toggle: OFF = Fișa este blocată | ON = Fișa este deblocată
     # Nu folosim value= — starea e controlată exclusiv prin session_state[toggle_key]
@@ -1098,21 +1087,21 @@ def porneste_motorul(supabase):
 
     editing_blocked = not deblocat
 
-    if already_valid and deblocat:
+    if deblocat:
         st.markdown(
-            "<div style='background:rgba(255,200,50,0.18);border:1px solid rgba(255,200,50,0.55);"
+            "<div style='background:rgba(34,197,94,0.18);border:1px solid rgba(34,197,94,0.60);"
             "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
-            "<span style='color:#ffe066;font-weight:700;font-size:0.97rem;'>"
-            "⚠️ Fișa a fost validată. Editarea este activă — modificările vor anula validarea anterioară."
+            "<span style='color:#4ade80;font-weight:700;font-size:0.97rem;'>"
+            "✅ Fișa este deblocată. Editarea este activă."
             "</span></div>",
             unsafe_allow_html=True,
         )
-    elif already_valid and not deblocat:
+    else:
         st.markdown(
-            "<div style='background:rgba(50,200,100,0.13);border:1px solid rgba(50,200,100,0.40);"
+            "<div style='background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.60);"
             "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
-            "<span style='color:#80ffb0;font-weight:700;font-size:0.97rem;'>"
-            "✅ Fișa este validată și blocată. Mută toggle-ul pe ON pentru a edita."
+            "<span style='color:#f87171;font-weight:700;font-size:0.97rem;'>"
+            "🔒 Fișa este blocată. Mută toggle-ul pe ON pentru a edita."
             "</span></div>",
             unsafe_allow_html=True,
         )
@@ -1286,7 +1275,7 @@ def porneste_motorul(supabase):
     if len(base_full) > 0 and st.session_state.get("operator_rol") == "ADMIN":
         with st.expander("Status fișă (ADMIN)", expanded=False):
             r = base_full.iloc[0].to_dict()
-            s1, s2, s3, s4, s5 = st.columns([1.2, 2.2, 1.0, 1.6, 1.0])
+            s1, s2, s3, s4 = st.columns([1.2, 2.2, 1.0, 1.6])
             with s1:
                 st.caption("Responsabil")
                 st.write(r.get("responsabil_idbdc", "") or "")
@@ -1300,9 +1289,6 @@ def porneste_motorul(supabase):
             with s4:
                 st.caption("Ultima modificare")
                 st.write(r.get("data_ultimei_modificari", "") or "-")
-            with s5:
-                st.caption("Validat")
-                st.write(fmt_bool(r.get("validat_idbdc", False)))
 
     # ============================
     # MESAJ PERSISTENT — mare, vizibil
