@@ -1100,15 +1100,18 @@ def porneste_motorul(supabase):
         return
 
     for _, table_name in tabele:
+        # Nu suprascrie session_state dacă datele sunt deja încărcate pentru același cod
+        # (evităm pierderea editărilor la rerun-uri intermediare)
+        if state_key_raw(table_name) in st.session_state:
+            continue
+
         df, cols = loaded[table_name]
         if df.empty and cols:
             df_full = prepare_empty_single_row(cols, cod)
             # [FIX-5] Propagare automată categorie + tip din selectoare pentru tabele de baza
             if table_name == tabela_baza and cat_admin == "Contracte":
-                # Completăm denumire_categorie din nomenclator dacă câmpul e gol
                 if "denumire_categorie" in df_full.columns:
                     opts = load_dropdown_options("nom_categorie", "denumire_categorie")
-                    # Preluăm prima opțiune care conține tipul (CEP/TERTI/SPECIALE) — fallback la None
                     match = next((o for o in opts if tip_admin.upper() in o.upper()), None)
                     if match:
                         df_full.at[0, "denumire_categorie"] = match
