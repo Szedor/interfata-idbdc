@@ -1497,14 +1497,17 @@ def porneste_motorul(supabase):
                 if df_edit_visible is None or len(df_edit_visible) == 0:
                     continue
 
-                df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
-
                 if table_name == "com_echipe_proiect":
+                    # Echipa: nu folosim merge_back (ar trunchia rândurile)
+                    # Setăm cod_identificare direct pe toate rândurile
+                    df_for_save = df_edit_visible.copy()
+                    df_for_save["cod_identificare"] = cod
                     df_for_save = autofill_functie_upt(df_for_save)
-
-                if "cod_identificare" in df_for_save.columns:
-                    df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
-                    df_for_save["cod_identificare"] = df_for_save["cod_identificare"].astype(str).replace("nan", cod)
+                else:
+                    df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
+                    if "cod_identificare" in df_for_save.columns:
+                        df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
+                        df_for_save["cod_identificare"] = df_for_save["cod_identificare"].astype(str).replace("nan", cod)
 
                 for _, row in df_for_save.iterrows():
                     data = row.to_dict()
