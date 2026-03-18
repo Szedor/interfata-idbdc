@@ -990,7 +990,10 @@ def porneste_motorul(supabase):
         else:
             tip_admin = ""
     with c3:
-        id_admin = st.text_input("Filtru numar contract sau id proiect")
+        if cat_admin == "Contracte":
+            id_admin = st.text_input("Filtru număr contract")
+        else:
+            id_admin = st.text_input("Filtru număr contract sau ID proiect")
 
     st.divider()
 
@@ -1443,7 +1446,7 @@ def porneste_motorul(supabase):
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     b1, b2 = st.columns(2)
     with b1:
-        btn_save = st.button("💾 SALVARE (toată fișa)", disabled=editing_blocked)
+        btn_save = st.button("💾 SALVARE FIȘĂ", disabled=editing_blocked)
     with b2:
         btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
