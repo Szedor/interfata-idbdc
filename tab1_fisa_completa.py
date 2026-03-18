@@ -337,63 +337,44 @@ def _render_sectiune_tabel(section_label: str, rows: list[dict], table: str = No
     )
 
 
-def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
+def _render_echipa_compact(rows: list[dict], cod_ctx: str = "", supabase=None):
     """
-    Afișează echipa în două zone:
-    - Reprezentant (responsabil contract / director proiect)
-    - Membrii echipă — în format text inline, comprimat, cu selector de câmpuri afișate
-
-    [7]+[8] Membrii afișați inline: Nume, Rol, Status · Nume, Rol ·  ...
-    [5] Fără coloana reprezinta_idbdc, fără câmpuri goale
-    [6] Etichete adaptate la context
+    Afișează echipa:
+    - Reprezentant cu date de contact din det_resurse_umane
+    - Membrii echipă în format inline, cu bife pentru câmpurile dorite
     """
     if not rows:
         st.info("Nu există echipă înregistrată pentru această fișă.")
         return
 
-    # Câmpuri disponibile în tabelă (cu date) — excludem tehnice și goale
-    CAMPURI_ASCUNSE = {
-        "reprezinta_idbdc", "cod_identificare", "nr_crt",
-        "responsabil_idbdc", "observatii_idbdc", "status_confirmare",
-        "data_ultimei_modificari", "validat_idbdc",
-        "creat_de", "creat_la", "modificat_de", "modificat_la",
-        "functie_upt",  # afișat deja prin acronim_functie_upt
-    }
-
-    # Câmpuri cu date (cel puțin un rând nenul) din toate rândurile
-    campuri_cu_date = []
     toate_campuri_posibile = [
         "nume_prenume", "functia_specifica", "acronim_functie_upt",
         "status_personal", "data_inceput_rol", "data_sfarsit_rol",
     ]
-    for c in toate_campuri_posibile:
-        if any(r.get(c) for r in rows):
-            campuri_cu_date.append(c)
+    campuri_cu_date = [c for c in toate_campuri_posibile if any(r.get(c) for r in rows)]
 
     ETICHETE_ECH = {
-        "nume_prenume":       "Nume",
-        "functia_specifica":  "Rol",
+        "nume_prenume":        "Nume",
+        "functia_specifica":   "Rol",
         "acronim_functie_upt": "Funcție UPT",
-        "status_personal":    "Status",
-        "data_inceput_rol":   "De la",
-        "data_sfarsit_rol":   "Până la",
+        "status_personal":     "Status",
+        "data_inceput_rol":    "De la",
+        "data_sfarsit_rol":    "Până la",
     }
 
-    # Selector câmpuri afișate — [7]
     ctx_key = cod_ctx or str(id(rows))
     sel_key = f"ech_campuri_{ctx_key}"
     if sel_key not in st.session_state:
-        # Default: Nume + Rol
         st.session_state[sel_key] = ["nume_prenume", "functia_specifica"]
 
-    with st.expander("⚙️ Câmpuri afișate în lista echipei", expanded=False):
-        cols_sel = st.columns(len(campuri_cu_date) or 1)
-        selectie = []
-        for i, c in enumerate(campuri_cu_date):
-            checked = c in st.session_state[sel_key]
-            if cols_sel[i].checkbox(ETICHETE_ECH.get(c, c), value=checked, key=f"ech_chk_{ctx_key}_{c}"):
-                selectie.append(c)
-        st.session_state[sel_key] = selectie if selectie else ["nume_prenume"]
+    # Bife câmpuri — fără expander, direct inline
+    cols_sel = st.columns(len(campuri_cu_date) or 1)
+    selectie = []
+    for i, c in enumerate(campuri_cu_date):
+        checked = c in st.session_state[sel_key]
+        if cols_sel[i].checkbox(ETICHETE_ECH.get(c, c), value=checked, key=f"ech_chk_{ctx_key}_{c}"):
+            selectie.append(c)
+    st.session_state[sel_key] = selectie if selectie else ["nume_prenume"]
 
     campuri_activi = [c for c in campuri_cu_date if c in st.session_state[sel_key]]
     if not campuri_activi:
@@ -413,14 +394,6 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
               if r.get("reprezinta_idbdc") is not True
               and str(r.get("reprezinta_idbdc", "")).strip().upper() not in ("TRUE", "DA", "1")]
 
-    nr_total = len(rows_sorted)
-
-    st.markdown(
-        f"<div style='color:rgba(255,255,255,0.65);font-size:0.83rem;margin-bottom:6px;'>"
-        f"{nr_total} persoane înregistrate în echipă</div>",
-        unsafe_allow_html=True,
-    )
-
     def _format_membru(r, campuri):
         parts = []
         for c in campuri:
@@ -429,7 +402,7 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
                 parts.append(_html.escape(v))
         return ", ".join(parts)
 
-    # ── Reprezentant ─────────────────────────────────────────────────────
+    # ── Reprezentant cu date de contact ──────────────────────────────────
     if reprezentanti:
         st.markdown(
             "<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
@@ -439,11 +412,39 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
         )
         for r in reprezentanti:
             txt = _format_membru(r, campuri_activi)
+            # Preia date contact din det_resurse_umane
+            contact_html = ""
+            if supabase:
+                try:
+                    nume_rep = str(r.get("nume_prenume") or "").strip()
+                    if nume_rep:
+                        res_c = supabase.table("det_resurse_umane")                            .select("email_upt,telefon_upt,telefon_mobil")                            .eq("nume_prenume", nume_rep).limit(1).execute()
+                        if res_c.data:
+                            rc = res_c.data[0]
+                            email = str(rc.get("email_upt") or "").strip()
+                            tel1  = str(rc.get("telefon_upt") or "").strip()
+                            tel2  = str(rc.get("telefon_mobil") or "").strip()
+                            parts_c = []
+                            if email:
+                                parts_c.append(f"✉ {_html.escape(email)}")
+                            if tel1:
+                                parts_c.append(f"☎ {_html.escape(tel1)}")
+                            if tel2 and tel2 != tel1:
+                                parts_c.append(f"📱 {_html.escape(tel2)}")
+                            if parts_c:
+                                contact_html = (
+                                    f" <span style='color:rgba(255,220,100,0.80);"
+                                    f"font-size:0.82rem;font-weight:400;'>"
+                                    f"{'  ·  '.join(parts_c)}</span>"
+                                )
+                except Exception:
+                    pass
             st.markdown(
-                f"<div style='padding:5px 12px;margin-bottom:3px;"
+                f"<div style='padding:6px 12px;margin-bottom:3px;"
                 f"background:rgba(255,255,255,0.10);border-radius:8px;"
                 f"border-left:3px solid rgba(255,220,80,0.70);'>"
-                f"<span style='font-weight:800;color:#ffffff;'>⭐ {txt}</span></div>",
+                f"<span style='font-weight:800;color:#ffffff;'>⭐ {txt}</span>"
+                f"{contact_html}</div>",
                 unsafe_allow_html=True,
             )
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
@@ -451,7 +452,7 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
     if not membri:
         return
 
-    # ── Membrii echipă — format inline [8] ───────────────────────────────
+    # ── Membrii echipă — format inline ───────────────────────────────────
     st.markdown(
         f"<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
         f"text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;'>"
@@ -464,8 +465,7 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
     if show_all_key not in st.session_state:
         st.session_state[show_all_key] = False
 
-    def _build_inline_html(lista, campuri):
-        """[8] Fiecare membru: câmpuri separate prin virgulă · separator între membri"""
+    def _build_inline(lista, campuri):
         parts = []
         for r in lista:
             txt = _format_membru(r, campuri)
@@ -484,10 +484,11 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
         if filtru:
             membri_display = [r for r in membri if filtru in str(r.get("nume_prenume") or "").lower()]
 
-    inline_text = _build_inline_html(membri_display, campuri_activi)
+    inline_text = _build_inline(membri_display, campuri_activi)
     st.markdown(
         f"<div style='background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);"
-        f"border-radius:10px;padding:10px 14px;line-height:1.9;font-size:0.88rem;color:rgba(255,255,255,0.88);'>"
+        f"border-radius:10px;padding:10px 14px;line-height:1.9;font-size:0.88rem;"
+        f"color:rgba(255,255,255,0.88);'>"
         f"{inline_text}</div>",
         unsafe_allow_html=True,
     )
@@ -505,6 +506,7 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = ""):
             ):
                 st.session_state[show_all_key] = True
                 st.rerun()
+
 
 
 # =========================================================
@@ -625,7 +627,7 @@ def render_fisa_completa(supabase: Client):
                 if not rows:
                     st.info("Nu există membri echipă pentru acest contract.")
                 else:
-                    _render_echipa_compact(rows, cod_ctx=cod)
+                    _render_echipa_compact(rows, cod_ctx=cod, supabase=supabase)
             else:
                 rows = _safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=50)
                 if not rows:
@@ -661,14 +663,47 @@ def render_fisa_completa(supabase: Client):
 
     rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
     if rows_ech:
-        df_ech = pd.DataFrame(rows_ech)
-        # [5] Excludem reprezinta_idbdc si campurile tehnice/ascunse
-        COLS_HIDE_ECH = COLS_HIDDEN_FISA | {"reprezinta_idbdc", "functie_upt"}
-        df_ech = df_ech[[c for c in df_ech.columns if c not in COLS_HIDE_ECH]]
-        # [5] Excludem coloanele complet goale
-        df_ech = df_ech.dropna(axis=1, how="all")
-        df_ech = df_ech.loc[:, ~(df_ech == "").all()]
-        df_ech.columns = [_col_label(c, "com_echipe_proiect") for c in df_ech.columns]
+        # Format inline pentru PDF: o singura linie per sectiune
+        def _is_rep(r):
+            v = r.get("reprezinta_idbdc")
+            return v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
+
+        reps_ech   = [r for r in rows_ech if _is_rep(r)]
+        membri_ech = [r for r in rows_ech if not _is_rep(r)]
+
+        campuri_pdf = ["nume_prenume", "functia_specifica", "status_personal"]
+
+        def _fmt_r(r):
+            return ", ".join(
+                str(r.get(c) or "").strip()
+                for c in campuri_pdf if str(r.get(c) or "").strip()
+            )
+
+        # Date contact reprezentant
+        contact_rep = ""
+        if reps_ech and supabase:
+            try:
+                nr = str(reps_ech[0].get("nume_prenume") or "").strip()
+                rc = supabase.table("det_resurse_umane")                    .select("email_upt,telefon_upt,telefon_mobil")                    .eq("nume_prenume", nr).limit(1).execute()
+                if rc.data:
+                    d = rc.data[0]
+                    parts_c = [p for p in [
+                        str(d.get("email_upt") or "").strip(),
+                        str(d.get("telefon_upt") or "").strip(),
+                        str(d.get("telefon_mobil") or "").strip(),
+                    ] if p]
+                    if parts_c:
+                        contact_rep = "  |  " + "  ·  ".join(parts_c)
+            except Exception:
+                pass
+
+        rep_txt    = ("  |  ".join(_fmt_r(r) + contact_rep for r in reps_ech)) if reps_ech else "-"
+        membri_txt = "  ·  ".join(_fmt_r(r) for r in membri_ech) if membri_ech else "-"
+
+        df_ech = pd.DataFrame([
+            {"Câmp": "Responsabil contract", "Valoare": rep_txt},
+            {"Câmp": "Membrii echipă", "Valoare": membri_txt},
+        ])
         export_frames["Echipă"] = df_ech
 
     ea1, ea2, ea3, ea4 = st.columns([1.0, 1.0, 1.0, 1.0])
