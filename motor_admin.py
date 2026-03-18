@@ -1209,12 +1209,11 @@ def porneste_motorul(supabase):
                 help="🔽 Selectează persoana din lista angajaților",
             )
 
-        # [FIX-2] cod_identificare dezactivat în echipă (se completează automat)
-        if "cod_identificare" in df_show.columns:
-            col_cfg_echipa["cod_identificare"] = st.column_config.TextColumn(
-                label="NR. CONTRACT" if is_contract else "NR.CONTRACT/ID PROIECT",
-                disabled=True,
-            )
+        # [FIX-2] cod_identificare ascuns din editor — se completează automat la salvare
+        cols_echipa_show = [c for c in df_show.columns if c != "cod_identificare"]
+        df_show = df_show[cols_echipa_show]
+        # Eliminăm din cfg eventualele referințe la cod_identificare
+        col_cfg_echipa.pop("cod_identificare", None)
 
         # Împărțim df în reprezentanți și restul (doar dacă nu e contract)
         if not is_contract and "reprezinta_idbdc" in df_show.columns:
@@ -1235,13 +1234,14 @@ def porneste_motorul(supabase):
             zona1_titlu = "⭐ Reprezentant: responsabil contract"
             zona1_subtitlu = ""
         else:
-            zona1_titlu = "⭐ Reprezentant: director proiect / responsabil contract / persoana de contact"
-            zona1_subtitlu = ""
+            zona1_titlu = "⭐ Reprezentanți IDBDC"
+            zona1_subtitlu = "director / responsabil proiect"
 
+        _subtitlu_html = f" <span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>({zona1_subtitlu})</span>" if zona1_subtitlu else ""
         st.markdown(
             f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
             f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
-            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>{zona1_titlu}</span>"
+            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>{zona1_titlu}</span>{_subtitlu_html}"
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1307,6 +1307,9 @@ def porneste_motorul(supabase):
             edited_rest["reprezinta_idbdc"] = False
 
         df_reunited = pd.concat([edited_rep, edited_rest], ignore_index=True)
+
+        # Completăm cod_identificare pe toate rândurile înainte de filtrare
+        df_reunited["cod_identificare"] = cod
 
         if "nume_prenume" in df_reunited.columns:
             df_reunited = df_reunited[
