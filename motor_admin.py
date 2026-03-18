@@ -73,6 +73,20 @@ def porneste_motorul(supabase):
         c = (col or "").lower()
         return c == "an" or c.startswith("an_")
 
+    def is_numeric_col(col: str, df: pd.DataFrame) -> bool:
+        """Detectează coloane numerice (INTEGER/FLOAT) după dtype și nume."""
+        c = (col or "").lower()
+        numeric_keywords = (
+            "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
+            "contributie_", "numar_", "nr_", "punctaj", "scor_",
+            "interval_", "total_", "pozitie_", "perioada_valabilitate_ani",
+        )
+        if any(c.startswith(k) or c == k for k in numeric_keywords):
+            return True
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            return True
+        return False
+
     def empty_row(columns):
         row = {c: None for c in columns}
         if "status_confirmare" in row:
@@ -750,6 +764,18 @@ def porneste_motorul(supabase):
                 disabled=True,
                 format="%d",
             )
+
+        # Coloane numerice (INTEGER/FLOAT) — NumberColumn
+        for c in df.columns:
+            if c in cfg:
+                continue
+            if c in CONTROL_COLS:
+                continue
+            if is_numeric_col(c, df):
+                cfg[c] = st.column_config.NumberColumn(
+                    label=_col_label_admin(c, table_name),
+                    step=1,
+                )
 
         # Etichete frumoase pentru toate coloanele ramase (text simplu)
         for c in df.columns:
