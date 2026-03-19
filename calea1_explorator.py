@@ -18,27 +18,31 @@ _MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
 def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
-    st.markdown("""
+    st.markdown(
+        """
         <style>
         .stApp { background: #0b2a52 !important; }
+        div.block-container { padding-top: 2rem; }
         </style>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-        <div style='display:flex;justify-content:center;align-items:center;
-                    min-height:80vh;'>
-          <div style='background:rgba(255,255,255,0.07);border:2px solid rgba(255,255,255,0.25);
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <div style="display:flex;justify-content:center;align-items:center;min-height:75vh;">
+          <div style="background:rgba(255,255,255,0.07);border:2px solid rgba(255,255,255,0.25);
                       border-radius:20px;padding:40px 48px;max-width:680px;width:100%;
-                      box-shadow:0 20px 60px rgba(0,0,0,0.40);text-align:center;'>
+                      box-shadow:0 20px 60px rgba(0,0,0,0.40);text-align:center;">
 
-            <div style='font-size:2.8rem;margin-bottom:0.5rem;'>⚠️</div>
+            <div style="font-size:2.8rem;margin-bottom:0.5rem;">⚠️</div>
 
-            <div style='color:#ffffff;font-size:1.55rem;font-weight:900;
-                        letter-spacing:0.06em;margin-bottom:1.2rem;'>
+            <div style="color:#ffffff;font-size:1.55rem;font-weight:900;
+                        letter-spacing:0.06em;margin-bottom:1.2rem;">
               IMPORTANT !
             </div>
 
-            <div style='color:rgba(255,255,255,0.90);font-size:0.97rem;
-                        line-height:1.75;text-align:justify;margin-bottom:1.4rem;'>
+            <div style="color:rgba(255,255,255,0.90);font-size:0.97rem;
+                        line-height:1.75;text-align:justify;margin-bottom:1.4rem;">
               Platforma <strong>IDBDC-UPT</strong>
               (<em>Interogare — Dezvoltare Baze de Date Cercetare – UPT</em>)
               a intrat în testarea finală a celor aproape <strong>6.000 de linii de cod</strong>,
@@ -55,14 +59,16 @@ def _maintenance_gate():
               deschiderea accesului.
             </div>
 
-            <div style='color:rgba(255,255,255,0.45);font-size:0.80rem;
-                        margin-bottom:1.2rem;font-style:italic;'>
+            <div style="color:rgba(255,255,255,0.45);font-size:0.80rem;
+                        margin-bottom:0.5rem;font-style:italic;">
               Acces temporar restricționat · Introduceți parola pentru a continua
             </div>
 
           </div>
         </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
     _, mid, _ = st.columns([1, 2, 1])
     with mid:
         pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c1")
@@ -75,7 +81,6 @@ def _maintenance_gate():
     st.stop()
 
 _maintenance_gate()
-
 TITLE_LINE_1 = "🔎 Baze de date - Interogare | Cautare | Consultare avansata"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
 
