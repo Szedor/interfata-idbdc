@@ -719,8 +719,19 @@ def porneste_motorul(supabase):
         rel = DROPDOWN_MAP.get(table_name, {})
         cfg = {}
 
+        # [3] Coloanele auto-preluate din selectoare nu mai au dropdown — sunt TextColumn disabled
+        AUTO_FILLED_COLS = {"denumire_categorie", "acronim_contracte_proiecte"}
+
         for target_col, (src_table, src_col) in rel.items():
             if target_col not in df.columns:
+                continue
+            # [3] Daca e coloana auto-completata, afisam ca text readonly
+            if target_col in AUTO_FILLED_COLS:
+                cfg[target_col] = st.column_config.TextColumn(
+                    label=_col_label_admin(target_col, table_name),
+                    disabled=True,
+                    help="Completat automat din selectoarele de sus",
+                )
                 continue
             if src_table == "__STATIC__":
                 options = STATIC_OPTIONS.get(src_col, [])
@@ -995,6 +1006,16 @@ def porneste_motorul(supabase):
         else:
             id_admin = st.text_input("Filtru număr contract sau ID proiect")
 
+    # [4] Avertismente daca operatorul introduce cod fara sa selecteze categoria/tipul
+    if id_admin and str(id_admin).strip():
+        if not cat_admin:
+            st.warning("Nu ati selectat categoria de date.")
+        elif cat_admin in ("Contracte", "Proiecte") and not tip_admin:
+            if cat_admin == "Contracte":
+                st.warning("Nu ati selectat tipul de contract.")
+            else:
+                st.warning("Nu ati selectat tipul de proiect.")
+
     st.divider()
 
     map_baze = {
@@ -1009,6 +1030,19 @@ def porneste_motorul(supabase):
         "PNCDI": "base_proiecte_pncdi",
     }
 
+    # [1][2] Mapari pentru auto-preluare in gridul Date de baza
+    map_categorie_label = {
+        "Contracte":               "Contracte",
+        "Proiecte":                "Proiecte",
+        "Evenimente stiintifice":  "Evenimente stiintifice",
+        "Proprietate intelectuala":"Proprietate intelectuala",
+    }
+    map_tip_label = {
+        "CEP": "CEP", "TERTI": "TERTI", "SPECIALE": "SPECIALE",
+        "FDI": "FDI", "PNRR": "PNRR", "PNCDI": "PNCDI",
+        "INTERNATIONALE": "INTERNATIONALE", "INTERREG": "INTERREG", "NONEU": "NONEU",
+    }
+
     if cat_admin in ("Contracte", "Proiecte"):
         tabela_baza = map_baze.get(tip_admin)
     elif cat_admin == "Evenimente stiintifice":
@@ -1019,11 +1053,11 @@ def porneste_motorul(supabase):
         tabela_baza = None
 
     if not tabela_baza:
-        st.info("Selectează categoria și (dacă este cazul) tipul.")
+        st.info("Selecteaza categoria si (daca este cazul) tipul.")
         return
 
     if not id_admin or str(id_admin).strip() == "":
-        st.info("Introdu «Filtru numar contract sau id proiect» pentru a deschide fișa.")
+        st.info("Introdu filtrul pentru a deschide fisa.")
         return
 
     cod = str(id_admin).strip()
@@ -1111,20 +1145,25 @@ def porneste_motorul(supabase):
         df, cols = loaded[table_name]
         if df.empty and cols:
             df_full = prepare_empty_single_row(cols, cod)
-            # [FIX-5] Propagare automată categorie + tip din selectoare pentru tabele de baza
-            if table_name == tabela_baza and cat_admin == "Contracte":
-                if "denumire_categorie" in df_full.columns:
-                    opts = load_dropdown_options("nom_categorie", "denumire_categorie")
-                    match = next((o for o in opts if tip_admin.upper() in o.upper()), None)
-                    if match:
-                        df_full.at[0, "denumire_categorie"] = match
-                if "acronim_contracte_proiecte" in df_full.columns:
-                    opts = load_dropdown_options("nom_contracte", "acronim_tip_contract")
-                    match = next((o for o in opts if tip_admin.upper() in o.upper()), None)
-                    if match:
-                        df_full.at[0, "acronim_contracte_proiecte"] = match
         else:
             df_full = df.copy()
+
+        # [1][2] Auto-preluare categorie si tip din selectoarele de sus — pentru tabela de baza
+        if table_name == tabela_baza:
+            if "denumire_categorie" in df_full.columns and cat_admin:
+                # Cautam valoarea exacta din nomenclator care corespunde categoriei selectate
+                opts_cat = load_dropdown_options("nom_categorie", "denumire_categorie")
+                match_cat = next((o for o in opts_cat if cat_admin.upper() in o.upper()), None)
+                if match_cat:
+                    df_full["denumire_categorie"] = match_cat
+            if "acronim_contracte_proiecte" in df_full.columns and tip_admin:
+                # Contracte sau Proiecte — sursa diferita
+                src_tip = "nom_contracte" if cat_admin == "Contracte" else "nom_proiecte"
+                col_tip = "acronim_tip_contract" if cat_admin == "Contracte" else "acronim_tip_proiect"
+                opts_tip = load_dropdown_options(src_tip, col_tip)
+                match_tip = next((o for o in opts_tip if tip_admin.upper() in o.upper()), None)
+                if match_tip:
+                    df_full["acronim_contracte_proiecte"] = match_tip
         st.session_state[state_key_raw(table_name)] = df_full.copy()
         st.session_state[state_key(table_name)] = hide_control_cols(df_full)
 
