@@ -13,44 +13,65 @@ import io
 GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
 PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 
-_MAINTENANCE_PASSWORD = "MW-2024-1147"
+_MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
 
 def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
-    st.set_page_config(page_title="IDBDC – System Alert", layout="centered")
     st.markdown("""
         <style>
-        .stApp { background: #0b1a2e !important; }
+        .stApp { background: #0b2a52 !important; }
         </style>
     """, unsafe_allow_html=True)
     st.markdown("""
-        <div style='text-align:center;margin-top:3rem;'>
-            <div style='font-size:2.5rem;'>🔒</div>
-            <div style='color:#ff4444;font-size:1.1rem;font-weight:900;
-                        letter-spacing:0.08em;margin:0.5rem 0;'>
-                SYSTEM ALERT — SEC-7743-ACL
+        <div style='display:flex;justify-content:center;align-items:center;
+                    min-height:80vh;'>
+          <div style='background:rgba(255,255,255,0.07);border:2px solid rgba(255,255,255,0.25);
+                      border-radius:20px;padding:40px 48px;max-width:680px;width:100%;
+                      box-shadow:0 20px 60px rgba(0,0,0,0.40);text-align:center;'>
+
+            <div style='font-size:2.8rem;margin-bottom:0.5rem;'>⚠️</div>
+
+            <div style='color:#ffffff;font-size:1.55rem;font-weight:900;
+                        letter-spacing:0.06em;margin-bottom:1.2rem;'>
+              IMPORTANT !
             </div>
-            <div style='background:rgba(255,50,50,0.10);border:1px solid rgba(255,80,80,0.40);
-                        border-radius:12px;padding:16px 24px;
-                        color:rgba(255,255,255,0.80);font-size:0.88rem;
-                        max-width:520px;margin:0 auto 1.5rem auto;line-height:1.6;'>
-                Acces suspendat ca urmare a detectarii unei intrari neautorizate
-                in fereastra de mentenanta activa.<br><br>
-                <span style='color:#ff9944;font-weight:700;'>
-                ACL cache poisoning detectat. RLS policies invalidate.
-                Rollback initiat pe schemele afectate.</span><br><br>
-                Contactati administratorul de sistem pentru deblocare.
+
+            <div style='color:rgba(255,255,255,0.90);font-size:0.97rem;
+                        line-height:1.75;text-align:justify;margin-bottom:1.4rem;'>
+              Platforma <strong>IDBDC-UPT</strong>
+              (<em>Interogare — Dezvoltare Baze de Date Cercetare – UPT</em>)
+              a intrat în testarea finală a celor aproape <strong>6.000 de linii de cod</strong>,
+              din <strong>11 fișiere principale Python</strong>, dintre care 5 fișiere sunt
+              dedicate modulelor AI, <strong>93 de funcții și algoritmi definiți</strong>,
+              <strong>24 de tabele de baze de date</strong> cu
+              <strong>122 de câmpuri de date distincte</strong>, precum și a securității
+              asigurate prin <strong>5 niveluri de autentificare</strong>.<br><br>
+              După finalizarea procesului de testare finală se va trece la încărcarea cu
+              date reale, atât curente cât și istorice. Pentru această etapă va fi vizibil
+              permanent un <strong>grafic de progres anual</strong> pentru fiecare categorie
+              — contracte și proiecte pe tipuri, evenimente științifice și proprietate
+              industrială — dar și o <strong>numărătoare inversă</strong> până la
+              deschiderea accesului.
             </div>
+
+            <div style='color:rgba(255,255,255,0.45);font-size:0.80rem;
+                        margin-bottom:1.2rem;font-style:italic;'>
+              Acces temporar restricționat · Introduceți parola pentru a continua
+            </div>
+
+          </div>
         </div>
     """, unsafe_allow_html=True)
-    pwd = st.text_input("Cod de deblocare sistem:", type="password", key="_mw_pwd_c1")
-    if st.button("Autorizare acces", key="_mw_btn_c1"):
-        if pwd == _MAINTENANCE_PASSWORD:
-            st.session_state["_mw_cleared"] = True
-            st.rerun()
-        else:
-            st.error("Cod invalid. Accesul ramane suspendat.")
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
+        pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c1")
+        if st.button("Acces platformă", key="_mw_btn_c1", use_container_width=True):
+            if pwd == _MAINTENANCE_PASSWORD:
+                st.session_state["_mw_cleared"] = True
+                st.rerun()
+            else:
+                st.error("Parolă incorectă.")
     st.stop()
 
 _maintenance_gate()
