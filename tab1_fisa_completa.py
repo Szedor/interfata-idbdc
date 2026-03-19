@@ -20,7 +20,7 @@ COL_LABELS = {
     "acronim_proiect": "ACRONIM TIP PROIECTE",
     "acronim_proiecte": "ACRONIM TIP PROIECTE",
     "acronim_prop_intelect": "FORME DE PROTECTIE A PROPRIETATII INDUSTRIALE",
-    "activitati_proiect": "ACTIVIATI",
+    "activitati_proiect": "ACTIVITATI",
     "an_referinta": "ANUL DE REFERINTA",
     "apel_pentru_propuneri": "APELUL PENTRU PROPUNERI",
     "autori": "AUTORI",
@@ -232,6 +232,12 @@ COL_LABELS_PER_TABLE = {
         "data_depozit_cerere":    "DATA DEPUNERE LA OSIM",
         "data_oficiala_acordare": "DATA ACORDARE",
         "numar_oficial_acordare": "NR. OFICIAL ACORDARE",
+    },
+    "com_date_financiare": {
+        "cod_identificare": "NR.CONTRACT",
+    },
+    "com_aspecte_tehnice": {
+        "cod_identificare": "NR.CONTRACT",
     },
 }
 
@@ -804,15 +810,44 @@ def render_fisa_completa(supabase: Client):
         if st.button("🖨️ Print", key="fisa_print", use_container_width=True):
             html_sections = []
             for section_label, df_sec in export_frames.items():
-                html_sections.append(f"<h3>{_html.escape(section_label)}</h3>")
-                html_sections.append(df_sec.to_html(index=False, escape=True))
+                if df_sec.empty:
+                    continue
+                # Calculam latimea col1 dupa cel mai lung text din coloana Camp
+                camp_col = "Camp" if "Camp" in df_sec.columns else df_sec.columns[0]
+                max_len  = max((len(str(v)) for v in df_sec[camp_col]), default=10)
+                # ~7px per caracter + padding, plafonat intre 120px si 300px
+                col1_px  = min(300, max(120, max_len * 7 + 16))
+                col2_px  = 100  # coloana sectiune fixa
+                # Tabel HTML cu latimi fixe per sectiune
+                rows_html = ""
+                for r_idx, (_, row) in enumerate(df_sec.iterrows()):
+                    bg = "#f8f8f8" if r_idx % 2 == 0 else "#ffffff"
+                    camp_val  = _html.escape(str(row.get(camp_col, "")))
+                    val_val   = _html.escape(str(row.get(df_sec.columns[1], ""))) if len(df_sec.columns) > 1 else ""
+                    rows_html += (
+                        f"<tr style='background:{bg};'>"
+                        f"<td style='width:{col1_px}px;font-weight:600;color:#2c4a6e;"
+                        f"white-space:nowrap;'>{camp_val}</td>"
+                        f"<td>{val_val}</td></tr>"
+                    )
+                tbl_html = (
+                    f"<table style='border-collapse:collapse;width:100%;margin-bottom:16px;'>"
+                    f"<thead><tr>"
+                    f"<th style='width:{col1_px}px;background:#e8f0f8;text-align:left;'>{_html.escape(camp_col)}</th>"
+                    f"<th style='background:#e8f0f8;text-align:left;'>{_html.escape(df_sec.columns[1] if len(df_sec.columns) > 1 else '')}</th>"
+                    f"</tr></thead><tbody>{rows_html}</tbody></table>"
+                )
+                html_sections.append(f"<h3>{_html.escape(section_label)}</h3>{tbl_html}")
+
             full_html = f"""<html><head><meta charset="utf-8"/>
-            <style>body{{font-family:Arial;padding:20px;}}
-            h2{{color:#003366;}} h3{{color:#0b2a52;margin-top:20px;}}
+            <style>
+            body{{font-family:Arial;padding:20px;font-size:11px;}}
+            h2{{color:#003366;}} h3{{color:#0b2a52;margin-top:20px;font-size:13px;}}
             table{{border-collapse:collapse;width:100%;margin-bottom:16px;}}
-            th,td{{border:1px solid #ccc;padding:5px;font-size:11px;}}
-            th{{background:#e8f0f8;}}
-            @media print{{button{{display:none;}}}}</style></head><body>
+            th,td{{border:1px solid #ccc;padding:5px;font-size:11px;vertical-align:top;}}
+            th{{background:#e8f0f8;font-weight:700;}}
+            @media print{{button{{display:none;}}}}
+            </style></head><body>
             <button onclick="window.print()">Print</button>
             <h2>Fisa — {_html.escape(cod)}</h2>
             {"".join(html_sections)}</body></html>"""
