@@ -8,136 +8,47 @@ _MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
 def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
-    st.markdown(
-        """
-        <style>
-        .stApp { background: #0b2a52 !important; }
-        div.block-container { padding-top: 2rem; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        <div style="display:flex;justify-content:center;align-items:center;min-height:75vh;">
-          <div style="background:rgba(255,255,255,0.07);border:2px solid rgba(255,255,255,0.25);
-                      border-radius:20px;padding:40px 48px;max-width:680px;width:100%;
-                      box-shadow:0 20px 60px rgba(0,0,0,0.40);text-align:center;">
-
-            <div style="font-size:2.8rem;margin-bottom:0.5rem;">⚠️</div>
-
-            <div style="color:#ffffff;font-size:1.55rem;font-weight:900;
-                        letter-spacing:0.06em;margin-bottom:1.2rem;">
-              IMPORTANT !
+    st.markdown("""
+        <style>.stApp { background: #0b1a2e !important; }</style>
+    """, unsafe_allow_html=True)
+    st.markdown("""
+                <div style='text-align:center;margin-top:3rem;'>
+            <div style='font-size:2.2rem;'>&#9888;&#65039;</div>
+            <div style='color:#ffffff;font-size:1.25rem;font-weight:900;
+                        letter-spacing:0.06em;margin:0.6rem 0;'>
+                IMPORTANT !
             </div>
-
-            <div style="color:rgba(255,255,255,0.90);font-size:0.97rem;
-                        line-height:1.75;text-align:justify;margin-bottom:1.4rem;">
-              Platforma <strong>IDBDC-UPT</strong>
-              (<em>Interogare — Dezvoltare Baze de Date Cercetare – UPT</em>)
-              a intrat în testarea finală a celor aproape <strong>6.000 de linii de cod</strong>,
-              din <strong>11 fișiere principale Python</strong>, dintre care 5 fișiere sunt
-              dedicate modulelor AI, <strong>93 de funcții și algoritmi definiți</strong>,
-              <strong>24 de tabele de baze de date</strong> cu
-              <strong>122 de câmpuri de date distincte</strong>, precum și a securității
-              asigurate prin <strong>5 niveluri de autentificare</strong>.<br><br>
-              După finalizarea procesului de testare finală se va trece la încărcarea cu
-              date reale, atât curente cât și istorice. Pentru această etapă va fi vizibil
-              permanent un <strong>grafic de progres anual</strong> pentru fiecare categorie
-              — contracte și proiecte pe tipuri, evenimente științifice și proprietate
-              industrială — dar și o <strong>numărătoare inversă</strong> până la
-              deschiderea accesului.
+            <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.28);
+                        border-radius:12px;padding:20px 28px;
+                        color:rgba(255,255,255,0.88);font-size:0.88rem;
+                        max-width:600px;margin:0 auto 1.5rem auto;line-height:1.75;text-align:justify;'>
+                Platforma <b>IDBDC-UPT</b>
+                (<i>Interogare &mdash; Dezvoltare Baze de Date Cercetare &ndash; UPT</i>)
+                a intrat &icirc;n testarea final&atilde; a celor aproape <b>6.000 de linii de cod</b>,
+                din <b>11 fi&scaron;iere principale Python</b>, dintre care 5 fi&scaron;iere sunt
+                dedicate modulelor AI, <b>93 de func&thorn;ii &scaron;i algoritmi defini&thorn;i</b>,
+                <b>24 de tabele de baze de date</b> cu <b>122 de c&acirc;mpuri de date distincte</b>,
+                precum &scaron;i a securit&atilde;&thorn;ii asigurate prin <b>5 niveluri de autentificare</b>.<br><br>
+                Dup&atilde; finalizarea procesului de testare final&atilde; se va trece la &icirc;nc&atilde;rcarea cu
+                date reale, at&acirc;t curente c&acirc;t &scaron;i istorice. Pentru aceast&atilde; etap&atilde; va fi vizibil
+                permanent un <b>grafic de progres anual</b> pentru fiecare categorie
+                &mdash; contracte &scaron;i proiecte pe tipuri, evenimente &scaron;tiin&thorn;ifice &scaron;i proprietate
+                industrial&atilde; &mdash; dar &scaron;i o <b>num&atilde;r&atilde;toare invers&atilde;</b>
+                p&acirc;n&atilde; la deschiderea accesului.
             </div>
-
-            <div style="color:rgba(255,255,255,0.45);font-size:0.80rem;
-                        margin-bottom:0.5rem;font-style:italic;">
-              Acces temporar restricționat · Introduceți parola pentru a continua
-            </div>
-
-          </div>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    _, mid, _ = st.columns([1, 2, 1])
-    with mid:
-        pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c2")
-        if st.button("Acces platformă", key="_mw_btn_c2", use_container_width=True):
-            if pwd == _MAINTENANCE_PASSWORD:
-                st.session_state["_mw_cleared"] = True
-                st.rerun()
-            else:
-                st.error("Parolă incorectă.")
+    """, unsafe_allow_html=True)
+    pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c2")
+    if st.button("Acces platforma", key="_mw_btn_c2"):
+        if pwd == _MAINTENANCE_PASSWORD:
+            st.session_state["_mw_cleared"] = True
+            st.rerun()
+        else:
+            st.error("Parola incorecta.")
     st.stop()
 
 _maintenance_gate()
-st
-from supabase import create_client, Client
-from motor_admin import porneste_motorul
-
-# ── MAINTENANCE LOCK ──────────────────────────────────────────────────────────
-_MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
-
-def _maintenance_gate():
-    if st.session_state.get("_mw_cleared"):
-        return
-    st.markdown("""
-        <style>
-        .stApp { background: #0b2a52 !important; }
-        </style>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-        <div style='display:flex;justify-content:center;align-items:center;
-                    min-height:80vh;'>
-          <div style='background:rgba(255,255,255,0.07);border:2px solid rgba(255,255,255,0.25);
-                      border-radius:20px;padding:40px 48px;max-width:680px;width:100%;
-                      box-shadow:0 20px 60px rgba(0,0,0,0.40);text-align:center;'>
-
-            <div style='font-size:2.8rem;margin-bottom:0.5rem;'>&#9888;&#65039;</div>
-
-            <div style='color:#ffffff;font-size:1.55rem;font-weight:900;
-                        letter-spacing:0.06em;margin-bottom:1.2rem;'>
-              IMPORTANT !
-            </div>
-
-            <div style='color:rgba(255,255,255,0.90);font-size:0.97rem;
-                        line-height:1.75;text-align:justify;margin-bottom:1.4rem;'>
-              Platforma <strong>IDBDC-UPT</strong>
-              (<em>Interogare &#8212; Dezvoltare Baze de Date Cercetare &#8211; UPT</em>)
-              a intrat &#238;n testarea final&#259; a celor aproape <strong>6.000 de linii de cod</strong>,
-              din <strong>11 fi&#351;iere principale Python</strong>, dintre care 5 fi&#351;iere sunt
-              dedicate modulelor AI, <strong>93 de func&#355;ii &#351;i algoritmi defini&#355;i</strong>,
-              <strong>24 de tabele de baze de date</strong> cu
-              <strong>122 de c&#226;mpuri de date distincte</strong>, precum &#351;i a securit&#259;&#355;ii
-              asigurate prin <strong>5 niveluri de autentificare</strong>.<br><br>
-              Dup&#259; finalizarea procesului de testare final&#259; se va trece la &#238;nc&#259;rcarea cu
-              date reale, at&#226;t curente c&#226;t &#351;i istorice. Pentru aceast&#259; etap&#259; va fi vizibil
-              permanent un <strong>grafic de progres anual</strong> pentru fiecare categorie
-              &#8212; contracte &#351;i proiecte pe tipuri, evenimente &#351;tiin&#355;ifice &#351;i proprietate
-              industrial&#259; &#8212; dar &#351;i o <strong>num&#259;r&#259;toare invers&#259;</strong> p&#226;n&#259; la
-              deschiderea accesului.
-            </div>
-
-            <div style='color:rgba(255,255,255,0.45);font-size:0.80rem;
-                        margin-bottom:1.2rem;font-style:italic;'>
-              Acces temporar restric&#355;ionat &#183; Introduce&#355;i parola pentru a continua
-            </div>
-
-          </div>
-        </div>
-    """, unsafe_allow_html=True)
-    _, mid, _ = st.columns([1, 2, 1])
-    with mid:
-        pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c2")
-        if st.button("Acces platform&#259;", key="_mw_btn_c2", use_container_width=True):
-            if pwd == _MAINTENANCE_PASSWORD:
-                st.session_state["_mw_cleared"] = True
-                st.rerun()
-            else:
-                st.error("Parol&#259; incorect&#259;.")
-    st.stop()
-
-_maintenance_gate()# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 TITLE_LINE_1 = "🛠️ Administrare baze de date"
