@@ -1,7 +1,7 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
 # !! FIȘIER BETONAT — NU SE MODIFICĂ !!
-# Ultima versiune validată: 17.03.2026
+# Ultima versiune validată: 19.03.2026
 # =========================================================
 
 import streamlit as st
@@ -10,10 +10,6 @@ import html as _html
 import io
 import streamlit.components.v1 as components
 from supabase import Client
-
-# =========================================================
-# ETICHETE CÂMPURI
-# =========================================================
 
 COL_LABELS = {
     "abreviere_domeniu_fdi": "DOMENIUL FDI",
@@ -103,10 +99,10 @@ COL_LABELS = {
     "parteneri": "PARTENERI",
     "perioada_valabilitate": "PERIOADA DE VALABILITATE A TITLULUI DE PROTECTIE",
     "perioada_valabilitate_ani": "PERIOADA DE VALABILITATE A FORMEI DE PROTECTIE",
+    "persoana_contact": "PERSOANA DE CONTACT",
     "pozitie_clasament": "POZITIE IN CLASAMENT",
     "programul_de_finantare": "PROGRAMUL DE FINANTARE",
     "punctaj": "PUNCTAJ",
-    "reprezinta_idbdc": "REPREZINTA CONTRACTUL/PROIECTUL",
     "rezultate_proiect": "REZULTATE",
     "rol": "ROL OPERATOR",
     "rol_upt": "ROL UPT",
@@ -130,7 +126,7 @@ COL_LABELS = {
     "titlu_engleza_google_translate": "TITLUL IN ENGLEZA CONF. GOOGLE TRANSLATE",
     "titlul": "TITLUL",
     "titlul_eveniment": "TITLUL EVENIMENTULUI STIINTIFIC",
-    "titlul_proiect": "OBIECTUL/TITLUL CONTRACTULUI/PROIECTULUI",
+    "titlul_proiect": "OBIECTUL/TITLULUI CONTRACTULUI/PROIECTULUI",
     "total_proiecte": "TOTAL PROIECTE DEPUSE",
     "username_sistem": "USERNAME",
     "valoare_anuala_contract": "VALOAREA ANUALA A CONTRACTULUI",
@@ -144,6 +140,7 @@ COLS_HIDDEN_FISA = {
     "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
     "creat_de", "creat_la", "modificat_de", "modificat_la",
     "nr_crt",
+    "persoana_contact",
 }
 
 CARD_PRIORITY = [
@@ -222,19 +219,19 @@ COL_LABELS_PER_TABLE = {
         "rol_upt":                 "ROL UPT IN PROIECT",
     },
     "base_evenimente_stiintifice": {
-        "cod_identificare":  "COD EVENIMENT",
-        "titlul_eveniment":  "TITLUL EVENIMENTULUI",
-        "natura_eveniment":  "NATURA EVENIMENTULUI",
-        "format_eveniment":  "FORMATUL EVENIMENTULUI",
-        "loc_desfasurare":   "LOCUL DE DESFASURARE",
+        "cod_identificare": "COD EVENIMENT",
+        "titlul_eveniment": "TITLUL EVENIMENTULUI",
+        "natura_eveniment": "NATURA EVENIMENTULUI",
+        "format_eveniment": "FORMATUL EVENIMENTULUI",
+        "loc_desfasurare":  "LOCUL DE DESFASURARE",
     },
     "base_prop_intelect": {
-        "cod_identificare":          "NR. CERERE / BREVET",
-        "acronim_prop_intelect":     "FORMA DE PROTECTIE",
-        "titlul_proiect":            "TITLUL INVENTIEI / LUCRARII",
-        "data_depozit_cerere":       "DATA DEPUNERE LA OSIM",
-        "data_oficiala_acordare":    "DATA ACORDARE",
-        "numar_oficial_acordare":    "NR. OFICIAL ACORDARE",
+        "cod_identificare":       "NR. CERERE / BREVET",
+        "acronim_prop_intelect":  "FORMA DE PROTECTIE",
+        "titlul_proiect":         "TITLUL INVENTIEI / LUCRARII",
+        "data_depozit_cerere":    "DATA DEPUNERE LA OSIM",
+        "data_oficiala_acordare": "DATA ACORDARE",
+        "numar_oficial_acordare": "NR. OFICIAL ACORDARE",
     },
 }
 
@@ -252,10 +249,6 @@ ALL_BASE_TABLES = [
 ]
 
 
-# =========================================================
-# HELPERS INTERNE
-# =========================================================
-
 def _col_label(col: str, table: str = None) -> str:
     if table and table in COL_LABELS_PER_TABLE:
         if col in COL_LABELS_PER_TABLE[table]:
@@ -263,7 +256,7 @@ def _col_label(col: str, table: str = None) -> str:
     return COL_LABELS.get(col, col.replace("_", " ").capitalize())
 
 
-def _safe_select_eq(supabase: Client, table: str, col: str, value: str, limit: int = 2000) -> list[dict]:
+def _safe_select_eq(supabase: Client, table: str, col: str, value: str, limit: int = 2000) -> list:
     try:
         res = supabase.table(table).select("*").eq(col, value).limit(limit).execute()
         return res.data or []
@@ -271,19 +264,15 @@ def _safe_select_eq(supabase: Client, table: str, col: str, value: str, limit: i
         return []
 
 
-def _render_sectiune_tabel(section_label: str, rows: list[dict], table: str = None):
-    """
-    Afișează o secțiune ca tabel cu 3 coloane:
-      Col 1 (~10%): numele secțiunii — o singură dată, aliniat sus
-      Col 2 (~23%): eticheta câmpului
-      Col 3 (~67%): valoarea efectivă
-    Fără spațiu între rândurile din aceeași secțiune.
-    """
+def _is_persoana_contact(r: dict) -> bool:
+    v = r.get("persoana_contact")
+    return v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
+
+
+def _render_sectiune_tabel(section_label: str, rows: list, table: str = None):
     if not rows:
         return
-
     priority_set = {c: i for i, c in enumerate(CARD_PRIORITY)}
-
     all_items = []
     for row in rows:
         visible_cols = [
@@ -302,122 +291,81 @@ def _render_sectiune_tabel(section_label: str, rows: list[dict], table: str = No
 
     rows_html = ""
     for i, (label, value) in enumerate(all_items):
+        sec_cell = ""
         if i == 0:
             sec_cell = (
-                f"<td rowspan='{len(all_items)}' style='"
-                f"vertical-align:top;"
-                f"padding:6px 10px 6px 0;"
-                f"width:10%;'>"
-                f"<span style='color:rgba(255,255,255,0.45);font-size:0.74rem;"
-                f"font-weight:800;text-transform:uppercase;letter-spacing:0.07em;"
-                f"white-space:nowrap;'>{_html.escape(section_label)}</span>"
-                f"</td>"
+                f"<td rowspan='{len(all_items)}' style='vertical-align:top;padding:6px 10px 6px 0;width:10%;'>"
+                f"<span style='color:rgba(255,255,255,0.45);font-size:0.74rem;font-weight:800;"
+                f"text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;'>"
+                f"{_html.escape(section_label)}</span></td>"
             )
-        else:
-            sec_cell = ""
-
         rows_html += (
-            f"<tr>"
-            f"{sec_cell}"
+            f"<tr>{sec_cell}"
             f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
-            f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;"
-            f"font-weight:700;text-transform:uppercase;letter-spacing:0.04em;'>"
-            f"{label}</span></td>"
+            f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
+            f"text-transform:uppercase;letter-spacing:0.04em;'>{label}</span></td>"
             f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
-            f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>"
-            f"{value}</span></td>"
-            f"</tr>"
+            f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{value}</span></td></tr>"
         )
-
     st.markdown(
-        f"<table style='width:100%;border-collapse:collapse;margin-bottom:0;'>"
-        f"{rows_html}"
-        f"</table>",
+        f"<table style='width:100%;border-collapse:collapse;margin-bottom:0;'>{rows_html}</table>",
         unsafe_allow_html=True,
     )
 
 
-def _render_echipa_compact(rows: list[dict], cod_ctx: str = "", supabase=None):
-    """
-    Afișează echipa — fără bife, fără texte redundante.
-    - Responsabil: câmpurile completate + date contact din det_resurse_umane
-    - Membrii: câmpurile completate, format inline, separator ·
-    Exact ce e pe ecran se exportă (CSV/PDF/DOCX).
-    """
+def _get_contact_info(supabase, nume: str) -> list:
+    if not supabase or not nume:
+        return []
+    try:
+        res = supabase.table("det_resurse_umane") \
+            .select("email_upt,telefon_upt,telefon_mobil") \
+            .eq("nume_prenume", nume).limit(1).execute()
+        if not res.data:
+            return []
+        d = res.data[0]
+        out = []
+        email = str(d.get("email_upt") or "").strip()
+        tel1  = str(d.get("telefon_upt") or "").strip()
+        tel2  = str(d.get("telefon_mobil") or "").strip()
+        if email: out.append(f"✉ {email}")
+        if tel1:  out.append(f"☎ {tel1}")
+        if tel2 and tel2 != tel1: out.append(f"📱 {tel2}")
+        return out
+    except Exception:
+        return []
+
+
+def _render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
     if not rows:
         st.info("Nu există echipă înregistrată pentru această fișă.")
         return
 
-    CAMPURI_ORDINE = [
-        "nume_prenume", "functia_specifica", "acronim_functie_upt",
-        "status_personal", "data_inceput_rol", "data_sfarsit_rol",
-    ]
+    rows_sorted   = sorted(rows, key=lambda r: (0 if _is_persoana_contact(r) else 1, str(r.get("nume_prenume") or "")))
+    persoane_cont = [r for r in rows_sorted if _is_persoana_contact(r)]
+    membri        = [r for r in rows_sorted if not _is_persoana_contact(r)]
 
-    def _is_rep(r):
-        v = r.get("reprezinta_idbdc")
-        return v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
-
-    def sort_key(r):
-        return (0 if _is_rep(r) else 1, str(r.get("nume_prenume") or ""))
-
-    rows_sorted   = sorted(rows, key=sort_key)
-    reprezentanti = [r for r in rows_sorted if _is_rep(r)]
-    membri        = [r for r in rows_sorted if not _is_rep(r)]
-
-    # Câmpuri care au cel puțin o valoare completată
-    campuri_activi = [c for c in CAMPURI_ORDINE if any(
-        str(r.get(c) or "").strip() for r in rows_sorted
-    )]
-
-    def _fmt_rand(r, campuri):
-        parts = [_html.escape(str(r.get(c) or "").strip())
-                 for c in campuri if str(r.get(c) or "").strip()]
-        return ", ".join(parts)
-
-    def _get_contact(nume):
-        """Preia email + telefon din det_resurse_umane pentru responsabil."""
-        if not supabase or not nume:
-            return []
-        try:
-            res = supabase.table("det_resurse_umane")                .select("email_upt,telefon_upt,telefon_mobil")                .eq("nume_prenume", nume).limit(1).execute()
-            if not res.data:
-                return []
-            d = res.data[0]
-            out = []
-            email = str(d.get("email_upt") or "").strip()
-            tel1  = str(d.get("telefon_upt") or "").strip()
-            tel2  = str(d.get("telefon_mobil") or "").strip()
-            if email: out.append(f"✉ {email}")
-            if tel1:  out.append(f"☎ {tel1}")
-            if tel2 and tel2 != tel1: out.append(f"📱 {tel2}")
-            return out
-        except Exception:
-            return []
-
-    # ── Responsabil ───────────────────────────────────────────────────────
-    if reprezentanti:
+    if persoane_cont:
         st.markdown(
             "<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
             "text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;'>"
-            "⭐ Responsabil contract / Director proiect</div>",
+            "⭐ Persoana de contact</div>",
             unsafe_allow_html=True,
         )
-        for r in reprezentanti:
-            txt     = _fmt_rand(r, campuri_activi)
-            contact = _get_contact(str(r.get("nume_prenume") or "").strip())
+        for r in persoane_cont:
+            nume    = str(r.get("nume_prenume") or "").strip()
+            rol     = str(r.get("functia_specifica") or "").strip()
+            contact = _get_contact_info(supabase, nume)
+            txt     = ", ".join(p for p in [nume, rol] if p)
             contact_html = ""
             if contact:
                 contact_html = (
-                    "  <span style='color:rgba(255,220,100,0.80);font-size:0.82rem;"
-                    "font-weight:400;'>" +
-                    "  ·  ".join(_html.escape(c) for c in contact) +
-                    "</span>"
+                    "  <span style='color:rgba(255,220,100,0.80);font-size:0.82rem;font-weight:400;'>" +
+                    "  ·  ".join(_html.escape(c) for c in contact) + "</span>"
                 )
             st.markdown(
-                f"<div style='padding:6px 12px;margin-bottom:3px;"
-                f"background:rgba(255,255,255,0.10);border-radius:8px;"
-                f"border-left:3px solid rgba(255,220,80,0.70);'>"
-                f"<span style='font-weight:800;color:#ffffff;'>⭐ {txt}</span>"
+                f"<div style='padding:6px 12px;margin-bottom:3px;background:rgba(255,255,255,0.10);"
+                f"border-radius:8px;border-left:3px solid rgba(255,220,80,0.70);'>"
+                f"<span style='font-weight:800;color:#ffffff;'>⭐ {_html.escape(txt)}</span>"
                 f"{contact_html}</div>",
                 unsafe_allow_html=True,
             )
@@ -426,11 +374,10 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = "", supabase=None):
     if not membri:
         return
 
-    # ── Membrii echipă — inline ───────────────────────────────────────────
     st.markdown(
         f"<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
         f"text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;'>"
-        f"👥 Membrii echipă ({len(membri)})</div>",
+        f"👥 Membrii echipei ({len(membri)})</div>",
         unsafe_allow_html=True,
     )
 
@@ -447,24 +394,26 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = "", supabase=None):
             placeholder="Filtrează după nume...", label_visibility="collapsed",
         ).strip().lower()
         if filtru:
-            membri_display = [r for r in membri
-                              if filtru in str(r.get("nume_prenume") or "").lower()]
+            membri_display = [r for r in membri if filtru in str(r.get("nume_prenume") or "").lower()]
 
-    inline_parts = [_fmt_rand(r, campuri_activi) for r in membri_display]
-    inline_text  = "  ·  ".join(p for p in inline_parts if p)
+    def _fmt_membru(r):
+        nume = str(r.get("nume_prenume") or "").strip()
+        rol  = str(r.get("functia_specifica") or "").strip()
+        if nume and rol:
+            return f"{_html.escape(nume)} ({_html.escape(rol)})"
+        return _html.escape(nume or rol)
 
+    inline_text = "  ·  ".join(_fmt_membru(r) for r in membri_display if _fmt_membru(r))
     st.markdown(
         f"<div style='background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);"
         f"border-radius:10px;padding:10px 14px;line-height:1.9;font-size:0.88rem;"
-        f"color:rgba(255,255,255,0.88);'>"
-        f"{inline_text}</div>",
+        f"color:rgba(255,255,255,0.88);'>{inline_text}</div>",
         unsafe_allow_html=True,
     )
 
     if len(membri) > PREVIEW:
         if st.session_state[show_all_key]:
-            if st.button("▲ Restrânge lista",
-                         key=f"echipa_collapse_{cod_ctx or id(rows)}", use_container_width=False):
+            if st.button("▲ Restrânge lista", key=f"echipa_collapse_{cod_ctx or id(rows)}", use_container_width=False):
                 st.session_state[show_all_key] = False
                 st.rerun()
         else:
@@ -475,10 +424,107 @@ def _render_echipa_compact(rows: list[dict], cod_ctx: str = "", supabase=None):
                 st.rerun()
 
 
+def _render_export_auth_tab1(supabase: Client) -> bool:
+    import re as _re
+    auth_key = "export_auth_tab1"
+    pattern  = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
 
-# =========================================================
-# RENDER PRINCIPAL — TAB 1
-# =========================================================
+    if st.session_state.get("auth_ai", False) or st.session_state.get(auth_key, False):
+        nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
+        st.markdown(
+            f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);"
+            f"border-radius:10px;padding:8px 16px;color:#ffffff;font-weight:700;font-size:0.95rem;"
+            f"margin-bottom:0.5rem;'>✅ Export autorizat — {_html.escape(str(nume))}</div>",
+            unsafe_allow_html=True,
+        )
+        return True
+
+    st.markdown(
+        "<div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);"
+        "border-radius:12px;padding:12px 18px;margin-bottom:0.6rem;'>"
+        "<span style='color:#ffffff;font-weight:800;font-size:0.97rem;'>"
+        "🔐 Export disponibil exclusiv pentru cadrele UPT — autentificare cu email instituțional"
+        "</span></div>",
+        unsafe_allow_html=True,
+    )
+    ea1, ea2, _ = st.columns([2.0, 1.0, 3.0])
+    with ea1:
+        email_exp = st.text_input(
+            "Email", value="", key="export_email_tab1",
+            label_visibility="collapsed", placeholder="prenume.nume@upt.ro",
+        ).strip().lower()
+    with ea2:
+        auth_clicked = st.button("✅ Autorizare", key="export_auth_btn_tab1")
+
+    if auth_clicked:
+        if not pattern.match(email_exp):
+            st.error("Email invalid. Format: prenume.nume@upt.ro")
+        else:
+            try:
+                res = supabase.table("det_resurse_umane") \
+                    .select("nume_prenume,email").eq("email", email_exp).limit(1).execute()
+                if res.data:
+                    user = res.data[0]
+                    st.session_state[auth_key]  = True
+                    st.session_state.user_email = email_exp
+                    st.session_state.user_name  = (user.get("nume_prenume") or "").strip() or email_exp
+                    st.rerun()
+                else:
+                    st.error("Emailul nu există în baza de date IDBDC.")
+            except Exception as e:
+                st.error(f"Eroare verificare: {e}")
+    return False
+
+
+def _build_section_export_df(rows: list, table: str = None) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame()
+    priority_set = {c: i for i, c in enumerate(CARD_PRIORITY)}
+    all_items = []
+    for row in rows:
+        visible_cols = [
+            c for c in row.keys()
+            if c not in COLS_HIDDEN_FISA
+            and row[c] is not None
+            and str(row[c]).strip() not in ("", "None", "nan")
+        ]
+        visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
+        for c in visible_cols:
+            all_items.append({"Camp": _col_label(c, table), "Valoare": str(row[c])})
+    return pd.DataFrame(all_items) if all_items else pd.DataFrame()
+
+
+def _build_echipa_export_rows(rows_ech: list, supabase: Client) -> pd.DataFrame:
+    persoane_cont = [r for r in rows_ech if _is_persoana_contact(r)]
+    membri        = sorted([r for r in rows_ech if not _is_persoana_contact(r)],
+                           key=lambda r: str(r.get("nume_prenume") or ""))
+
+    contact_parts = []
+    for r in persoane_cont:
+        nume = str(r.get("nume_prenume") or "").strip()
+        rol  = str(r.get("functia_specifica") or "").strip()
+        txt  = ", ".join(p for p in [nume, rol] if p)
+        contact = _get_contact_info(supabase, nume)
+        if contact:
+            txt += "  " + "  ".join(contact)
+        if txt:
+            contact_parts.append(txt)
+    val_contact = "  |  ".join(contact_parts) if contact_parts else "-"
+
+    def _fmt_m(r):
+        nume = str(r.get("nume_prenume") or "").strip()
+        rol  = str(r.get("functia_specifica") or "").strip()
+        if nume and rol:
+            return f"{nume} ({rol})"
+        return nume or rol
+
+    val_membri = "  .  ".join(_fmt_m(r) for r in membri if _fmt_m(r)) or "-"
+
+    return pd.DataFrame([
+        {"Camp": "Persoana de contact", "Valoare": val_contact},
+        {"Camp": "Membrii echipei",     "Valoare": val_membri},
+    ])
+
 
 def render_fisa_completa(supabase: Client):
     st.markdown("## 📄 Fișă completă")
@@ -495,26 +541,20 @@ def render_fisa_completa(supabase: Client):
             placeholder="Ex: 998877 sau 26FDI26",
         ).strip()
 
-    cod_found = False
+    cod_found     = False
     tabela_gasita = None
     if cod and len(cod) >= 3:
         for t in ALL_BASE_TABLES:
             rows_check = _safe_select_eq(supabase, t, "cod_identificare", cod, limit=1)
             if rows_check:
-                cod_found = True
+                cod_found     = True
                 tabela_gasita = t
                 break
         with c2:
             if cod_found:
-                st.markdown(
-                    "<div style='margin-top:28px;font-size:1.4rem;' title='Cod găsit'>✅</div>",
-                    unsafe_allow_html=True,
-                )
+                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>✅</div>", unsafe_allow_html=True)
             elif cod and len(cod) >= 3:
-                st.markdown(
-                    "<div style='margin-top:28px;font-size:1.4rem;' title='Cod negăsit'>❌</div>",
-                    unsafe_allow_html=True,
-                )
+                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>❌</div>", unsafe_allow_html=True)
 
     if not cod or len(cod) < 3:
         st.info("Introduceți codul identificare (minim 3 caractere).", icon="ℹ️")
@@ -535,9 +575,8 @@ def render_fisa_completa(supabase: Client):
         return
 
     st.divider()
-    titlu_fisa = TABLE_LABELS.get(tabela_gasita, "Fișă")
+    titlu_fisa       = TABLE_LABELS.get(tabela_gasita, "Fișă")
     titlu_fisa_curat = titlu_fisa.split(" ", 1)[-1] if " " in titlu_fisa else titlu_fisa
-
     st.markdown(
         f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
         f"letter-spacing:0.03em;margin-bottom:1rem;'>"
@@ -545,7 +584,6 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
-    # ── Linie de control cu cele 4 bife ──────────────────────────────────
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     _p1, _p2, _p3, _p4, _lbl = st.columns([0.7, 0.7, 0.7, 0.7, 5.2])
     with _p1:
@@ -558,17 +596,16 @@ def render_fisa_completa(supabase: Client):
         pin_teh = st.checkbox("Tehnic",    key=f"fisa_pin_{cod}_tehnic")
     with _lbl:
         st.markdown(
-            "<div style='color:rgba(255,255,255,0.45);font-size:0.875rem;"
-            "padding-top:6px;font-style:italic;'>Bifează o secțiune pentru a afișa informațiile existente în aceasta.</div>",
+            "<div style='color:rgba(255,255,255,0.45);font-size:0.875rem;padding-top:6px;"
+            "font-style:italic;'>Bifează o secțiune pentru a afișa informațiile existente în aceasta.</div>",
             unsafe_allow_html=True,
         )
 
-    # ── Afișare secțiuni bifate ───────────────────────────────────────────
     sectiuni_active = []
-    if pin_gen: sectiuni_active.append(("Generale",  tabela_gasita,          "generale"))
-    if pin_fin: sectiuni_active.append(("Financiar", "com_date_financiare",   "financiar"))
-    if pin_ech: sectiuni_active.append(("Echipă",    "com_echipe_proiect",    "echipa"))
-    if pin_teh: sectiuni_active.append(("Tehnic",    "com_aspecte_tehnice",   "tehnic"))
+    if pin_gen: sectiuni_active.append(("Generale",  tabela_gasita,        "generale"))
+    if pin_fin: sectiuni_active.append(("Financiar", "com_date_financiare", "financiar"))
+    if pin_ech: sectiuni_active.append(("Echipa",    "com_echipe_proiect",  "echipa"))
+    if pin_teh: sectiuni_active.append(("Tehnic",    "com_aspecte_tehnice", "tehnic"))
 
     if sectiuni_active:
         st.markdown(
@@ -585,9 +622,9 @@ def render_fisa_completa(supabase: Client):
                 )
             if sec_key == "echipa":
                 st.markdown(
-                    f"<div style='color:rgba(255,255,255,0.45);font-size:0.74rem;"
-                    f"font-weight:800;text-transform:uppercase;letter-spacing:0.07em;"
-                    f"margin-bottom:6px;'>{_html.escape(sec_label)}</div>",
+                    f"<div style='color:rgba(255,255,255,0.45);font-size:0.74rem;font-weight:800;"
+                    f"text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;'>"
+                    f"{_html.escape(sec_label)}</div>",
                     unsafe_allow_html=True,
                 )
                 rows = _safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=2000)
@@ -603,7 +640,7 @@ def render_fisa_completa(supabase: Client):
                     _render_sectiune_tabel(sec_label, rows, sec_table)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Export fișă ───────────────────────────────────────────────────────
+    # ── Export ────────────────────────────────────────────────────────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     st.divider()
     st.markdown(
@@ -612,89 +649,37 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
+    if not _render_export_auth_tab1(supabase):
+        return
+
     export_frames = {}
-    rows_exp = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
-    if rows_exp:
-        df_t = pd.DataFrame(rows_exp)
-        df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
-        df_t.columns = [_col_label(c, tabela_gasita) for c in df_t.columns]
-        export_frames["Generale"] = df_t
+
+    rows_gen = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
+    if rows_gen:
+        df_gen = _build_section_export_df(rows_gen, tabela_gasita)
+        if not df_gen.empty:
+            export_frames["Generale"] = df_gen
 
     for com_label, com_table in [("Financiar", "com_date_financiare"), ("Tehnic", "com_aspecte_tehnice")]:
-        rows_exp = _safe_select_eq(supabase, com_table, "cod_identificare", cod, limit=50)
-        if rows_exp:
-            df_t = pd.DataFrame(rows_exp)
-            df_t = df_t[[c for c in df_t.columns if c not in COLS_HIDDEN_FISA]]
-            df_t.columns = [_col_label(c, com_table) for c in df_t.columns]
-            export_frames[com_label] = df_t
+        rows_com = _safe_select_eq(supabase, com_table, "cod_identificare", cod, limit=50)
+        if rows_com:
+            df_com = _build_section_export_df(rows_com, com_table)
+            if not df_com.empty:
+                export_frames[com_label] = df_com
 
     rows_ech = _safe_select_eq(supabase, "com_echipe_proiect", "cod_identificare", cod, limit=2000)
     if rows_ech:
-        # Export echipă — identic cu ce e pe ecran
-        CAMPURI_ECH = ["nume_prenume", "functia_specifica", "acronim_functie_upt",
-                       "status_personal", "data_inceput_rol", "data_sfarsit_rol"]
+        df_ech = _build_echipa_export_rows(rows_ech, supabase)
+        if not df_ech.empty:
+            export_frames["Echipa"] = df_ech
 
-        def _ech_is_rep(r):
-            v = r.get("reprezinta_idbdc")
-            return v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
+    if not export_frames:
+        st.info("Nu există date de exportat pentru acest cod.")
+        return
 
-        campuri_ech_activi = [c for c in CAMPURI_ECH if any(
-            str(r.get(c) or "").strip() for r in rows_ech
-        )]
-
-        def _ech_fmt(r):
-            return ", ".join(
-                str(r.get(c) or "").strip()
-                for c in campuri_ech_activi if str(r.get(c) or "").strip()
-            )
-
-        reps_ech   = [r for r in rows_ech if _ech_is_rep(r)]
-        membri_ech = sorted([r for r in rows_ech if not _ech_is_rep(r)],
-                            key=lambda r: str(r.get("nume_prenume") or ""))
-
-        # Contact responsabil
-        rep_rows = []
-        for r in reps_ech:
-            txt = _ech_fmt(r)
-            contact_parts = []
-            try:
-                nr = str(r.get("nume_prenume") or "").strip()
-                rc = supabase.table("det_resurse_umane")                    .select("email_upt,telefon_upt,telefon_mobil")                    .eq("nume_prenume", nr).limit(1).execute()
-                if rc.data:
-                    d = rc.data[0]
-                    for fld in ["email_upt", "telefon_upt", "telefon_mobil"]:
-                        v = str(d.get(fld) or "").strip()
-                        if v:
-                            contact_parts.append(v)
-            except Exception:
-                pass
-            full = txt + ("  ·  " + "  ·  ".join(contact_parts) if contact_parts else "")
-            rep_rows.append(full)
-
-        membri_txt = "  ·  ".join(_ech_fmt(r) for r in membri_ech if _ech_fmt(r))
-
-        df_ech = pd.DataFrame([
-            {"Câmp": "Responsabil contract / Director proiect",
-             "Valoare": "  |  ".join(rep_rows) if rep_rows else "-"},
-            {"Câmp": "Membrii echipă", "Valoare": membri_txt or "-"},
-        ])
-        export_frames["Echipă"] = df_ech
-
-    ea1, ea2, ea3, ea4 = st.columns([1.0, 1.0, 1.0, 1.0])
+    ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
 
     with ea1:
-        csv_parts = []
-        for section_label, df_sec in export_frames.items():
-            csv_parts.append(f"=== {section_label} ===")
-            csv_parts.append(df_sec.to_csv(index=False))
-            csv_parts.append("")
-        st.download_button(
-            "⬇️ Export fișă (CSV)", data="\n".join(csv_parts).encode("utf-8-sig"),
-            file_name=f"fisa_{cod}.csv", mime="text/csv", key="fisa_csv",
-            use_container_width=True,
-        )
-
-    with ea2:
         try:
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -703,144 +688,132 @@ def render_fisa_completa(supabase: Client):
                     df_sec.to_excel(writer, index=False, sheet_name=sheet_name)
             buf.seek(0)
             st.download_button(
-                "⬇️ Download fișă (Excel)", data=buf, file_name=f"fisa_{cod}.xlsx",
+                "⬇️ Excel (.xlsx)", data=buf,
+                file_name=f"fisa_{cod}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="fisa_xlsx", use_container_width=True,
             )
         except Exception:
             st.caption("Excel indisponibil")
 
-    with ea3:
+    with ea2:
         try:
-            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib.pagesizes import A4
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
             from reportlab.lib import colors
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.lib.units import cm
             from reportlab.lib.colors import HexColor
 
-            pdf_buf = io.BytesIO()
-            doc = SimpleDocTemplate(
-                pdf_buf, pagesize=A4,
-                leftMargin=1.8*cm, rightMargin=1.8*cm,
-                topMargin=1.8*cm, bottomMargin=1.8*cm,
-            )
-            styles = getSampleStyleSheet()
-            style_title = ParagraphStyle("T", parent=styles["Title"],
-                fontName="Helvetica-Bold", fontSize=13, textColor=colors.white, leading=18)
-            style_sub = ParagraphStyle("S", parent=styles["Normal"],
-                fontName="Helvetica-Bold", fontSize=9, textColor=colors.white)
-            style_sec = ParagraphStyle("SC", parent=styles["Normal"],
-                fontName="Helvetica-Bold", fontSize=7.5, textColor=HexColor("#5A7FA8"))
-            style_label = ParagraphStyle("L", parent=styles["Normal"],
-                fontName="Helvetica-Bold", fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
-            style_val = ParagraphStyle("V", parent=styles["Normal"],
-                fontName="Helvetica", fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
-            style_head = ParagraphStyle("H", parent=styles["Normal"],
-                fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)
-
-            BLUE_DARK  = HexColor("#0B2A52")
-            BLUE_MED   = HexColor("#1A4A7A")
-            BLUE_ROW   = HexColor("#EEF4FB")
+            pdf_buf   = io.BytesIO()
+            doc       = SimpleDocTemplate(pdf_buf, pagesize=A4,
+                            leftMargin=1.8*cm, rightMargin=1.8*cm,
+                            topMargin=1.8*cm, bottomMargin=1.8*cm)
+            styles    = getSampleStyleSheet()
+            BLUE_DARK = HexColor("#0B2A52")
+            BLUE_MED  = HexColor("#1A4A7A")
+            BLUE_ROW  = HexColor("#EEF4FB")
+            s_title   = ParagraphStyle("T", parent=styles["Title"],
+                            fontName="Helvetica-Bold", fontSize=13, textColor=colors.white, leading=18)
+            s_sub     = ParagraphStyle("S", parent=styles["Normal"],
+                            fontName="Helvetica-Bold", fontSize=9, textColor=colors.white)
+            s_sec     = ParagraphStyle("SC", parent=styles["Normal"],
+                            fontName="Helvetica-Bold", fontSize=7.5, textColor=HexColor("#5A7FA8"))
+            s_lbl     = ParagraphStyle("L", parent=styles["Normal"],
+                            fontName="Helvetica-Bold", fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
+            s_val     = ParagraphStyle("V", parent=styles["Normal"],
+                            fontName="Helvetica", fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
+            s_head    = ParagraphStyle("H", parent=styles["Normal"],
+                            fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)
             col_w = [2.5*cm, 5.5*cm, 9.44*cm]
-
             story = []
-            hdr = Table([[Paragraph("IDBDC — UPT", style_title),
-                          Paragraph("Departamentul Cercetare Dezvoltare Inovare", style_sub)]],
+
+            hdr = Table([[Paragraph("IDBDC — UPT", s_title),
+                          Paragraph("Departamentul Cercetare Dezvoltare Inovare", s_sub)]],
                         colWidths=[5*cm, 12.44*cm])
             hdr.setStyle(TableStyle([
-                ("BACKGROUND",(0,0),(-1,-1),BLUE_DARK),
-                ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-                ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10),
-                ("LEFTPADDING",(0,0),(0,0),14),("LEFTPADDING",(1,0),(1,0),8),
+                ("BACKGROUND", (0,0),(-1,-1), BLUE_DARK), ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                ("TOPPADDING",(0,0),(-1,-1),10), ("BOTTOMPADDING",(0,0),(-1,-1),10),
+                ("LEFTPADDING",(0,0),(0,0),14), ("LEFTPADDING",(1,0),(1,0),8),
             ]))
             story.append(hdr)
             story.append(Spacer(1, 0.2*cm))
-            sub = Table([[Paragraph(f"Fișă completă  ·  Cod: {_html.escape(cod)}", style_sub)]],
-                        colWidths=[17.44*cm])
+            sub = Table([[Paragraph(f"Fisa completa  |  Cod: {cod}", s_sub)]], colWidths=[17.44*cm])
             sub.setStyle(TableStyle([
                 ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
-                ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+                ("TOPPADDING",(0,0),(-1,-1),5), ("BOTTOMPADDING",(0,0),(-1,-1),5),
                 ("LEFTPADDING",(0,0),(-1,-1),14),
             ]))
             story.append(sub)
             story.append(Spacer(1, 0.3*cm))
-
-            antet = Table([[Paragraph("SECȚIUNEA",style_head),
-                            Paragraph("CÂMP",style_head),
-                            Paragraph("VALOARE",style_head)]], colWidths=col_w)
+            antet = Table([[Paragraph("SECTIUNEA",s_head), Paragraph("CAMP",s_head), Paragraph("VALOARE",s_head)]],
+                          colWidths=col_w)
             antet.setStyle(TableStyle([
                 ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
-                ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+                ("TOPPADDING",(0,0),(-1,-1),4), ("BOTTOMPADDING",(0,0),(-1,-1),4),
                 ("LEFTPADDING",(0,0),(-1,-1),5),
                 ("GRID",(0,0),(-1,-1),0.3,HexColor("#6A9CC8")),
             ]))
             story.append(antet)
 
             for df_sec_name, df_sec in export_frames.items():
-                rows_data = []
+                tbl_data = []
                 for r_idx, (_, row) in enumerate(df_sec.iterrows()):
-                    bg = BLUE_ROW if r_idx % 2 == 0 else colors.white
-                    for c_idx, col_name in enumerate(df_sec.columns):
-                        val = str(row[col_name]) if row[col_name] is not None else ""
-                        label = col_name
-                        rows_data.append((df_sec_name if c_idx == 0 and r_idx == 0 else "",
-                                          label, val, bg))
-
-                tbl_data = [[Paragraph(r[0], style_sec),
-                             Paragraph(r[1], style_label),
-                             Paragraph(r[2].replace("\n","<br/>").encode("ascii","replace").decode("ascii"), style_val)]
-                            for r in rows_data]
+                    bg        = BLUE_ROW if r_idx % 2 == 0 else colors.white
+                    sec_label = df_sec_name if r_idx == 0 else ""
+                    camp_val  = str(row.get("Camp", ""))
+                    val_val   = str(row.get("Valoare", "")) if row.get("Valoare") is not None else ""
+                    tbl_data.append((sec_label, camp_val, val_val, bg))
                 if not tbl_data:
                     continue
-                tbl = Table(tbl_data, colWidths=col_w)
+                tbl_rows = [[
+                    Paragraph(r[0], s_sec),
+                    Paragraph(r[1], s_lbl),
+                    Paragraph(r[2].replace("\n","<br/>").encode("ascii","replace").decode("ascii"), s_val),
+                ] for r in tbl_data]
+                tbl = Table(tbl_rows, colWidths=col_w)
                 cmds = [
                     ("VALIGN",(0,0),(-1,-1),"TOP"),
-                    ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
+                    ("TOPPADDING",(0,0),(-1,-1),3), ("BOTTOMPADDING",(0,0),(-1,-1),3),
                     ("LEFTPADDING",(0,0),(-1,-1),5),
                     ("GRID",(0,0),(-1,-1),0.3,HexColor("#C5D8EC")),
                     ("LINEABOVE",(0,0),(-1,0),1.2,BLUE_MED),
                 ]
-                for i, r in enumerate(rows_data):
-                    cmds.append(("BACKGROUND",(0,i),(-1,i), r[3]))
+                for i, r in enumerate(tbl_data):
+                    cmds.append(("BACKGROUND",(0,i),(-1,i),r[3]))
                 tbl.setStyle(TableStyle(cmds))
                 story.append(tbl)
 
             story.append(Spacer(1, 0.5*cm))
             story.append(Paragraph(
-                "Document generat automat — IDBDC UPT  ·  Uz intern",
-                ParagraphStyle("F", parent=styles["Normal"],
-                    fontName="Helvetica", fontSize=7,
-                    textColor=HexColor("#8AADCC"), alignment=1)
+                "Document generat automat — IDBDC UPT  |  Uz intern",
+                ParagraphStyle("F", parent=styles["Normal"], fontName="Helvetica",
+                    fontSize=7, textColor=HexColor("#8AADCC"), alignment=1)
             ))
             doc.build(story)
             pdf_buf.seek(0)
             st.download_button(
-                "⬇️ Download fișă (PDF)", data=pdf_buf,
+                "⬇️ PDF (.pdf)", data=pdf_buf,
                 file_name=f"fisa_{cod}.pdf", mime="application/pdf",
                 key="fisa_pdf", use_container_width=True,
             )
         except ImportError:
-            st.caption("PDF indisponibil (reportlab lipsă)")
+            st.caption("PDF indisponibil (reportlab lipsa)")
 
-    with ea4:
-        if st.button("🖨️ Print fișă (PDF / Excel / Word)", key="fisa_print", use_container_width=True):
+    with ea3:
+        if st.button("🖨️ Print", key="fisa_print", use_container_width=True):
             html_sections = []
             for section_label, df_sec in export_frames.items():
                 html_sections.append(f"<h3>{_html.escape(section_label)}</h3>")
                 html_sections.append(df_sec.to_html(index=False, escape=True))
-            full_html = f"""
-            <html><head><meta charset="utf-8"/>
+            full_html = f"""<html><head><meta charset="utf-8"/>
             <style>body{{font-family:Arial;padding:20px;}}
             h2{{color:#003366;}} h3{{color:#0b2a52;margin-top:20px;}}
             table{{border-collapse:collapse;width:100%;margin-bottom:16px;}}
             th,td{{border:1px solid #ccc;padding:5px;font-size:11px;}}
             th{{background:#e8f0f8;}}
-            @media print{{button{{display:none;}}}}
-            </style></head><body>
-            <button onclick="window.print()">🖨️ Print</button>
-            <h2>Fișă — {_html.escape(cod)}</h2>
-            {"".join(html_sections)}
-            </body></html>
-            """
+            @media print{{button{{display:none;}}}}</style></head><body>
+            <button onclick="window.print()">Print</button>
+            <h2>Fisa — {_html.escape(cod)}</h2>
+            {"".join(html_sections)}</body></html>"""
             components.html(full_html, height=700, scrolling=True)
