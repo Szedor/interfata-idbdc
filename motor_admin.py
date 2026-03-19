@@ -95,8 +95,8 @@ def porneste_motorul(supabase):
             row["status_confirmare"] = False
         if "validat_idbdc" in row:
             row["validat_idbdc"] = False
-        if "reprezinta_idbdc" in row:
-            row["reprezinta_idbdc"] = False
+        if "persoana_contact" in row:
+            row["persoana_contact"] = False
         y = current_year()
         for c in columns:
             if c == "an" or c.startswith("an_"):
@@ -511,7 +511,7 @@ def porneste_motorul(supabase):
             "acronim_functie_upt":        "🔽 ABREVIERE FUNCTIE UPT",
             "acronim_departament":        "🔽 ACRONIM DEPARTAMENT",
             "cod_universitate":           "🔽 COD UNIVERSITATE",
-            "reprezinta_idbdc":           "Reprezinta contractul/proiectul",
+            "persoana_contact":           "PERSOANA DE CONTACT",
             "functie_upt":                "Abreviere functie UPT (auto)",
             "data_contract":              "📅 DATA CONTRACTULUI",
             "data_inceput":               "📅 DATA DE INCEPUT",
@@ -735,14 +735,14 @@ def porneste_motorul(supabase):
                 help="🔽 Selectează din listă",
             )
 
-        if table_name == "com_echipe_proiect" and "reprezinta_idbdc" in df.columns:
-            df["reprezinta_idbdc"] = df["reprezinta_idbdc"].apply(
+        if table_name == "com_echipe_proiect" and "persoana_contact" in df.columns:
+            df["persoana_contact"] = df["persoana_contact"].apply(
                 lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
-            # [FIX-6iv] Ascundem coloana reprezinta_idbdc pentru contracte
+            # [FIX-6iv] Ascundem coloana persoana_contact pentru contracte
             if not is_contract_ctx:
-                cfg["reprezinta_idbdc"] = st.column_config.CheckboxColumn(
-                    label=_col_label_admin("reprezinta_idbdc", table_name),
+                cfg["persoana_contact"] = st.column_config.CheckboxColumn(
+                    label=_col_label_admin("persoana_contact", table_name),
                     help="Bifează dacă persoana reprezintă IDBDC în proiect",
                     default=False,
                 )
@@ -1192,141 +1192,91 @@ def porneste_motorul(supabase):
 
     def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name):
         """
-        Zona 1 (sus): Reprezentant responsabil contract / director proiect
-        Zona 2 (jos): Membrii echipă
-        La salvare cele două zone se reunesc.
+        Un singur tabel pentru toata echipa.
+        Coloana persoana_contact (True/False) vizibila doar operatorului — determina cine e persoana de contact.
         """
-        # [FIX-6iv] Pentru contracte: scoatem coloana reprezinta_idbdc din df_show
-        is_contract = tabela_baza in TABELE_CONTRACTE
-        if is_contract and "reprezinta_idbdc" in df_show.columns:
-            df_show = df_show.drop(columns=["reprezinta_idbdc"])
-
         persoane_disponibile = load_dropdown_options("det_resurse_umane", "nume_prenume")
 
         col_cfg_echipa = dict(col_cfg)
-        if "reprezinta_idbdc" in col_cfg_echipa and is_contract:
-            del col_cfg_echipa["reprezinta_idbdc"]
 
         if "nume_prenume" in df_show.columns:
             col_cfg_echipa["nume_prenume"] = st.column_config.SelectboxColumn(
                 label="🔽 NUME SI PRENUME",
                 options=persoane_disponibile,
                 required=True,
-                help="🔽 Selectează persoana din lista angajaților",
+                help="🔽 Selecteaza persoana din lista angajatilor",
             )
 
-        # [FIX-2] cod_identificare ascuns din editor — se completează automat la salvare
+        if "persoana_contact" in df_show.columns:
+            col_cfg_echipa["persoana_contact"] = st.column_config.CheckboxColumn(
+                label="PERSOANA DE CONTACT",
+                help="Bifeaza daca persoana este persoana de contact pentru acest contract/proiect",
+                default=False,
+            )
+
+        # cod_identificare ascuns din editor — se completeaza automat la salvare
         cols_echipa_show = [c for c in df_show.columns if c != "cod_identificare"]
-        df_show = df_show[cols_echipa_show]
-        # Eliminăm din cfg eventualele referințe la cod_identificare
+        df_show_edit = df_show[cols_echipa_show].copy()
         col_cfg_echipa.pop("cod_identificare", None)
 
-        # Împărțim df în reprezentanți și restul (doar dacă nu e contract)
-        if not is_contract and "reprezinta_idbdc" in df_show.columns:
-            mask_rep = df_show["reprezinta_idbdc"].apply(
-                lambda v: v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
+        # Asiguram ca persoana_contact e boolean
+        if "persoana_contact" in df_show_edit.columns:
+            df_show_edit["persoana_contact"] = df_show_edit["persoana_contact"].apply(
+                lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
-            df_rep  = df_show[mask_rep].copy().reset_index(drop=True)
-            df_rest = df_show[~mask_rep].copy().reset_index(drop=True)
-        else:
-            # Pentru contracte: primul tabel = toți membrii (fără împărțire)
-            # Zona 1 = rândul cu reprezinta_idbdc=True (sau primul rând dacă nu există coloana)
-            df_rep  = df_show.head(0).copy()  # gol — va fi populat manual
-            df_rest = df_show.copy()
-
-        # ── ZONA 1 ─────────────────────────────────────────────────────────
-        # Titlu adaptat la context
-        if is_contract:
-            zona1_titlu = "⭐ Reprezentant: responsabil contract"
-            zona1_subtitlu = ""
-        else:
-            zona1_titlu = "⭐ Reprezentanți IDBDC"
-            zona1_subtitlu = "director / responsabil proiect"
-
-        _subtitlu_html = f" <span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>({zona1_subtitlu})</span>" if zona1_subtitlu else ""
-        st.markdown(
-            f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.30);"
-            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
-            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>{zona1_titlu}</span>{_subtitlu_html}"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-        key_rep = f"editor_echipa_rep_{cod}"
-        edited_rep = st.data_editor(
-            df_rep,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="dynamic",
-            column_config=col_cfg_echipa,
-            disabled=editing_blocked,
-            key=key_rep,
-            height=min(200, 60 + max(1, len(df_rep)) * 38),
-        )
-
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-
-        # ── ZONA 2 ─────────────────────────────────────────────────────────
-        nr_rest = len(df_rest)
-        st.markdown(
-            f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
-            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
-            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>👥 Membrii echipă</span> "
-            f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_rest} persoane</span>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
 
         filter_key = f"echipa_filter_{cod}"
         filtru = st.text_input(
-            "🔍 Filtrează după nume",
+            "🔍 Filtreaza dupa nume",
             value="",
             key=filter_key,
-            placeholder="Tastează pentru a filtra lista...",
+            placeholder="Tasteaza pentru a filtra lista...",
             label_visibility="collapsed",
         ).strip().lower()
 
-        df_rest_filtered = df_rest.copy()
-        if filtru and "nume_prenume" in df_rest_filtered.columns:
-            df_rest_filtered = df_rest_filtered[
-                df_rest_filtered["nume_prenume"].astype(str).str.lower().str.contains(filtru, na=False)
+        df_filtered = df_show_edit.copy()
+        if filtru and "nume_prenume" in df_filtered.columns:
+            df_filtered = df_filtered[
+                df_filtered["nume_prenume"].astype(str).str.lower().str.contains(filtru, na=False)
             ].reset_index(drop=True)
 
-        key_rest = f"editor_echipa_rest_{cod}"
-        edited_rest = st.data_editor(
-            df_rest_filtered,
+        nr_membri = len(df_show_edit)
+        st.markdown(
+            f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
+            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
+            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>👥 Echipa</span> "
+            f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_membri} persoane</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        key_editor = f"editor_echipa_{cod}"
+        edited_echipa = st.data_editor(
+            df_filtered,
             use_container_width=True,
             hide_index=True,
             num_rows="dynamic",
             column_config=col_cfg_echipa,
             disabled=editing_blocked,
-            key=key_rest,
-            height=400,
+            key=key_editor,
+            height=420,
         )
 
-        # ── Reunim pentru salvare ──────────────────────────────────────────
-        if not is_contract and "reprezinta_idbdc" in edited_rep.columns:
-            edited_rep = edited_rep.copy()
-            edited_rep["reprezinta_idbdc"] = True
-        if not is_contract and "reprezinta_idbdc" in edited_rest.columns:
-            edited_rest = edited_rest.copy()
-            edited_rest["reprezinta_idbdc"] = False
+        # Completam cod_identificare pe toate randurile
+        edited_echipa = edited_echipa.copy()
+        edited_echipa["cod_identificare"] = cod
 
-        df_reunited = pd.concat([edited_rep, edited_rest], ignore_index=True)
+        if "persoana_contact" not in edited_echipa.columns:
+            edited_echipa["persoana_contact"] = False
 
-        # Completăm cod_identificare pe toate rândurile înainte de filtrare
-        df_reunited["cod_identificare"] = cod
-
-        if "nume_prenume" in df_reunited.columns:
-            df_reunited = df_reunited[
-                df_reunited["nume_prenume"].notna() &
-                (df_reunited["nume_prenume"].astype(str).str.strip() != "")
+        if "nume_prenume" in edited_echipa.columns:
+            edited_echipa = edited_echipa[
+                edited_echipa["nume_prenume"].notna() &
+                (edited_echipa["nume_prenume"].astype(str).str.strip() != "")
             ].reset_index(drop=True)
 
-        # [FIX-3] Salvăm rezultatul și în session_state pentru a supraviețui rerun-ului
-        st.session_state[f"echipa_reunited_{cod}"] = df_reunited
-        edited_data[table_name] = df_reunited
-
+        st.session_state[f"echipa_reunited_{cod}"] = edited_echipa
+        edited_data[table_name] = edited_echipa
     # ============================
     # TAB-URI + EDITOR
     # ============================
