@@ -1384,11 +1384,49 @@ def porneste_motorul(supabase):
     # ============================
 
     if "admin_msg" in st.session_state:
-        msg_type, msg_text = st.session_state["admin_msg"]
+        msg_type, msg_text = st.session_state.pop("admin_msg")
         if msg_type == "success":
-            st.success(msg_text)
+            st.markdown(
+                f"""
+                <div style='
+                    background: rgba(30,180,80,0.22);
+                    border: 2px solid rgba(30,220,100,0.75);
+                    border-radius: 14px;
+                    padding: 18px 28px;
+                    margin: 12px 0 16px 0;
+                    text-align: center;
+                '>
+                    <span style='font-size:2.2rem;'>✅</span><br>
+                    <span style='color:#80ffb0;font-size:1.35rem;font-weight:900;letter-spacing:0.02em;'>
+                        {msg_text}
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         else:
-            st.error(msg_text)
+            parts = str(msg_text).split(":", 1)
+            titlu_err = parts[0].strip()
+            detaliu_err = parts[1].strip() if len(parts) > 1 else ""
+            st.markdown(
+                f"""
+                <div style='
+                    background: rgba(220,50,50,0.20);
+                    border: 2px solid rgba(255,80,80,0.70);
+                    border-radius: 14px;
+                    padding: 18px 28px;
+                    margin: 12px 0 16px 0;
+                    text-align: center;
+                '>
+                    <span style='font-size:2.2rem;'>❌</span><br>
+                    <span style='color:#ffaaaa;font-size:1.35rem;font-weight:900;'>
+                        {titlu_err}
+                    </span>
+                    {"<br><span style='color:rgba(255,180,180,0.85);font-size:0.95rem;font-weight:600;margin-top:6px;display:block;'>Motiv: " + detaliu_err + "</span>" if detaliu_err else ""}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     # ============================
     # BUTOANE
@@ -1477,10 +1515,6 @@ def porneste_motorul(supabase):
 
             ok, msg = direct_save_all_tables(items, operator)
             if ok:
-                # Curatam cache-ul de state pentru a forta reincarcarea datelor salvate
-                for _, tn in tabele:
-                    for k in (state_key(tn), state_key_raw(tn)):
-                        st.session_state.pop(k, None)
                 st.session_state["admin_msg"] = ("success", "✅ Fișa a fost salvată")
             else:
                 st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {msg}")
