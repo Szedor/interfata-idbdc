@@ -14,19 +14,16 @@ def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
     st.markdown("""
-        <style>.stApp { background: #0b1a2e !important; }</style>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-                                <div style='text-align:center;margin-top:3rem;'>
-            <div style='font-size:3.3rem;'>&#9888;&#65039;</div>
-            <div style='color:#ffffff;font-size:1.88rem;font-weight:900;
-                        letter-spacing:0.06em;margin:0.8rem 0;'>
+        <div style='text-align:center;margin-top:3rem;'>
+            <div style='font-size:2.2rem;'>&#9888;&#65039;</div>
+            <div style='color:#ffffff;font-size:1.20rem;font-weight:900;
+                        letter-spacing:0.06em;margin:0.5rem 0;'>
                 IMPORTANT !
             </div>
             <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.28);
-                        border-radius:12px;padding:28px 36px;
-                        font-size:1.32rem;
-                        max-width:780px;margin:0 auto 1.5rem auto;line-height:1.80;text-align:justify;'>
+                        border-radius:12px;padding:18px 26px;
+                        font-size:0.92rem;
+                        max-width:620px;margin:0 auto 1.2rem auto;line-height:1.75;text-align:justify;'>
                 <span style='color:#ffdd88;'>
                 Platforma <b>IDBDC-UPT</b>
                 (<i>Interogare — Dezvoltare Baze de Date Cercetare – UPT</i>)
@@ -47,13 +44,46 @@ def _maintenance_gate():
             </div>
         </div>
     """, unsafe_allow_html=True)
-    pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c3")
-    if st.button("Acces platforma", key="_mw_btn_c3"):
-        if pwd == _MAINTENANCE_PASSWORD:
-            st.session_state["_mw_cleared"] = True
-            st.rerun()
-        else:
-            st.error("Parola incorecta.")
+    st.markdown("""
+                                                                                <div style='text-align:center;margin-top:2.5rem;'>
+            <div style='font-size:2.6rem;'>&#9888;&#65039;</div>
+            <div style='color:#ffffff;font-size:1.40rem;font-weight:900;
+                        letter-spacing:0.06em;margin:0.7rem 0;'>
+                IMPORTANT !
+            </div>
+            <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.28);
+                        border-radius:12px;padding:22px 30px;
+                        font-size:1.00rem;
+                        max-width:680px;margin:0 auto 1.2rem auto;line-height:1.78;text-align:justify;'>
+                <span style='color:#ffdd88;'>
+                Platforma <b>IDBDC-UPT</b>
+                (<i>Interogare — Dezvoltare Baze de Date Cercetare – UPT</i>)
+                a intrat în testarea finală a celor aproape <b>6.000 de linii de cod</b>,
+                din <b>11 fișiere principale Python</b>, dintre care 5 fișiere sunt
+                dedicate modulelor AI, <b>93 de funcții și algoritmi definiți</b>,
+                <b>24 de tabele de baze de date</b> cu <b>122 de câmpuri de date distincte</b>,
+                precum și a securității asigurate prin <b>5 niveluri de autentificare</b>.
+                </span><br><br>
+                <span style='color:rgba(255,255,255,0.82);'>
+                După finalizarea procesului de testare finală se va trece la încărcarea cu
+                date reale, atât curente cât și istorice. Pentru această etapă va fi vizibil
+                permanent un <b>grafic de progres anual</b> pentru fiecare categorie
+                — contracte și proiecte pe tipuri, evenimente științifice și proprietate
+                industrială — dar și o <b>numărătoare inversă</b>
+                până la deschiderea accesului.
+                </span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    _, mid, _ = st.columns([1.5, 1, 1.5])
+    with mid:
+        pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c3")
+        if st.button("Acces platformă", key="_mw_btn_c3", use_container_width=True):
+            if pwd == _MAINTENANCE_PASSWORD:
+                st.session_state["_mw_cleared"] = True
+                st.rerun()
+            else:
+                st.error("Parolă incorectă.")
     st.stop()
 
 _maintenance_gate()
@@ -231,7 +261,7 @@ def email_gate(supabase: Client):
     render_header()
 
     _, mid, _ = st.columns([1.5, 1.0, 1.5])
-    with mid:
+    with col_m:
         st.subheader("🔐 Acces securizat")
         st.markdown(
             "<div style='color:rgba(255,255,255,0.88);font-size:0.95rem;"
