@@ -9,16 +9,19 @@ def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
     st.markdown("""
+        <style>.stApp { background: #0b1a2e !important; }</style>
+    """, unsafe_allow_html=True)
+    st.markdown("""
         <div style='text-align:center;margin-top:3rem;'>
             <div style='font-size:2.2rem;'>&#9888;&#65039;</div>
-            <div style='color:#ffffff;font-size:1.20rem;font-weight:900;
+            <div style='color:#ffffff;font-size:1.10rem;font-weight:900;
                         letter-spacing:0.06em;margin:0.5rem 0;'>
                 IMPORTANT !
             </div>
             <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.28);
-                        border-radius:12px;padding:18px 26px;
-                        font-size:0.92rem;
-                        max-width:620px;margin:0 auto 1.2rem auto;line-height:1.75;text-align:justify;'>
+                        border-radius:12px;padding:16px 24px;
+                        color:rgba(255,255,255,0.88);font-size:0.88rem;
+                        max-width:560px;margin:0 auto 1.5rem auto;line-height:1.70;'>
                 <span style='color:#ffdd88;'>
                 Platforma <b>IDBDC-UPT</b>
                 (<i>Interogare — Dezvoltare Baze de Date Cercetare – UPT</i>)
@@ -29,42 +32,11 @@ def _maintenance_gate():
                 precum și a securității asigurate prin <b>5 niveluri de autentificare</b>.
                 </span><br><br>
                 <span style='color:rgba(255,255,255,0.82);'>
-                După finalizarea procesului de testare finală se va trece la încărcarea cu
-                date reale, atât curente cât și istorice. Pentru această etapă va fi vizibil
-                permanent un <b>grafic de progres anual</b> pentru fiecare categorie
-                — contracte și proiecte pe tipuri, evenimente științifice și proprietate
-                industrială — dar și o <b>numărătoare inversă</b>
-                până la deschiderea accesului.
-                </span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-                                                                                <div style='text-align:center;margin-top:2.5rem;'>
-            <div style='font-size:2.6rem;'>&#9888;&#65039;</div>
-            <div style='color:#ffffff;font-size:1.40rem;font-weight:900;
-                        letter-spacing:0.06em;margin:0.7rem 0;'>
-                IMPORTANT !
-            </div>
-            <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.28);
-                        border-radius:12px;padding:22px 30px;
-                        font-size:1.00rem;
-                        max-width:680px;margin:0 auto 1.2rem auto;line-height:1.78;text-align:justify;'>
-                <span style='color:#ffdd88;'>
-                Platforma <b>IDBDC-UPT</b>
-                (<i>Interogare — Dezvoltare Baze de Date Cercetare – UPT</i>)
-                a intrat în testarea finală a celor aproape <b>6.000 de linii de cod</b>,
-                din <b>11 fișiere principale Python</b>, dintre care 5 fișiere sunt
-                dedicate modulelor AI, <b>93 de funcții și algoritmi definiți</b>,
-                <b>24 de tabele de baze de date</b> cu <b>122 de câmpuri de date distincte</b>,
-                precum și a securității asigurate prin <b>5 niveluri de autentificare</b>.
-                </span><br><br>
-                <span style='color:rgba(255,255,255,0.82);'>
-                După finalizarea procesului de testare finală se va trece la încărcarea cu
-                date reale, atât curente cât și istorice. Pentru această etapă va fi vizibil
-                permanent un <b>grafic de progres anual</b> pentru fiecare categorie
-                — contracte și proiecte pe tipuri, evenimente științifice și proprietate
-                industrială — dar și o <b>numărătoare inversă</b>
+                După finalizarea procesului de testare finală se va trece la încărcarea
+                cu date reale, atât curente cât și istorice. Pentru această etapă
+                va fi vizibil permanent un <b>grafic de progres anual</b> pentru fiecare categorie
+                — contracte și proiecte pe tipuri, evenimente științifice și
+                proprietate industrială — dar și o <b>numărătoare inversă</b>
                 până la deschiderea accesului.
                 </span>
             </div>
