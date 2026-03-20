@@ -14,7 +14,7 @@ from supabase import Client
 COL_LABELS = {
     "abreviere_domeniu_fdi": "DOMENIUL FDI",
     "acronim_contracte": "ACRONIM TIP PROIECTE",
-    "acronim_contracte_proiecte": "TIPUL DE CONTRACT SAU PROIECT",
+    "acronim_contracte_proiecte": "TIPUL DE CONTRACT",
     "acronim_departament": "ACRONIM DEPARTAMENT",
     "acronim_functie_upt": "ABREVIERE FUNCTIE UPT",
     "acronim_proiect": "ACRONIM TIP PROIECTE",
