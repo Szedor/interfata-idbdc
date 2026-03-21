@@ -155,6 +155,12 @@ def run():
     if "operator_rol" not in st.session_state:
         st.session_state.operator_rol = None
 
+    if "operator_filtru_categorie" not in st.session_state:
+        st.session_state.operator_filtru_categorie = []
+
+    if "operator_filtru_tipuri" not in st.session_state:
+        st.session_state.operator_filtru_tipuri = []
+
     st.markdown(
         f"""
         <div class="admin-header">
@@ -197,7 +203,7 @@ def run():
                 res_op = (
                     supabase
                     .table("com_operatori")
-                    .select("nume_prenume, rol")
+                    .select("nume_prenume, rol, filtru_categorie, filtru_proiect")
                     .eq("cod_operatori", cod_in)
                     .execute()
                 )
@@ -206,6 +212,12 @@ def run():
 
                     st.session_state.operator_identificat = res_op.data[0].get("nume_prenume")
                     st.session_state.operator_rol = (res_op.data[0].get("rol") or "OPERATOR").strip()
+
+                    # Filtre acces — text CSV -> lista Python
+                    raw_cat = res_op.data[0].get("filtru_categorie") or ""
+                    raw_tip = res_op.data[0].get("filtru_proiect") or ""
+                    st.session_state.operator_filtru_categorie = [x.strip() for x in raw_cat.split(",") if x.strip()]
+                    st.session_state.operator_filtru_tipuri    = [x.strip() for x in raw_tip.split(",") if x.strip()]
 
                     st.rerun()
 
