@@ -985,19 +985,30 @@ def porneste_motorul(supabase):
     # SELECTOARE
     # ============================
 
+    # ============================
+    # FILTRE OPERATOR din session_state
+    # ============================
+    _rol_c2            = (st.session_state.get("operator_rol") or "").strip().upper()
+    _filtru_categorii  = st.session_state.get("operator_filtru_categorie") or []
+    _filtru_tipuri     = st.session_state.get("operator_filtru_tipuri") or []
+
+    # Toate categoriile posibile
+    _toate_cat = ["Contracte", "Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
+    # Daca operatorul are filtru_categorie completat, limitam; altfel (ADMIN fara filtru) arata tot
+    _cat_disponibile = [""] + [c for c in _toate_cat if not _filtru_categorii or c in _filtru_categorii]
+
     c1, c2, c3 = st.columns(3)
     with c1:
-        cat_admin = st.selectbox(
-            "Categoria de date",
-            ["", "Contracte", "Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"],
-        )
+        cat_admin = st.selectbox("Categoria de date", _cat_disponibile)
     with c2:
         if cat_admin == "Contracte":
-            _rol_c2 = (st.session_state.get("operator_rol") or "").strip().upper()
-            _optiuni_contracte = ["", "CEP", "TERTI", "SPECIALE"] if _rol_c2 == "ADMIN" else ["", "CEP", "TERTI"]
-            tip_admin = st.selectbox("Tipul de contract", _optiuni_contracte)
+            _toate_contracte = ["CEP", "TERTI", "SPECIALE"]
+            _tip_disponibile = [""] + [t for t in _toate_contracte if not _filtru_tipuri or t in _filtru_tipuri]
+            tip_admin = st.selectbox("Tipul de contract", _tip_disponibile)
         elif cat_admin == "Proiecte":
-            tip_admin = st.selectbox("Tipul de proiect", ["", "FDI", "PNRR", "PNCDI", "INTERNATIONALE", "INTERREG", "NONEU"])
+            _toate_proiecte = ["FDI", "PNRR", "PNCDI", "INTERNATIONALE", "INTERREG", "NONEU"]
+            _tip_disponibile = [""] + [t for t in _toate_proiecte if not _filtru_tipuri or t in _filtru_tipuri]
+            tip_admin = st.selectbox("Tipul de proiect", _tip_disponibile)
         else:
             tip_admin = ""
     with c3:
@@ -1005,6 +1016,64 @@ def porneste_motorul(supabase):
             id_admin = st.text_input("Filtru număr contract")
         else:
             id_admin = st.text_input("Filtru număr contract sau ID proiect")
+
+    # ── Buton Listă contracte SPECIALE ───────────────────────────────────────
+    if cat_admin == "Contracte" and tip_admin == "SPECIALE" and (not id_admin or not id_admin.strip()):
+        st.markdown("---")
+        st.markdown("**📋 Listă contracte SPECIALE**")
+        _fc1, _fc2, _fc3 = st.columns(3)
+        with _fc1:
+            _filtru_an = st.text_input("Filtru an (ex: 2024)", key="spec_filtru_an")
+        with _fc2:
+            try:
+                _persoane_spec = [""] + (supabase.table("base_contracte_speciale")
+                                  .select("persoana_contact").execute().data or [])
+                _persoane_spec = [""] + sorted(set(
+                    r.get("persoana_contact", "") for r in
+                    (supabase.table("base_contracte_speciale").select("persoana_contact").execute().data or [])
+                    if r.get("persoana_contact")
+                ))
+            except Exception:
+                _persoane_spec = [""]
+            _filtru_persoana = st.selectbox("Filtru persoană contact", _persoane_spec, key="spec_filtru_persoana")
+        with _fc3:
+            _filtru_beneficiar = st.text_input("Filtru beneficiar", key="spec_filtru_beneficiar")
+
+        if st.button("🔍 Afișează lista", key="spec_btn_lista"):
+            try:
+                q = supabase.table("base_contracte_speciale").select(
+                    "cod_identificare, titlul_proiect, denumire_beneficiar, persoana_contact, data_inceput, data_sfarsit, status_contract_proiect"
+                )
+                if _filtru_an and _filtru_an.strip():
+                    try:
+                        _an = int(_filtru_an.strip())
+                        q = q.lte("data_inceput", f"{_an}-12-31").gte("data_sfarsit", f"{_an}-01-01")
+                    except ValueError:
+                        st.warning("Anul introdus nu este valid.")
+                if _filtru_persoana:
+                    q = q.eq("persoana_contact", _filtru_persoana)
+                if _filtru_beneficiar and _filtru_beneficiar.strip():
+                    q = q.ilike("denumire_beneficiar", f"%{_filtru_beneficiar.strip()}%")
+                _res_spec = q.order("data_inceput", desc=True).limit(500).execute()
+                _df_spec = pd.DataFrame(_res_spec.data or [])
+                if _df_spec.empty:
+                    st.info("Niciun contract SPECIAL găsit pentru filtrele selectate.")
+                else:
+                    _rename_spec = {
+                        "cod_identificare":        "NR. CONTRACT",
+                        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+                        "denumire_beneficiar":     "BENEFICIAR",
+                        "persoana_contact":        "PERSOANĂ CONTACT",
+                        "data_inceput":            "DATA ÎNCEPUT",
+                        "data_sfarsit":            "DATA SFÂRȘIT",
+                        "status_contract_proiect": "STATUS",
+                    }
+                    _df_spec = _df_spec.rename(columns=_rename_spec)
+                    st.dataframe(_df_spec, use_container_width=True, height=400)
+                    st.caption(f"Total: {len(_df_spec)} contracte")
+            except Exception as e:
+                st.error(f"Eroare la încărcarea listei: {e}")
+        st.markdown("---")
 
     # [4] Avertismente daca operatorul introduce cod fara sa selecteze categoria/tipul
     if id_admin and str(id_admin).strip():
