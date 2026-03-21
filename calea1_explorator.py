@@ -116,7 +116,7 @@ TEXT_COL_CANDIDATES = [
     "descriere", "observatii", "cuvinte_cheie",
 ]
 
-YEAR_COL_CANDIDATES_CP  = ["an_referinta", "data_inceput"]
+YEAR_COL_CANDIDATES_CP  = ["data_inceput"]
 YEAR_COL_CANDIDATES_EV  = ["data_inceput", "data_eveniment", "data"]
 YEAR_COL_CANDIDATES_PI  = ["data_oficiala_acordare", "data_acordare", "data"]
 
@@ -479,13 +479,23 @@ def _count_results_estimate(supabase: Client, tables: list[str], criteriu: str,
             total = getattr(res, "count", 0) or 0
 
         elif criteriu == "An de referință":
-            for col_an in YEAR_COL_CANDIDATES_CP:
-                for t in tables:
-                    cols_t = set(get_table_columns(supabase, t))
-                    if col_an not in cols_t:
-                        continue
-                    res = supabase.table(t).select("cod_identificare", count="exact").eq(col_an, valoare).limit(1).execute()
+            # Un contract/proiect apare la anul X dacă data_inceput <= X <= data_sfarsit
+            for t in tables:
+                cols_t = set(get_table_columns(supabase, t))
+                if "data_inceput" not in cols_t:
+                    continue
+                try:
+                    an_int = int(valoare)
+                    data_start = f"{an_int}-01-01"
+                    data_end   = f"{an_int}-12-31"
+                    res = (supabase.table(t)
+                           .select("cod_identificare", count="exact")
+                           .lte("data_inceput", data_end)
+                           .gte("data_sfarsit",  data_start)
+                           .limit(1).execute())
                     total += getattr(res, "count", 0) or 0
+                except Exception:
+                    pass
 
         else:  # Cuvânt cheie
             for col_kw in ["titlul_proiect", "titlu_proiect", "titlu", "denumire"]:
@@ -680,10 +690,45 @@ def render_explorare_criteriu(supabase: Client):
                 pass
 
     elif criteriu == "An de referință":
-        for col_an in YEAR_COL_CANDIDATES_CP + YEAR_COL_CANDIDATES_EV + YEAR_COL_CANDIDATES_PI:
-            df_t = _query_tables(supabase, tables_to_query, col_an, valoare)
-            if not df_t.empty:
-                df = pd.concat([df, df_t], ignore_index=True) if not df.empty else df_t
+        # Contract/proiect activ în anul X dacă data_inceput <= 31dec(X) și data_sfarsit >= 01ian(X)
+        try:
+            an_int     = int(valoare)
+            data_start = f"{an_int}-01-01"
+            data_end   = f"{an_int}-12-31"
+        except ValueError:
+            st.warning("Anul introdus nu este valid.")
+            return
+
+        for t in tables_to_query:
+            cols_t = set(get_table_columns(supabase, t))
+            # Pentru tabele cu interval (contracte, proiecte)
+            if "data_inceput" in cols_t and "data_sfarsit" in cols_t:
+                try:
+                    res = (supabase.table(t).select("*")
+                           .lte("data_inceput", data_end)
+                           .gte("data_sfarsit",  data_start)
+                           .limit(800).execute())
+                    rows = res.data or []
+                    if rows:
+                        df_t = pd.DataFrame(rows)
+                        df_t["_sursa"] = t
+                        df = pd.concat([df, df_t], ignore_index=True) if not df.empty else df_t
+                except Exception:
+                    pass
+            else:
+                # Pentru tabele fara interval (evenimente, prop. intelectuala) — căutare exacta pe an
+                for col_an in YEAR_COL_CANDIDATES_EV + YEAR_COL_CANDIDATES_PI:
+                    if col_an in cols_t:
+                        try:
+                            res = supabase.table(t).select("*").eq(col_an, valoare).limit(800).execute()
+                            rows = res.data or []
+                            if rows:
+                                df_t = pd.DataFrame(rows)
+                                df_t["_sursa"] = t
+                                df = pd.concat([df, df_t], ignore_index=True) if not df.empty else df_t
+                        except Exception:
+                            pass
+                        break
 
     else:  # Cuvânt cheie titlu / acronim
         kw_cols = ["titlu", "titlul_proiect", "titlu_proiect", "titlu_eveniment",
@@ -1055,7 +1100,7 @@ def _render_ca_rezultate(supabase: Client):
         if c in available_cols:
             default_cols.append(c)
             break
-    for c in ["status_contract_proiect", "an_referinta", "data_inceput"]:
+    for c in ["status_contract_proiect", "data_inceput", "data_sfarsit"]:
         if c in available_cols:
             default_cols.append(c)
             break
