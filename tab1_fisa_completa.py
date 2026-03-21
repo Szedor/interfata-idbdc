@@ -162,6 +162,7 @@ CARD_PRIORITY = [
 TABLE_LABELS = {
     "base_contracte_cep":           "📄 Contract CEP",
     "base_contracte_terti":         "📄 Contract TERȚI",
+    "base_contracte_speciale":      "📄 Contract SPECIAL",
     "base_proiecte_fdi":            "🔬 Proiect FDI",
     "base_proiecte_pncdi":          "🔬 Proiect PNCDI",
     "base_proiecte_pnrr":           "🔬 Proiect PNRR",
@@ -179,6 +180,11 @@ COL_LABELS_PER_TABLE = {
         "titlul_proiect":          "OBIECTUL CONTRACTULUI",
     },
     "base_contracte_terti": {
+        "cod_identificare":        "NR.CONTRACT",
+        "status_contract_proiect": "STATUS CONTRACT",
+        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+    },
+    "base_contracte_speciale": {
         "cod_identificare":        "NR.CONTRACT",
         "status_contract_proiect": "STATUS CONTRACT",
         "titlul_proiect":          "OBIECTUL CONTRACTULUI",
@@ -244,6 +250,7 @@ COL_LABELS_PER_TABLE = {
 ALL_BASE_TABLES = [
     "base_contracte_terti",
     "base_contracte_cep",
+    "base_contracte_speciale",
     "base_proiecte_fdi",
     "base_proiecte_pncdi",
     "base_proiecte_pnrr",
