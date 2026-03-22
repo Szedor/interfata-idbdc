@@ -1026,23 +1026,21 @@ def porneste_motorul(supabase):
             _filtru_an = st.text_input("Filtru an (ex: 2024)", key="spec_filtru_an")
         with _fc2:
             try:
-                _persoane_spec = [""] + (supabase.table("base_contracte_speciale")
-                                  .select("persoana_contact").execute().data or [])
-                _persoane_spec = [""] + sorted(set(
-                    r.get("persoana_contact", "") for r in
-                    (supabase.table("base_contracte_speciale").select("persoana_contact").execute().data or [])
-                    if r.get("persoana_contact")
+                _responsabili_spec = [""] + sorted(set(
+                    r.get("responsabil_idbdc", "") for r in
+                    (supabase.table("base_contracte_speciale").select("responsabil_idbdc").execute().data or [])
+                    if r.get("responsabil_idbdc")
                 ))
             except Exception:
-                _persoane_spec = [""]
-            _filtru_persoana = st.selectbox("Filtru persoană contact", _persoane_spec, key="spec_filtru_persoana")
+                _responsabili_spec = [""]
+            _filtru_responsabil = st.selectbox("Filtru responsabil", _responsabili_spec, key="spec_filtru_responsabil")
         with _fc3:
             _filtru_beneficiar = st.text_input("Filtru beneficiar", key="spec_filtru_beneficiar")
 
         if st.button("🔍 Afișează lista", key="spec_btn_lista"):
             try:
                 q = supabase.table("base_contracte_speciale").select(
-                    "cod_identificare, titlul_proiect, denumire_beneficiar, persoana_contact, data_inceput, data_sfarsit, status_contract_proiect"
+                    "cod_identificare, titlul_proiect, denumire_beneficiar, responsabil_idbdc, data_inceput, data_sfarsit, status_contract_proiect"
                 )
                 if _filtru_an and _filtru_an.strip():
                     try:
@@ -1050,8 +1048,8 @@ def porneste_motorul(supabase):
                         q = q.lte("data_inceput", f"{_an}-12-31").gte("data_sfarsit", f"{_an}-01-01")
                     except ValueError:
                         st.warning("Anul introdus nu este valid.")
-                if _filtru_persoana:
-                    q = q.eq("persoana_contact", _filtru_persoana)
+                if _filtru_responsabil:
+                    q = q.eq("responsabil_idbdc", _filtru_responsabil)
                 if _filtru_beneficiar and _filtru_beneficiar.strip():
                     q = q.ilike("denumire_beneficiar", f"%{_filtru_beneficiar.strip()}%")
                 _res_spec = q.order("data_inceput", desc=True).limit(500).execute()
@@ -1063,7 +1061,7 @@ def porneste_motorul(supabase):
                         "cod_identificare":        "NR. CONTRACT",
                         "titlul_proiect":          "OBIECTUL CONTRACTULUI",
                         "denumire_beneficiar":     "BENEFICIAR",
-                        "persoana_contact":        "PERSOANĂ CONTACT",
+                        "responsabil_idbdc":       "RESPONSABIL",
                         "data_inceput":            "DATA ÎNCEPUT",
                         "data_sfarsit":            "DATA SFÂRȘIT",
                         "status_contract_proiect": "STATUS",
@@ -1233,6 +1231,9 @@ def porneste_motorul(supabase):
                 match_tip = next((o for o in opts_tip if tip_admin.upper() in o.upper()), None)
                 if match_tip:
                     df_full["acronim_contracte_proiecte"] = match_tip
+                else:
+                    # Fallback direct — dacă nomenclatorul nu are valoarea exactă
+                    df_full["acronim_contracte_proiecte"] = tip_admin
         st.session_state[state_key_raw(table_name)] = df_full.copy()
         st.session_state[state_key(table_name)] = hide_control_cols(df_full)
 
@@ -1395,6 +1396,10 @@ def porneste_motorul(supabase):
     for i, (label, table_name) in enumerate(tabele):
         with tabs[i]:
             df_show = st.session_state[state_key(table_name)].copy()
+
+            # Ascunde an_referinta din Date de baza pentru tabele de contracte
+            if table_name in ("base_contracte_terti", "base_contracte_speciale", "base_contracte_cep"):
+                df_show = df_show.drop(columns=["an_referinta"], errors="ignore")
 
             if table_name == "com_date_financiare" and "an_referinta" in df_show.columns and "valuta" in df_show.columns:
                 cols = list(df_show.columns)
