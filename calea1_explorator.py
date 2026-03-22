@@ -14,12 +14,12 @@ GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
 PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 
 # ── MAINTENANCE LOCK ──────────────────────────────────────────────────────────
+st.set_page_config(page_title="IDBDC – Explorare", layout="wide")
 _MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
 
 def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
-    st.set_page_config(page_title="IDBDC – System Alert", layout="centered")
     st.markdown("""
         <style>
         .stApp { background: #0b1a2e !important; }
