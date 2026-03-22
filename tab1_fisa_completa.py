@@ -250,7 +250,6 @@ COL_LABELS_PER_TABLE = {
 ALL_BASE_TABLES = [
     "base_contracte_terti",
     "base_contracte_cep",
-    "base_contracte_speciale",
     "base_proiecte_fdi",
     "base_proiecte_pncdi",
     "base_proiecte_pnrr",
