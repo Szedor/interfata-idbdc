@@ -3,6 +3,7 @@ from supabase import create_client, Client
 from motor_admin import porneste_motorul
 
 # ── MAINTENANCE LOCK ──────────────────────────────────────────────────────────
+st.set_page_config(page_title="IDBDC – Administrare", layout="wide")
 _MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
 
 def _maintenance_gate():
