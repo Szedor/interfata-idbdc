@@ -1039,8 +1039,11 @@ def porneste_motorul(supabase):
 
         if st.button("🔍 Afișează lista", key="spec_btn_lista"):
             try:
+                # ── 1. Date de bază ──────────────────────────────────────
                 q = supabase.table("base_contracte_speciale").select(
-                    "cod_identificare, titlul_proiect, denumire_beneficiar, responsabil_idbdc, data_inceput, data_sfarsit, status_contract_proiect"
+                    "cod_identificare, titlul_proiect, denumire_beneficiar, "
+                    "derulat_prin, responsabil_idbdc, data_contract, "
+                    "data_inceput, data_sfarsit, status_contract_proiect"
                 )
                 if _filtru_an and _filtru_an.strip():
                     try:
@@ -1052,23 +1055,82 @@ def porneste_motorul(supabase):
                     q = q.eq("responsabil_idbdc", _filtru_responsabil)
                 if _filtru_beneficiar and _filtru_beneficiar.strip():
                     q = q.ilike("denumire_beneficiar", f"%{_filtru_beneficiar.strip()}%")
-                _res_spec = q.order("data_inceput", desc=True).limit(500).execute()
-                _df_spec = pd.DataFrame(_res_spec.data or [])
-                if _df_spec.empty:
+                _res_base = q.order("data_inceput", desc=True).limit(500).execute()
+                _df_base = pd.DataFrame(_res_base.data or [])
+
+                if _df_base.empty:
                     st.info("Niciun contract SPECIAL găsit pentru filtrele selectate.")
                 else:
+                    _coduri = _df_base["cod_identificare"].tolist()
+
+                    # ── 2. Date financiare ───────────────────────────────
+                    try:
+                        _res_fin = (supabase.table("com_date_financiare")
+                                    .select("cod_identificare, valoare_totala_contract, "
+                                            "cofinantare_totala_contract, valuta")
+                                    .in_("cod_identificare", _coduri)
+                                    .execute())
+                        _df_fin = pd.DataFrame(_res_fin.data or [])
+                        if not _df_fin.empty:
+                            # Pastreaza doar coloanele cu cel putin o valoare non-nula
+                            _df_fin = _df_fin.dropna(axis=1, how="all")
+                            _df_fin = _df_fin.groupby("cod_identificare", as_index=False).first()
+                    except Exception:
+                        _df_fin = pd.DataFrame()
+
+                    # ── 3. Echipă — concatenare membri per contract ──────
+                    try:
+                        _res_ech = (supabase.table("com_echipe_proiect")
+                                    .select("cod_identificare, nume_prenume, "
+                                            "functia_specifica, persoana_contact")
+                                    .in_("cod_identificare", _coduri)
+                                    .execute())
+                        _df_ech = pd.DataFrame(_res_ech.data or [])
+                        if not _df_ech.empty:
+                            # Persoana de contact prima, apoi restul alfabetic
+                            _df_ech = _df_ech.sort_values(
+                                ["cod_identificare", "persoana_contact"],
+                                ascending=[True, False]
+                            )
+                            _df_ech_grp = (_df_ech.groupby("cod_identificare", as_index=False)
+                                           .agg(membri_echipa=("nume_prenume", lambda x: ", ".join(x.dropna()))))
+                        else:
+                            _df_ech_grp = pd.DataFrame()
+                    except Exception:
+                        _df_ech_grp = pd.DataFrame()
+
+                    # ── 4. Join toate ────────────────────────────────────
+                    _df_final = _df_base.copy()
+                    if not _df_fin.empty and "cod_identificare" in _df_fin.columns:
+                        _df_final = _df_final.merge(_df_fin, on="cod_identificare", how="left")
+                    if not _df_ech_grp.empty and "cod_identificare" in _df_ech_grp.columns:
+                        _df_final = _df_final.merge(_df_ech_grp, on="cod_identificare", how="left")
+
+                    # ── 5. Elimina coloanele complet goale ───────────────
+                    _df_final = _df_final.dropna(axis=1, how="all")
+                    _df_final = _df_final.loc[:, (_df_final != "").any(axis=0)]
+
+                    # ── 6. Etichete frumoase ─────────────────────────────
                     _rename_spec = {
-                        "cod_identificare":        "NR. CONTRACT",
-                        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
-                        "denumire_beneficiar":     "BENEFICIAR",
-                        "responsabil_idbdc":       "RESPONSABIL",
-                        "data_inceput":            "DATA ÎNCEPUT",
-                        "data_sfarsit":            "DATA SFÂRȘIT",
-                        "status_contract_proiect": "STATUS",
+                        "cod_identificare":           "NR. CONTRACT",
+                        "titlul_proiect":             "OBIECTUL CONTRACTULUI",
+                        "denumire_beneficiar":        "BENEFICIAR",
+                        "derulat_prin":               "DERULAT PRIN",
+                        "responsabil_idbdc":          "RESPONSABIL",
+                        "data_contract":              "DATA CONTRACT",
+                        "data_inceput":               "DATA ÎNCEPUT",
+                        "data_sfarsit":               "DATA SFÂRȘIT",
+                        "status_contract_proiect":    "STATUS",
+                        "valoare_totala_contract":    "VALOARE TOTALĂ",
+                        "cofinantare_totala_contract":"COFINANȚARE",
+                        "valuta":                     "VALUTĂ",
+                        "membri_echipa":              "MEMBRI ECHIPĂ",
                     }
-                    _df_spec = _df_spec.rename(columns=_rename_spec)
-                    st.dataframe(_df_spec, use_container_width=True, height=400)
-                    st.caption(f"Total: {len(_df_spec)} contracte")
+                    _df_final = _df_final.rename(columns={k: v for k, v in _rename_spec.items() if k in _df_final.columns})
+
+                    st.dataframe(_df_final, use_container_width=True, height=400)
+                    st.caption(f"Total: {len(_df_final)} contracte SPECIALE")
+
             except Exception as e:
                 st.error(f"Eroare la încărcarea listei: {e}")
         st.markdown("---")
