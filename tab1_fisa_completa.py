@@ -159,6 +159,15 @@ CARD_PRIORITY = [
     "cuvinte_cheie", "descriere", "observatii",
 ]
 
+# Ordinea fixă a câmpurilor în secțiunea TEHNIC — matriță pentru toate tipurile
+TEHNIC_COL_ORDER = [
+    "cod_identificare",
+    "obiectiv_general",
+    "obiective_specifice",
+    "activitati_proiect",
+    "rezultate_proiect",
+]
+
 TABLE_LABELS = {
     "base_contracte_cep":           "📄 Contract CEP",
     "base_contracte_terti":         "📄 Contract TERȚI",
@@ -500,7 +509,14 @@ def _build_section_export_df(rows: list, table: str = None) -> pd.DataFrame:
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
         ]
-        visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
+        # Sectiunea Tehnic — ordine fixa de matrita
+        if table == "com_aspecte_tehnice":
+            ordered = [c for c in TEHNIC_COL_ORDER if c in visible_cols]
+            rest    = [c for c in visible_cols if c not in TEHNIC_COL_ORDER]
+            rest.sort(key=lambda c: (priority_set.get(c, 999), c))
+            visible_cols = ordered + rest
+        else:
+            visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
         for c in visible_cols:
             all_items.append({"Camp": _col_label(c, table), "Valoare": str(row[c])})
     return pd.DataFrame(all_items) if all_items else pd.DataFrame()
@@ -684,6 +700,14 @@ def render_fisa_completa(supabase: Client):
         df_ech = _build_echipa_export_rows(rows_ech, supabase)
         if not df_ech.empty:
             export_frames["Echipa"] = df_ech
+
+    # Ordine fixă secțiuni — matriță pentru toate tipurile: Generale / Financiar / Echipa / Tehnic
+    _SECTIUNI_ORDINE = ["Generale", "Financiar", "Echipa", "Tehnic"]
+    export_frames = {
+        k: export_frames[k]
+        for k in _SECTIUNI_ORDINE
+        if k in export_frames
+    }
 
     if not export_frames:
         st.info("Nu există date de exportat pentru acest cod.")
