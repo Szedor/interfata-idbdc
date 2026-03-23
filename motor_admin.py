@@ -8,6 +8,16 @@ def porneste_motorul(supabase):
     # ============================
     # CONFIG
     # ============================
+
+    def _fmt_numeric(val) -> str:
+        """Formatează valorile numerice cu separator de mii și 2 zecimale (format românesc)."""
+        if val is None:
+            return ""
+        try:
+            f = float(str(val).replace(",", ".").strip())
+            return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except (ValueError, TypeError):
+            return str(val)
     ADMIN_ONLY_COLS = {
         "responsabil_idbdc", "observatii_idbdc",
         "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
@@ -795,15 +805,24 @@ def porneste_motorul(supabase):
                 format="%d",
             )
 
+        # Campuri de valori financiare — format cu 2 zecimale
+        VALUE_COLS_KEYWORDS = (
+            "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
+            "contributie_", "total_",
+        )
         for c in df.columns:
             if c in cfg:
                 continue
             if c in CONTROL_COLS:
                 continue
             if is_numeric_col(c, df):
+                c_lower = c.lower()
+                is_value_col = any(c_lower.startswith(k) or c_lower == k
+                                   for k in VALUE_COLS_KEYWORDS)
                 cfg[c] = st.column_config.NumberColumn(
                     label=_col_label_admin(c, table_name),
-                    step=1,
+                    step=0.01 if is_value_col else 1,
+                    format="%.2f" if is_value_col else "%d",
                 )
 
         for c in df.columns:
@@ -1127,6 +1146,13 @@ def porneste_motorul(supabase):
                         "membri_echipa":              "MEMBRI ECHIPĂ",
                     }
                     _df_final = _df_final.rename(columns={k: v for k, v in _rename_spec.items() if k in _df_final.columns})
+
+                    # Format numeric pentru coloanele de valori
+                    for _val_col in ["VALOARE TOTALĂ", "COFINANȚARE"]:
+                        if _val_col in _df_final.columns:
+                            _df_final[_val_col] = _df_final[_val_col].apply(
+                                lambda v: _fmt_numeric(v) if v is not None and str(v).strip() not in ("", "None", "nan") else ""
+                            )
 
                     st.dataframe(_df_final, use_container_width=True, height=400)
                     st.caption(f"Total: {len(_df_final)} contracte SPECIALE")
@@ -1461,6 +1487,10 @@ def porneste_motorul(supabase):
 
             # Ascunde an_referinta din Date de baza pentru tabele de contracte
             if table_name in ("base_contracte_terti", "base_contracte_speciale", "base_contracte_cep"):
+                df_show = df_show.drop(columns=["an_referinta"], errors="ignore")
+
+            # Ascunde an_referinta din Date financiare pentru contracte
+            if table_name == "com_date_financiare" and tabela_baza in TABELE_CONTRACTE:
                 df_show = df_show.drop(columns=["an_referinta"], errors="ignore")
 
             if table_name == "com_date_financiare" and "an_referinta" in df_show.columns and "valuta" in df_show.columns:
