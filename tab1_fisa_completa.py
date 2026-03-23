@@ -168,6 +168,28 @@ TEHNIC_COL_ORDER = [
     "rezultate_proiect",
 ]
 
+# Tabele de contracte — pentru excludere an_referinta din Generale si Financiar
+_TABELE_CONTRACTE = {
+    "base_contracte_cep",
+    "base_contracte_terti",
+    "base_contracte_speciale",
+}
+
+# Câmpuri excluse din Generale/Financiar pentru contracte
+_COLS_EXCLUDE_CONTRACTE = {"an_referinta"}
+
+
+def _fmt_numeric(val) -> str:
+    """Formatează valorile numerice cu separator de mii și 2 zecimale."""
+    if val is None:
+        return ""
+    try:
+        f = float(str(val).replace(",", ".").strip())
+        # Separator mii = "." , zecimale = ","  (format românesc)
+        return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (ValueError, TypeError):
+        return str(val)
+
 TABLE_LABELS = {
     "base_contracte_cep":           "📄 Contract CEP",
     "base_contracte_terti":         "📄 Contract TERȚI",
@@ -290,21 +312,43 @@ def _is_persoana_contact(r: dict) -> bool:
     return v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
 
 
-def _render_sectiune_tabel(section_label: str, rows: list, table: str = None):
+def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
+                           tabela_baza_ctx: str = None):
     if not rows:
         return
     priority_set = {c: i for i, c in enumerate(CARD_PRIORITY)}
+
+    # Coloane excluse suplimentar pentru contracte (an_referinta)
+    is_contract_ctx = (tabela_baza_ctx or table or "") in _TABELE_CONTRACTE
+    extra_hidden = _COLS_EXCLUDE_CONTRACTE if is_contract_ctx else set()
+
     all_items = []
     for row in rows:
         visible_cols = [
             c for c in row.keys()
             if c not in COLS_HIDDEN_FISA
+            and c not in extra_hidden
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
         ]
-        visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
+        # Sectiunea Tehnic — ordine fixă de matriță
+        if table == "com_aspecte_tehnice":
+            ordered = [c for c in TEHNIC_COL_ORDER if c in visible_cols]
+            rest    = sorted([c for c in visible_cols if c not in TEHNIC_COL_ORDER],
+                             key=lambda c: (priority_set.get(c, 999), c))
+            visible_cols = ordered + rest
+        else:
+            visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
         for c in visible_cols:
-            all_items.append((_col_label(c, table), _html.escape(str(row[c]))))
+            # Format numeric pentru câmpuri de valori
+            raw_val = row[c]
+            try:
+                float(str(raw_val).replace(",", ".").strip())
+                is_num = True
+            except (ValueError, TypeError):
+                is_num = False
+            val_str = _fmt_numeric(raw_val) if is_num else str(raw_val)
+            all_items.append((_col_label(c, table), _html.escape(val_str)))
 
     if not all_items:
         st.info(f"Nu există câmpuri completate pentru secțiunea {section_label}.")
@@ -497,28 +541,41 @@ def _render_export_auth_tab1(supabase: Client) -> bool:
     return False
 
 
-def _build_section_export_df(rows: list, table: str = None) -> pd.DataFrame:
+def _build_section_export_df(rows: list, table: str = None,
+                              tabela_baza_ctx: str = None) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame()
     priority_set = {c: i for i, c in enumerate(CARD_PRIORITY)}
+
+    is_contract_ctx = (tabela_baza_ctx or table or "") in _TABELE_CONTRACTE
+    extra_hidden = _COLS_EXCLUDE_CONTRACTE if is_contract_ctx else set()
+
     all_items = []
     for row in rows:
         visible_cols = [
             c for c in row.keys()
             if c not in COLS_HIDDEN_FISA
+            and c not in extra_hidden
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
         ]
         # Sectiunea Tehnic — ordine fixa de matrita
         if table == "com_aspecte_tehnice":
             ordered = [c for c in TEHNIC_COL_ORDER if c in visible_cols]
-            rest    = [c for c in visible_cols if c not in TEHNIC_COL_ORDER]
-            rest.sort(key=lambda c: (priority_set.get(c, 999), c))
+            rest    = sorted([c for c in visible_cols if c not in TEHNIC_COL_ORDER],
+                             key=lambda c: (priority_set.get(c, 999), c))
             visible_cols = ordered + rest
         else:
             visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
         for c in visible_cols:
-            all_items.append({"Camp": _col_label(c, table), "Valoare": str(row[c])})
+            raw_val = row[c]
+            try:
+                float(str(raw_val).replace(",", ".").strip())
+                is_num = True
+            except (ValueError, TypeError):
+                is_num = False
+            val_str = _fmt_numeric(raw_val) if is_num else str(raw_val)
+            all_items.append({"Camp": _col_label(c, table), "Valoare": val_str})
     return pd.DataFrame(all_items) if all_items else pd.DataFrame()
 
 
@@ -665,7 +722,8 @@ def render_fisa_completa(supabase: Client):
                 if not rows:
                     st.info(f"Nu există informații pentru secțiunea {sec_label}.")
                 else:
-                    _render_sectiune_tabel(sec_label, rows, sec_table)
+                    _render_sectiune_tabel(sec_label, rows, sec_table,
+                                           tabela_baza_ctx=tabela_gasita)
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ── Export ────────────────────────────────────────────────────────────
@@ -684,14 +742,16 @@ def render_fisa_completa(supabase: Client):
 
     rows_gen = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
     if rows_gen:
-        df_gen = _build_section_export_df(rows_gen, tabela_gasita)
+        df_gen = _build_section_export_df(rows_gen, tabela_gasita,
+                                           tabela_baza_ctx=tabela_gasita)
         if not df_gen.empty:
             export_frames["Generale"] = df_gen
 
     for com_label, com_table in [("Financiar", "com_date_financiare"), ("Tehnic", "com_aspecte_tehnice")]:
         rows_com = _safe_select_eq(supabase, com_table, "cod_identificare", cod, limit=50)
         if rows_com:
-            df_com = _build_section_export_df(rows_com, com_table)
+            df_com = _build_section_export_df(rows_com, com_table,
+                                               tabela_baza_ctx=tabela_gasita)
             if not df_com.empty:
                 export_frames[com_label] = df_com
 
