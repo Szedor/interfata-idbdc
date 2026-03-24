@@ -1493,10 +1493,10 @@ def porneste_motorul(supabase):
             if table_name == "com_date_financiare" and tabela_baza in TABELE_CONTRACTE:
                 df_show = df_show.drop(columns=["an_referinta"], errors="ignore")
 
-            if table_name == "com_date_financiare" and "an_referinta" in df_show.columns and "valuta" in df_show.columns:
+            if table_name == "com_date_financiare" and "valuta" in df_show.columns and "cod_identificare" in df_show.columns:
                 cols = list(df_show.columns)
                 cols.remove("valuta")
-                idx = cols.index("an_referinta") + 1
+                idx = cols.index("cod_identificare") + 1
                 cols.insert(idx, "valuta")
                 df_show = df_show[cols]
 
