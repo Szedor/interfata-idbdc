@@ -7,7 +7,11 @@
 _MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
 
 _MAINTENANCE_STYLE = """
-    <style>.stApp { background: #0b1a2e !important; }</style>
+    <style>
+        .stApp { background: #0b1a2e !important; }
+        .stButton > button { background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; -webkit-text-fill-color: #0b1f3a !important; opacity: 1 !important; }
+        .stButton > button p { color: #0b1f3a !important; -webkit-text-fill-color: #0b1f3a !important; }
+    </style>
 """
 
 _MAINTENANCE_HTML = """
