@@ -54,8 +54,10 @@ def run():
 
             div.stButton > button {
                 border: 1px solid white !important;
-                color: white !important;
-                background-color: rgba(255,255,255,0.10) !important;
+                color: #0b1f3a !important;
+                -webkit-text-fill-color: #0b1f3a !important;
+                background-color: rgba(255,255,255,0.96) !important;
+                opacity: 1 !important;
                 width: 100%;
                 font-size: 14px !important;
                 font-weight: bold !important;
