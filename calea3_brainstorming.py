@@ -14,7 +14,11 @@ def _maintenance_gate():
     if st.session_state.get("_mw_cleared"):
         return
     st.markdown("""
-        <style>.stApp { background: #0b1a2e !important; }</style>
+        <style>
+            .stApp { background: #0b1a2e !important; }
+            .stButton > button { background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; -webkit-text-fill-color: #0b1f3a !important; opacity: 1 !important; }
+            .stButton > button p { color: #0b1f3a !important; -webkit-text-fill-color: #0b1f3a !important; }
+        </style>
     """, unsafe_allow_html=True)
     st.markdown("""
         <div style='text-align:center;margin-top:3rem;'>
@@ -127,8 +131,10 @@ def apply_style():
 
             div.stButton > button {{
                 border: 1px solid white !important;
-                color: white !important;
-                background-color: rgba(255,255,255,0.10) !important;
+                color: #0b1f3a !important;
+                -webkit-text-fill-color: #0b1f3a !important;
+                background-color: rgba(255,255,255,0.96) !important;
+                opacity: 1 !important;
                 width: 100%;
                 font-size: 14px !important;
                 font-weight: bold !important;
