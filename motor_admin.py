@@ -538,6 +538,14 @@ def porneste_motorul(supabase):
             "data_sfarsit_valabilitate":  "📅 DATA DE SFARSIT VALABILITATE",
             "data_apel":                  "📅 DATA APELULUI",
             "abreviere_domeniu_fdi": "DOMENIUL FDI",
+            "program":               "PROGRAM",
+            "subprogram":            "SUBPROGRAM",
+            "instrument_finantare":  "INSTRUMENT DE FINANTARE",
+            "apel":                  "APEL",
+            "pilon":                 "PILON",
+            "componenta":            "COMPONENTA",
+            "reforma":               "REFORMA",
+            "investitie":            "INVESTITIE",
             "acronim_tip_contract": "ACRONIM TIP CONTRACT",
             "acronim_proiect": "ACRONIM PROIECT",
             "acronim_tip_proiect": "ACRONIM TIP PROIECT",
@@ -664,11 +672,20 @@ def porneste_motorul(supabase):
             },
             "base_proiecte_pncdi": {
                 "cod_identificare":        "NR.CONTRACT / COD PROIECT",
+                "program":             "PROGRAM",
+                "subprogram":          "SUBPROGRAM",
+                "instrument_finantare":"INSTRUMENT DE FINANTARE",
+                "apel":                "APEL",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
             },
             "base_proiecte_pnrr": {
                 "cod_identificare":        "COD PROIECT PNRR",
+                "pilon":               "PILON",
+                "componenta":          "COMPONENTA",
+                "reforma":             "REFORMA",
+                "investitie":          "INVESTITIE",
+                "apel":                "APEL",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
             },
@@ -1499,6 +1516,30 @@ def porneste_motorul(supabase):
                 idx = cols.index("cod_identificare") + 1
                 cols.insert(idx, "valuta")
                 df_show = df_show[cols]
+
+            # Reordonare coloane sursa finantare PNCDI dupa cod_identificare
+            if table_name == "base_proiecte_pncdi" and "cod_identificare" in df_show.columns:
+                _pncdi_cols = [c for c in ["program", "subprogram", "instrument_finantare", "apel"] if c in df_show.columns]
+                if _pncdi_cols:
+                    cols = list(df_show.columns)
+                    for c in _pncdi_cols:
+                        cols.remove(c)
+                    idx = cols.index("cod_identificare") + 1
+                    for c in reversed(_pncdi_cols):
+                        cols.insert(idx, c)
+                    df_show = df_show[cols]
+
+            # Reordonare coloane sursa finantare PNRR dupa cod_identificare
+            if table_name == "base_proiecte_pnrr" and "cod_identificare" in df_show.columns:
+                _pnrr_cols = [c for c in ["pilon", "componenta", "reforma", "investitie", "apel"] if c in df_show.columns]
+                if _pnrr_cols:
+                    cols = list(df_show.columns)
+                    for c in _pnrr_cols:
+                        cols.remove(c)
+                    idx = cols.index("cod_identificare") + 1
+                    for c in reversed(_pnrr_cols):
+                        cols.insert(idx, c)
+                    df_show = df_show[cols]
 
             col_cfg = build_column_config_for_table(table_name, df_show, tabela_baza_ctx=tabela_baza)
 
