@@ -200,6 +200,7 @@ TABLE_LABELS = {
     "base_proiecte_internationale": "🌍 Proiect Internațional",
     "base_proiecte_interreg":       "🌍 Proiect INTERREG",
     "base_proiecte_noneu":          "🌍 Proiect NON-EU",
+    "base_proiecte_see":            "🌍 Proiect SEE",
     "base_evenimente_stiintifice":  "🎓 Eveniment Științific",
     "base_prop_intelect":           "💡 Proprietate Industrială",
 }
@@ -255,6 +256,12 @@ COL_LABELS_PER_TABLE = {
         "titlul_proiect":          "TITLUL PROIECTULUI",
         "rol_upt":                 "ROL UPT IN PROIECT",
     },
+    "base_proiecte_see": {
+        "cod_identificare":        "COD / NR. PROIECT",
+        "status_contract_proiect": "STATUS PROIECT",
+        "titlul_proiect":          "TITLUL PROIECTULUI",
+        "rol_upt":                 "ROL UPT IN PROIECT",
+    },
     "base_evenimente_stiintifice": {
         "cod_identificare": "COD EVENIMENT",
         "titlul_eveniment": "TITLUL EVENIMENTULUI",
@@ -287,6 +294,7 @@ ALL_BASE_TABLES = [
     "base_proiecte_internationale",
     "base_proiecte_interreg",
     "base_proiecte_noneu",
+    "base_proiecte_see",
     "base_evenimente_stiintifice",
     "base_prop_intelect",
 ]
