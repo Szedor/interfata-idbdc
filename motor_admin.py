@@ -472,6 +472,11 @@ def porneste_motorul(supabase):
                 "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
                 "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
             },
+            "base_proiecte_see": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
             "base_proiecte_pncdi": {
                 "denumire_categorie": ("nom_categorie", "denumire_categorie"),
                 "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
@@ -546,6 +551,10 @@ def porneste_motorul(supabase):
             "componenta":            "COMPONENTA",
             "reforma":               "REFORMA",
             "investitie":            "INVESTITIE",
+            "sursa_finantare":       "SURSA DE FINANTARE",
+            "programul_tematic":     "PROGRAMUL TEMATIC",
+            "componenta_axa":        "COMPONENTA / AXA",
+            "obiectiv_specific":     "OBIECTIV SPECIFIC",
             "acronim_tip_contract": "ACRONIM TIP CONTRACT",
             "acronim_proiect": "ACRONIM PROIECT",
             "acronim_tip_proiect": "ACRONIM TIP PROIECT",
@@ -702,6 +711,12 @@ def porneste_motorul(supabase):
                 "rol_upt":                 "ROL UPT IN PROIECT",
             },
             "base_proiecte_noneu": {
+                "cod_identificare":        "COD / NR. PROIECT",
+                "status_contract_proiect": "🔽 STATUS PROIECT",
+                "titlul_proiect":          "TITLUL PROIECTULUI",
+                "rol_upt":                 "ROL UPT IN PROIECT",
+            },
+            "base_proiecte_see": {
                 "cod_identificare":        "COD / NR. PROIECT",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
@@ -1042,7 +1057,7 @@ def porneste_motorul(supabase):
             _tip_disponibile = [""] + [t for t in _toate_contracte if not _filtru_tipuri or t in _filtru_tipuri]
             tip_admin = st.selectbox("Tipul de contract", _tip_disponibile)
         elif cat_admin == "Proiecte":
-            _toate_proiecte = ["FDI", "PNRR", "PNCDI", "INTERNATIONALE", "INTERREG", "NONEU"]
+            _toate_proiecte = ["FDI", "PNRR", "PNCDI", "INTERNATIONALE", "INTERREG", "NONEU", "SEE"]
             _tip_disponibile = [""] + [t for t in _toate_proiecte if not _filtru_tipuri or t in _filtru_tipuri]
             tip_admin = st.selectbox("Tipul de proiect", _tip_disponibile)
         else:
@@ -1199,6 +1214,7 @@ def porneste_motorul(supabase):
         "INTERNATIONALE": "base_proiecte_internationale",
         "INTERREG": "base_proiecte_interreg",
         "NONEU": "base_proiecte_noneu",
+        "SEE":  "base_proiecte_see",
         "PNCDI": "base_proiecte_pncdi",
     }
 
@@ -1212,7 +1228,7 @@ def porneste_motorul(supabase):
     map_tip_label = {
         "CEP": "CEP", "TERTI": "TERTI", "SPECIALE": "SPECIALE",
         "FDI": "FDI", "PNRR": "PNRR", "PNCDI": "PNCDI",
-        "INTERNATIONALE": "INTERNATIONALE", "INTERREG": "INTERREG", "NONEU": "NONEU",
+        "INTERNATIONALE": "INTERNATIONALE", "INTERREG": "INTERREG", "NONEU": "NONEU", "SEE": "SEE",
     }
 
     if cat_admin in ("Contracte", "Proiecte"):
@@ -1538,6 +1554,18 @@ def porneste_motorul(supabase):
                         cols.remove(c)
                     idx = cols.index("cod_identificare") + 1
                     for c in reversed(_pnrr_cols):
+                        cols.insert(idx, c)
+                    df_show = df_show[cols]
+
+            # Reordonare coloane sursa finantare SEE dupa cod_identificare
+            if table_name == "base_proiecte_see" and "cod_identificare" in df_show.columns:
+                _see_cols = [c for c in ["sursa_finantare", "program", "apel", "programul_tematic", "componenta_axa", "obiectiv_specific"] if c in df_show.columns]
+                if _see_cols:
+                    cols = list(df_show.columns)
+                    for c in _see_cols:
+                        cols.remove(c)
+                    idx = cols.index("cod_identificare") + 1
+                    for c in reversed(_see_cols):
                         cols.insert(idx, c)
                     df_show = df_show[cols]
 
