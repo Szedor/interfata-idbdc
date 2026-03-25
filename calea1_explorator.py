@@ -43,6 +43,7 @@ CATEGORII = {
             "INTERNATIONALE":  "base_proiecte_internationale",
             "INTERREG":        "base_proiecte_interreg",
             "NONEU":           "base_proiecte_noneu",
+            "SEE":             "base_proiecte_see",
         }
     },
     "Evenimente stiintifice": {
