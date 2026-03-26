@@ -386,14 +386,22 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
     )
 
 
-def _get_contact_info(supabase, nume: str) -> list:
+def _get_contact_info(supabase, nume: str, debug_st=None) -> list:
     if not supabase or not nume:
         return []
     try:
+        # Potrivire exacta mai intai
         res = supabase.table("det_resurse_umane") \
             .select("email_upt,telefon_upt,telefon_mobil,acronim_departament") \
-            .eq("nume_prenume", nume).limit(1).execute()
+            .eq("nume_prenume", nume.strip()).limit(1).execute()
+        # Fallback ilike daca nu gasim (tolereaza diferente majuscule/spatii)
         if not res.data:
+            res = supabase.table("det_resurse_umane") \
+                .select("email_upt,telefon_upt,telefon_mobil,acronim_departament") \
+                .ilike("nume_prenume", nume.strip()).limit(1).execute()
+        if not res.data:
+            if debug_st:
+                debug_st.warning(f"⚠️ '{nume}' negăsit în det_resurse_umane.")
             return []
         d = res.data[0]
         out = []
@@ -406,7 +414,9 @@ def _get_contact_info(supabase, nume: str) -> list:
         if tel1:  out.append(f"☎ {tel1}")
         if tel2 and tel2 != tel1: out.append(f"📱 {tel2}")
         return out
-    except Exception:
+    except Exception as e:
+        if debug_st:
+            debug_st.error(f"Eroare contact '{nume}': {e}")
         return []
 
 
@@ -430,7 +440,9 @@ def _render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
             nume    = str(r.get("nume_prenume") or "").strip()
             rol     = str(r.get("functia_specifica") or "").strip()
             dept_row = str(r.get("acronim_departament") or "").strip()
-            contact = _get_contact_info(supabase, nume)
+            contact = _get_contact_info(supabase, nume, debug_st=st)
+            # DEBUG TEMPORAR — de eliminat dupa confirmare
+            st.caption(f"🔍 DEBUG — nume din echipă: '{nume}' | dept_row din com_echipe: '{dept_row}' | contact găsit: {contact}")
             # Daca departamentul vine deja din randul echipei, nu il mai adaugam din contact
             if dept_row:
                 contact = [c for c in contact if not c.startswith("🏛")]
