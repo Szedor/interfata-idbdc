@@ -53,8 +53,10 @@ def maintenance_gate(st, pwd_key: str, btn_key: str):
     st       — modulul streamlit
     pwd_key  — cheie unică pentru widget-ul de parolă (ex: '_mw_pwd_c1')
     btn_key  — cheie unică pentru butonul de acces (ex: '_mw_btn_c1')
+    Cheia de stare este derivată din btn_key pentru a fi unică per cale.
     """
-    if st.session_state.get("_mw_cleared"):
+    _cleared_key = f"_mw_cleared_{btn_key}"
+    if st.session_state.get(_cleared_key):
         return
     st.markdown(_MAINTENANCE_STYLE, unsafe_allow_html=True)
     st.markdown(_MAINTENANCE_HTML, unsafe_allow_html=True)
@@ -63,7 +65,7 @@ def maintenance_gate(st, pwd_key: str, btn_key: str):
         pwd = st.text_input("Parola de acces:", type="password", key=pwd_key)
         if st.button("Acces platformă", key=btn_key, use_container_width=True):
             if pwd == _MAINTENANCE_PASSWORD:
-                st.session_state["_mw_cleared"] = True
+                st.session_state[_cleared_key] = True
                 st.rerun()
             else:
                 st.error("Parolă incorectă.")
