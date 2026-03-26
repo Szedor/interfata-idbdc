@@ -391,15 +391,17 @@ def _get_contact_info(supabase, nume: str) -> list:
         return []
     try:
         res = supabase.table("det_resurse_umane") \
-            .select("email_upt,telefon_upt,telefon_mobil") \
+            .select("email_upt,telefon_upt,telefon_mobil,acronim_departament") \
             .eq("nume_prenume", nume).limit(1).execute()
         if not res.data:
             return []
         d = res.data[0]
         out = []
+        dept  = str(d.get("acronim_departament") or "").strip()
         email = str(d.get("email_upt") or "").strip()
         tel1  = str(d.get("telefon_upt") or "").strip()
         tel2  = str(d.get("telefon_mobil") or "").strip()
+        if dept:  out.append(f"🏛 {dept}")
         if email: out.append(f"✉ {email}")
         if tel1:  out.append(f"☎ {tel1}")
         if tel2 and tel2 != tel1: out.append(f"📱 {tel2}")
