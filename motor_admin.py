@@ -406,28 +406,39 @@ def porneste_motorul(supabase):
     def load_functie_map() -> dict:
         try:
             res = supabase.table("det_resurse_umane") \
-                .select("nume_prenume,acronim_functie_upt") \
+                .select("nume_prenume,acronim_functie_upt,acronim_departament") \
                 .execute()
-            return {
-                r["nume_prenume"]: r.get("acronim_functie_upt", "")
-                for r in (res.data or [])
-                if r.get("nume_prenume")
-            }
+            result = {}
+            for r in (res.data or []):
+                if r.get("nume_prenume"):
+                    result[r["nume_prenume"]] = {
+                        "functie_upt": r.get("acronim_functie_upt", "") or "",
+                        "acronim_departament": r.get("acronim_departament", "") or "",
+                    }
+            return result
         except Exception:
             return {}
 
     def autofill_functie_upt(df: pd.DataFrame) -> pd.DataFrame:
-        if "nume_prenume" not in df.columns or "functie_upt" not in df.columns:
+        if "nume_prenume" not in df.columns:
             return df
         functie_map = load_functie_map()
         if not functie_map:
             return df
+        has_functie = "functie_upt" in df.columns
+        has_dept = "acronim_departament" in df.columns
         for idx, row in df.iterrows():
             nume = row.get("nume_prenume")
             if nume and str(nume).strip():
-                functie = functie_map.get(str(nume).strip(), "")
-                if functie:
-                    df.at[idx, "functie_upt"] = functie
+                info = functie_map.get(str(nume).strip(), {})
+                if has_functie:
+                    functie = info.get("functie_upt", "")
+                    if functie:
+                        df.at[idx, "functie_upt"] = functie
+                if has_dept:
+                    dept = info.get("acronim_departament", "")
+                    if dept:
+                        df.at[idx, "acronim_departament"] = dept
         return df
 
     def build_column_config_for_table(table_name: str, df: pd.DataFrame, tabela_baza_ctx: str = None):
@@ -1298,7 +1309,7 @@ def porneste_motorul(supabase):
             for k in (f"df_admin__{tn}", f"df_admin_raw__{tn}",
                       f"editor_{tn}_{prev_cod}", f"editor_echipa_rep_{prev_cod}",
                       f"editor_echipa_rest_{prev_cod}", f"echipa_filter_{prev_cod}",
-                      f"toggle_deblocat_{prev_cod}"):
+                      f"toggle_deblocat_{prev_cod}", f"echipa_reunited_{prev_cod}"):
                 if k in st.session_state:
                     del st.session_state[k]
         st.session_state[_prev_cod_key] = cod
