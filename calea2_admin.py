@@ -133,7 +133,7 @@ def run():
 
         parola_m = st.sidebar.text_input("Parola:", type="password", key="p1_pass")
 
-        if st.sidebar.button("Autorizare acces"):
+        if st.sidebar.button("Autorizare acces", use_container_width=True):
 
             if _check_gate_password(supabase, "admin", parola_m):
                 st.session_state.autorizat_p1 = True
