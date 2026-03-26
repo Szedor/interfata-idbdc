@@ -392,12 +392,12 @@ def _get_contact_info(supabase, nume: str, debug_st=None) -> list:
     try:
         # Potrivire exacta mai intai
         res = supabase.table("det_resurse_umane") \
-            .select("email_upt,telefon_upt,telefon_mobil,acronim_departament") \
+            .select("email,telefon_mobil,acronim_departament") \
             .eq("nume_prenume", nume.strip()).limit(1).execute()
         # Fallback ilike daca nu gasim (tolereaza diferente majuscule/spatii)
         if not res.data:
             res = supabase.table("det_resurse_umane") \
-                .select("email_upt,telefon_upt,telefon_mobil,acronim_departament") \
+                .select("email,telefon_mobil,acronim_departament") \
                 .ilike("nume_prenume", nume.strip()).limit(1).execute()
         if not res.data:
             if debug_st:
@@ -406,13 +406,11 @@ def _get_contact_info(supabase, nume: str, debug_st=None) -> list:
         d = res.data[0]
         out = []
         dept  = str(d.get("acronim_departament") or "").strip()
-        email = str(d.get("email_upt") or "").strip()
-        tel1  = str(d.get("telefon_upt") or "").strip()
-        tel2  = str(d.get("telefon_mobil") or "").strip()
+        email = str(d.get("email") or "").strip()
+        tel   = str(d.get("telefon_mobil") or "").strip()
         if dept:  out.append(f"🏛 {dept}")
         if email: out.append(f"✉ {email}")
-        if tel1:  out.append(f"☎ {tel1}")
-        if tel2 and tel2 != tel1: out.append(f"📱 {tel2}")
+        if tel:   out.append(f"📱 {tel}")
         return out
     except Exception as e:
         if debug_st:
@@ -440,9 +438,7 @@ def _render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
             nume    = str(r.get("nume_prenume") or "").strip()
             rol     = str(r.get("functia_specifica") or "").strip()
             dept_row = str(r.get("acronim_departament") or "").strip()
-            contact = _get_contact_info(supabase, nume, debug_st=st)
-            # DEBUG TEMPORAR — de eliminat dupa confirmare
-            st.caption(f"🔍 DEBUG — nume din echipă: '{nume}' | dept_row din com_echipe: '{dept_row}' | contact găsit: {contact}")
+            contact = _get_contact_info(supabase, nume)
             # Daca departamentul vine deja din randul echipei, nu il mai adaugam din contact
             if dept_row:
                 contact = [c for c in contact if not c.startswith("🏛")]
