@@ -11,7 +11,7 @@ from grant_navigator.engine import ai_documents
 _MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
 
 def _maintenance_gate():
-    if st.session_state.get("_mw_cleared"):
+    if st.session_state.get("_mw_cleared__mw_btn_c3"):
         return
     st.markdown("""
         <style>
@@ -56,7 +56,7 @@ def _maintenance_gate():
         pwd = st.text_input("Parola de acces:", type="password", key="_mw_pwd_c3")
         if st.button("Acces platformă", key="_mw_btn_c3", use_container_width=True):
             if pwd == _MAINTENANCE_PASSWORD:
-                st.session_state["_mw_cleared"] = True
+                st.session_state["_mw_cleared__mw_btn_c3"] = True
                 st.rerun()
             else:
                 st.error("Parolă incorectă.")
