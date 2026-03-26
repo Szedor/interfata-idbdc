@@ -1312,7 +1312,7 @@ def gate():
             st.markdown('<div class="gate-title">🛡️ Acces securizat</div>', unsafe_allow_html=True)
             st.markdown('<div class="gate-subtitle">Interogare baze de date – DCDI</div>', unsafe_allow_html=True)
             parola = st.text_input("Parola acces:", type="password")
-            if st.button("Autorizare acces"):
+            if st.button("Autorizare acces", use_container_width=True):
                 if parola == PASSWORD_CONSULTARE:
                     st.session_state.autorizat_consultare = True
                     st.rerun()
