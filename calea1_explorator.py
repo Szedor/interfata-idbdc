@@ -1347,7 +1347,7 @@ def run():
     tab1, tab2, tab3 = st.tabs([
         "📄 Fișa completă (după cod)",
         "🔎 Explorare după criteriu",
-        "🔍 Căutare aprofundată + Export",
+        "🔍 Căutare aprofundată",
     ])
 
     with tab1:
