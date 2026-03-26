@@ -429,7 +429,12 @@ def _render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
         for r in persoane_cont:
             nume    = str(r.get("nume_prenume") or "").strip()
             rol     = str(r.get("functia_specifica") or "").strip()
+            dept_row = str(r.get("acronim_departament") or "").strip()
             contact = _get_contact_info(supabase, nume)
+            # Daca departamentul vine deja din randul echipei, nu il mai adaugam din contact
+            if dept_row:
+                contact = [c for c in contact if not c.startswith("🏛")]
+                contact = [f"🏛 {dept_row}"] + contact
             txt     = ", ".join(p for p in [nume, rol] if p)
             contact_html = ""
             if contact:
@@ -599,7 +604,11 @@ def _build_echipa_export_rows(rows_ech: list, supabase: Client) -> pd.DataFrame:
         nume = str(r.get("nume_prenume") or "").strip()
         rol  = str(r.get("functia_specifica") or "").strip()
         txt  = ", ".join(p for p in [nume, rol] if p)
+        dept_row = str(r.get("acronim_departament") or "").strip()
         contact = _get_contact_info(supabase, nume)
+        if dept_row:
+            contact = [c for c in contact if not c.startswith("🏛")]
+            contact = [f"🏛 {dept_row}"] + contact
         if contact:
             txt += "  " + "  ".join(contact)
         if txt:
