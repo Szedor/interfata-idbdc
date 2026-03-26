@@ -1308,9 +1308,10 @@ def porneste_motorul(supabase):
         for _, tn in tabele:
             for k in (f"df_admin__{tn}", f"df_admin_raw__{tn}",
                       f"editor_{tn}_{prev_cod}", f"editor_echipa_rep_{prev_cod}",
-                      f"editor_echipa_rest_{prev_cod}", f"echipa_filter_{prev_cod}",
+                      f"editor_echipa_rest_{prev_cod}",
                       f"toggle_deblocat_{prev_cod}", f"echipa_reunited_{prev_cod}"):
                 if k in st.session_state:
+                    del st.session_state[k]
                     del st.session_state[k]
         st.session_state[_prev_cod_key] = cod
         st.session_state[_prev_tabela_key] = tabela_baza
@@ -1466,21 +1467,7 @@ def porneste_motorul(supabase):
                 lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
 
-        filter_key = f"echipa_filter_{cod}"
-        filtru = st.text_input(
-            "🔍 Filtreaza dupa nume",
-            value="",
-            key=filter_key,
-            placeholder="Tasteaza pentru a filtra lista...",
-            label_visibility="collapsed",
-        ).strip().lower()
-
         df_filtered = df_show_edit.copy()
-        if filtru and "nume_prenume" in df_filtered.columns:
-            df_filtered = df_filtered[
-                df_filtered["nume_prenume"].astype(str).str.lower().str.contains(filtru, na=False)
-            ].reset_index(drop=True)
-
         nr_membri = len(df_show_edit)
         st.markdown(
             f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
