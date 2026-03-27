@@ -1312,7 +1312,6 @@ def porneste_motorul(supabase):
                       f"toggle_deblocat_{prev_cod}", f"echipa_reunited_{prev_cod}"):
                 if k in st.session_state:
                     del st.session_state[k]
-                    del st.session_state[k]
         st.session_state[_prev_cod_key] = cod
         st.session_state[_prev_tabela_key] = tabela_baza
 
@@ -1369,6 +1368,17 @@ def porneste_motorul(supabase):
                     df_full["acronim_contracte_proiecte"] = tip_admin
         st.session_state[state_key_raw(table_name)] = df_full.copy()
         st.session_state[state_key(table_name)] = hide_control_cols(df_full)
+
+        # Initializare echipa_reunited la prima incarcare — evita KeyError la salvare
+        # daca tab-ul Echipa nu a fost deschis/interactionat inainte de salvare
+        if table_name == "com_echipe_proiect":
+            echipa_key = f"echipa_reunited_{cod}"
+            if echipa_key not in st.session_state:
+                df_echipa_init = df_full.copy()
+                df_echipa_init["cod_identificare"] = cod
+                if "persoana_contact" not in df_echipa_init.columns:
+                    df_echipa_init["persoana_contact"] = False
+                st.session_state[echipa_key] = df_echipa_init
 
     base_full = st.session_state[state_key_raw(tabela_baza)]
 
