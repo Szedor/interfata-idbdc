@@ -3,9 +3,7 @@ from supabase import create_client, Client
 from motor_admin import porneste_motorul
 
 # ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ────────────────────────
-st.set_page_config(page_title="IDBDC – Administrare", layout="wide")
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
-_maintenance_gate_fn(st, pwd_key="_mw_pwd_c2", btn_key="_mw_btn_c2")
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -25,6 +23,10 @@ def _check_gate_password(supabase: Client, gate: str, password: str) -> bool:
 
 
 def run():
+    # ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ──────────────
+    st.set_page_config(page_title="IDBDC – Administrare", layout="wide")
+    _maintenance_gate_fn(st, pwd_key="_mw_pwd_c2", btn_key="_mw_btn_c2")
+    # ────────────────────────────────────────────────────────────────────
     url: str = st.secrets["SUPABASE_URL"]
     key: str = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
