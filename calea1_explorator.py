@@ -14,9 +14,7 @@ GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
 PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
 
 # ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ────────────────────────
-st.set_page_config(page_title="IDBDC – Explorare", layout="wide")
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
-_maintenance_gate_fn(st, pwd_key="_mw_pwd_c1", btn_key="_mw_btn_c1")
 # ──────────────────────────────────────────────────────────────────────────────
 
 TITLE_LINE_1 = "🔎 Baze de date - Interogare | Cautare | Consultare avansata"
@@ -1328,6 +1326,10 @@ def gate():
 # =========================================================
 
 def run():
+    # ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ──────────────
+    st.set_page_config(page_title="IDBDC – Explorare", layout="wide")
+    _maintenance_gate_fn(st, pwd_key="_mw_pwd_c1", btn_key="_mw_btn_c1")
+    # ────────────────────────────────────────────────────────────────────
     gate()
     hide_streamlit_chrome()
     apply_style_full_blue()
