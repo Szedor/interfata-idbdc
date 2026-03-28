@@ -1,4 +1,5 @@
 import streamlit as st
+from config import Config
 
 # Configurare generală a paginii
 st.set_page_config(page_title="IDBDC UPT - Sistem Integrat", layout="wide")
@@ -22,13 +23,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Preluare parametru pagină din URL (ex: ?pagina=brainstorming)
+# Preluare parametru pagină din URL
 query_params = st.query_params
 calea_activa = query_params.get("pagina", "explorator")
 
-# Alias: acceptă și ?pagina=ai ca să deschidă modulul 3
+# Alias
 if calea_activa == "ai":
     calea_activa = "brainstorming"
+
+# Validare pagină
+if calea_activa not in Config.VALID_PAGES:
+    calea_activa = "explorator"
 
 # Direcționare către scriptul corespunzător
 if calea_activa == "explorator":
