@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
+from config import Config
 import datetime as dt
 import html as _html
 import streamlit.components.v1 as components
@@ -74,6 +75,11 @@ COM_TABLES = {
     "🧪 Tehnic":     "com_aspecte_tehnice",
     "👥 Echipă":     "com_echipe_proiect",
 }
+
+
+@st.cache_resource
+def get_supabase():
+    return create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
 
 
 # =========================================================
@@ -1335,13 +1341,10 @@ def run():
     apply_style_full_blue()
 
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        supabase: Client = get_supabase()
     except Exception:
         st.error("Config lipsă: setează SUPABASE_URL și SUPABASE_KEY în Streamlit Cloud → Settings → Secrets.")
         st.stop()
-
-    supabase: Client = create_client(url, key)
 
     render_header()
     st.divider()
