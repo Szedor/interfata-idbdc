@@ -1,8 +1,8 @@
 import streamlit as st
-from supabase import Client
+from supabase import Client, create_client
 
+from config import Config
 from motor_admin import porneste_motorul
-from services.db import get_supabase
 
 # ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ────────────────────────
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
@@ -11,6 +11,11 @@ from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
 
 TITLE_LINE_1 = "🛠️ Administrare baze de date"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
+
+
+@st.cache_resource
+def get_supabase():
+    return create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
 
 
 def _check_gate_password(supabase: Client, gate: str, password: str) -> bool:
