@@ -4,7 +4,7 @@ from config import Config
 # Configurare generală a paginii
 st.set_page_config(page_title="IDBDC UPT - Sistem Integrat", layout="wide")
 
-# Elimină toate elementele UI Streamlit (Manage app, footer, header, meniu)
+# Elimină toate elementele UI Streamlit
 st.markdown(
     """
     <style>
