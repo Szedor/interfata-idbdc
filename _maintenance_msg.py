@@ -1,10 +1,12 @@
+from config import Config
+
 # =========================================================
 # !! FISIER BETONAT — NU SE MODIFICA !!
 # Mesajul de maintenance comun pentru toate caile IDBDC.
 # Ultima versiune validata: 24.03.2026
 # =========================================================
 
-_MAINTENANCE_PASSWORD = "seLAN$EAZAin2026"
+_MAINTENANCE_PASSWORD = Config.MAINTENANCE_PASSWORD
 
 _MAINTENANCE_STYLE = """
     <style>
