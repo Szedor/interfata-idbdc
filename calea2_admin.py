@@ -1,6 +1,8 @@
 import streamlit as st
-from supabase import create_client, Client
+from supabase import Client
+
 from motor_admin import porneste_motorul
+from services.db import get_supabase
 
 # ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ────────────────────────
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
@@ -27,9 +29,8 @@ def run():
     st.set_page_config(page_title="IDBDC – Administrare", layout="wide")
     _maintenance_gate_fn(st, pwd_key="_mw_pwd_c2", btn_key="_mw_btn_c2")
     # ────────────────────────────────────────────────────────────────────
-    url: str = st.secrets["SUPABASE_URL"]
-    key: str = st.secrets["SUPABASE_KEY"]
-    supabase: Client = create_client(url, key)
+
+    supabase: Client = get_supabase()
 
     st.markdown(
         """
@@ -169,11 +170,10 @@ def run():
                     st.session_state.operator_identificat = res_op.data[0].get("nume_prenume")
                     st.session_state.operator_rol = (res_op.data[0].get("rol") or "OPERATOR").strip()
 
-                    # Filtre acces — text CSV -> lista Python
                     raw_cat = res_op.data[0].get("filtru_categorie") or ""
                     raw_tip = res_op.data[0].get("filtru_proiect") or ""
                     st.session_state.operator_filtru_categorie = [x.strip() for x in raw_cat.split(",") if x.strip()]
-                    st.session_state.operator_filtru_tipuri    = [x.strip() for x in raw_tip.split(",") if x.strip()]
+                    st.session_state.operator_filtru_tipuri = [x.strip() for x in raw_tip.split(",") if x.strip()]
 
                     st.rerun()
 
@@ -186,9 +186,7 @@ def run():
         st.info("Introduceți codul de operator în bara din stânga pentru a intra în modul.")
         st.stop()
 
-    st.sidebar.success(
-        f"Operator: {st.session_state.operator_identificat}"
-    )
+    st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
 
     if st.sidebar.button("Ieșire / Resetare"):
         st.session_state.clear()
