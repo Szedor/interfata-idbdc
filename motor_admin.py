@@ -86,8 +86,13 @@ def porneste_motorul(supabase):
         return c == "an" or c.startswith("an_")
 
     def is_numeric_col(col: str, df: pd.DataFrame) -> bool:
-        """Detectează coloane numerice (INTEGER/FLOAT) după dtype și nume."""
+        """Detectează coloane numerice reale, fără a trata codurile de identificare ca valori numerice."""
         c = (col or "").lower()
+
+        # Codurile de identificare NU sunt valori financiare și nu trebuie afișate cu zecimale.
+        if c == "cod_identificare":
+            return False
+
         numeric_keywords = (
             "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
             "contributie_", "numar_", "nr_", "punctaj", "scor_",
