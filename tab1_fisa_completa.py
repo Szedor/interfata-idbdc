@@ -179,16 +179,52 @@ _TABELE_CONTRACTE = {
 _COLS_EXCLUDE_CONTRACTE = {"an_referinta"}
 
 
-def _fmt_numeric(val) -> str:
-    """Formatează valorile numerice cu separator de mii și 2 zecimale."""
+def _fmt_numeric(val, col_name: str = "") -> str:
+    """
+    Formatează valorile numerice.
+
+    Reguli:
+    - cod_identificare și numerele de contract NU au zecimale
+    - telefoanele NU au zecimale
+    - numerele întregi NU au ,00
+    - doar valorile financiare reale păstrează 2 zecimale
+    """
     if val is None:
         return ""
+
+    raw = str(val).strip()
+    if raw == "":
+        return ""
+
     try:
-        f = float(str(val).replace(",", ".").strip())
-        # Separator mii = "." , zecimale = ","  (format românesc)
-        return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        f = float(raw.replace(",", "."))
     except (ValueError, TypeError):
-        return str(val)
+        return raw
+
+    col_name = (col_name or "").lower().strip()
+
+    no_decimal_fields = {
+        "cod_identificare",
+        "numar_contract",
+        "nr_contract",
+        "nr_contract_achizitie",
+        "nr_contract_subsecvent",
+        "numar_oficial_acordare",
+        "numar_publicare_cerere",
+        "numar_data_notificare_intern",
+        "telefon_mobil",
+        "telefon_upt",
+        "cod_depunere",
+        "cod_temporar",
+    }
+
+    if col_name in no_decimal_fields:
+        return f"{int(round(f)):,}".replace(",", ".")
+
+    if f.is_integer():
+        return f"{int(f):,}".replace(",", ".")
+
+    return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 TABLE_LABELS = {
     "base_contracte_cep":           "📄 Contract CEP",
@@ -355,7 +391,7 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
                 is_num = True
             except (ValueError, TypeError):
                 is_num = False
-            val_str = _fmt_numeric(raw_val) if is_num else str(raw_val)
+            val_str = _fmt_numeric(raw_val, c) if is_num else str(raw_val)
             all_items.append((_col_label(c, table), _html.escape(val_str)))
 
     if not all_items:
@@ -597,7 +633,7 @@ def _build_section_export_df(rows: list, table: str = None,
                 is_num = True
             except (ValueError, TypeError):
                 is_num = False
-            val_str = _fmt_numeric(raw_val) if is_num else str(raw_val)
+            val_str = _fmt_numeric(raw_val, c) if is_num else str(raw_val)
             all_items.append({"Camp": _col_label(c, table), "Valoare": val_str})
     return pd.DataFrame(all_items) if all_items else pd.DataFrame()
 
