@@ -219,10 +219,10 @@ def _fmt_numeric(val, col_name: str = "") -> str:
     }
 
     if col_name in no_decimal_fields:
-        return f"{int(round(f)):,}".replace(",", ".")
+        return str(int(round(f)))
 
     if f.is_integer():
-        return f"{int(f):,}".replace(",", ".")
+        return str(int(f))
 
     return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
