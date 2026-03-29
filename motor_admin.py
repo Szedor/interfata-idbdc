@@ -88,11 +88,8 @@ def porneste_motorul(supabase):
     def is_numeric_col(col: str, df: pd.DataFrame) -> bool:
         """Detectează coloane numerice reale, fără a trata codurile de identificare ca valori numerice."""
         c = (col or "").lower()
-
-        # Codurile de identificare NU sunt valori financiare și nu trebuie afișate cu zecimale.
         if c == "cod_identificare":
             return False
-
         numeric_keywords = (
             "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
             "contributie_", "numar_", "nr_", "punctaj", "scor_",
@@ -103,6 +100,31 @@ def porneste_motorul(supabase):
         if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
             return True
         return False
+
+    def normalize_identifier_column(df: pd.DataFrame) -> pd.DataFrame:
+        """Forțează cod_identificare să fie text simplu, fără zecimale sau separatori numerici."""
+        if "cod_identificare" not in df.columns:
+            return df
+
+        def _normalize_code(v):
+            if v is None:
+                return None
+            if isinstance(v, float):
+                if pd.isna(v):
+                    return None
+                if v.is_integer():
+                    return str(int(v))
+                return str(v)
+            if isinstance(v, int):
+                return str(v)
+            s = str(v).strip()
+            if s == "" or s.lower() in ("none", "nan"):
+                return None
+            return s
+
+        out = df.copy()
+        out["cod_identificare"] = out["cod_identificare"].apply(_normalize_code).astype("object")
+        return out
 
     def empty_row(columns):
         row = {c: None for c in columns}
@@ -150,6 +172,7 @@ def porneste_motorul(supabase):
                         return None
                 df[c] = df[c].apply(_to_date)
 
+        df = normalize_identifier_column(df)
         return df, cols, True
 
     def prepare_empty_single_row(cols: list, cod: str):
@@ -163,6 +186,7 @@ def porneste_motorul(supabase):
         for c in df.columns:
             if is_date_col(c):
                 df[c] = df[c].apply(lambda v: None if v is None else (v if isinstance(v, _dt.date) else None))
+        df = normalize_identifier_column(df)
         return df
 
     def append_observatii(existing: str, msg: str) -> str:
@@ -172,10 +196,12 @@ def porneste_motorul(supabase):
         return base + "\n" + msg
 
     def hide_control_cols(df: pd.DataFrame) -> pd.DataFrame:
+        df = normalize_identifier_column(df)
         if is_admin:
             return df
         cols = [c for c in df.columns if c not in ADMIN_ONLY_COLS]
-        return df[cols] if cols else df
+        out = df[cols] if cols else df
+        return normalize_identifier_column(out)
 
     def merge_back_control_cols(df_edited: pd.DataFrame, df_original: pd.DataFrame) -> pd.DataFrame:
         out = df_edited.copy()
@@ -194,7 +220,7 @@ def porneste_motorul(supabase):
             out = out[df_original.columns]
         except Exception:
             pass
-        return out
+        return normalize_identifier_column(out)
 
     def fmt_bool(v):
         return "DA" if bool(v) else "NU"
@@ -853,6 +879,11 @@ def porneste_motorul(supabase):
                 format="%d",
             )
 
+        if "cod_identificare" in df.columns:
+            cfg["cod_identificare"] = st.column_config.TextColumn(
+                label=_col_label_admin("cod_identificare", table_name),
+            )
+
         # Campuri de valori financiare — format cu 2 zecimale
         VALUE_COLS_KEYWORDS = (
             "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
@@ -1371,6 +1402,7 @@ def porneste_motorul(supabase):
                 else:
                     # Fallback direct — dacă nomenclatorul nu are valoarea exactă
                     df_full["acronim_contracte_proiecte"] = tip_admin
+        df_full = normalize_identifier_column(df_full)
         st.session_state[state_key_raw(table_name)] = df_full.copy()
         st.session_state[state_key(table_name)] = hide_control_cols(df_full)
 
@@ -1385,7 +1417,8 @@ def porneste_motorul(supabase):
                     df_echipa_init["persoana_contact"] = False
                 st.session_state[echipa_key] = df_echipa_init
 
-    base_full = st.session_state[state_key_raw(tabela_baza)]
+    base_full = normalize_identifier_column(st.session_state[state_key_raw(tabela_baza)])
+    st.session_state[state_key_raw(tabela_baza)] = base_full
 
     # ============================
     # BLOCARE / DEBLOCARE FIȘĂ
@@ -1582,6 +1615,7 @@ def porneste_motorul(supabase):
                         cols.insert(idx, c)
                     df_show = df_show[cols]
 
+            df_show = normalize_identifier_column(df_show)
             col_cfg = build_column_config_for_table(table_name, df_show, tabela_baza_ctx=tabela_baza)
 
             if table_name == "com_echipe_proiect":
@@ -1595,7 +1629,7 @@ def porneste_motorul(supabase):
             editor_key = f"editor_{table_name}_{cod}"
 
             edited = st.data_editor(
-                df_show,
+                normalize_identifier_column(df_show),
                 use_container_width=True,
                 hide_index=True,
                 num_rows=num_rows_mode,
@@ -1603,7 +1637,7 @@ def porneste_motorul(supabase):
                 disabled=editing_blocked,
                 key=editor_key,
             )
-            edited_data[table_name] = edited
+            edited_data[table_name] = normalize_identifier_column(edited)
 
     # ============================
     # STATUS FIȘĂ
