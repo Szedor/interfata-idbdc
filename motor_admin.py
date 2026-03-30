@@ -9,22 +9,46 @@ def porneste_motorul(supabase):
     # CONFIG
     # ============================
 
-    def _fmt_numeric(val) -> str:
-        """Formatează valorile numerice cu separator de mii și 2 zecimale (format românesc)."""
+    def _fmt_numeric(val, col_name: str = "") -> str:
         if val is None:
             return ""
+        raw = str(val).strip()
+        if raw == "":
+            return ""
         try:
-            f = float(str(val).replace(",", ".").strip())
-            return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            f = float(raw.replace(",", "."))
         except (ValueError, TypeError):
-            return str(val)
+            return raw
+
+        col_name = (col_name or "").lower().strip()
+        no_decimal_fields = {
+            "cod_identificare",
+            "numar_contract",
+            "nr_contract",
+            "nr_contract_achizitie",
+            "nr_contract_subsecvent",
+            "numar_oficial_acordare",
+            "numar_publicare_cerere",
+            "numar_data_notificare_intern",
+            "telefon_mobil",
+            "telefon_upt",
+            "cod_depunere",
+            "cod_temporar",
+        }
+
+        if col_name in no_decimal_fields:
+            return str(int(round(f)))
+
+        if f.is_integer():
+            return str(int(f))
+
+        return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
     ADMIN_ONLY_COLS = {
         "responsabil_idbdc", "observatii_idbdc",
         "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
         "creat_de", "creat_la", "modificat_de", "modificat_la",
     }
-
-    is_admin = st.session_state.get("operator_rol") == "ADMIN"
 
     CONTROL_COLS = [
         "responsabil_idbdc",
@@ -34,29 +58,54 @@ def porneste_motorul(supabase):
         "validat_idbdc",
     ]
 
-    NOMDET_WHITELIST = [
-        "nom_categorie",
-        "nom_status_proiect",
-        "nom_contracte",
-        "nom_proiecte",
-        "nom_departament",
-        "nom_functie_upt",
-        "nom_domenii_fdi",
-        "nom_universitati",
-        "det_resurse_umane",
-    ]
-
-    NOMDET_DROPDOWN_MAP = {
-        "det_resurse_umane": {
-            "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
-            "acronim_departament": ("nom_departament", "acronim_departament"),
-        }
-    }
-
     STATIC_OPTIONS = {"VALUTA_3": ["LEI", "EUR", "USD"]}
 
-    # Tabele baza pentru contracte — folosit pentru override etichete
     TABELE_CONTRACTE = {"base_contracte_cep", "base_contracte_terti", "base_contracte_speciale"}
+    TABELE_PROIECTE_CONTRACT_LIKE = {
+        "base_proiecte_fdi",
+        "base_proiecte_internationale",
+        "base_proiecte_interreg",
+        "base_proiecte_noneu",
+        "base_proiecte_see",
+    }
+
+    FDI_BASE_ORDER = [
+        "nr_crt",
+        "denumire_categorie",
+        "acronim_contracte_proiecte",
+        "cod_identificare",
+        "cod_temporar",
+        "titlul_proiect",
+        "acronim_proiect",
+        "data_inceput",
+        "data_sfarsit",
+        "status_contract_proiect",
+        "program",
+        "cod_domeniu_fdi",
+        "validat_idbdc",
+        "observatii_idbdc",
+    ]
+
+    FDI_BASE_EXCLUDE = {
+        "an_referinta",
+        "responsabil_idbdc",
+    }
+
+    FDI_FIN_ORDER = [
+        "suma_solicitata_fdi",
+        "suma_aprobata_mec",
+        "cofinantare_upt_fdi",
+    ]
+
+    TECHNIC_ORDER = [
+        "cod_identificare",
+        "obiectiv_general",
+        "obiective_specifice",
+        "activitati_proiect",
+        "rezultate_proiect",
+    ]
+
+    is_admin = st.session_state.get("operator_rol") == "ADMIN"
 
     # ============================
     # HELPERS
@@ -67,6 +116,12 @@ def porneste_motorul(supabase):
 
     def current_year():
         return datetime.now().year
+
+    def state_key(table_name: str) -> str:
+        return f"admin_df_{table_name}_{cod}"
+
+    def state_key_raw(table_name: str) -> str:
+        return f"admin_raw_{table_name}_{cod}"
 
     def get_table_columns(table_name: str):
         try:
@@ -86,7 +141,6 @@ def porneste_motorul(supabase):
         return c == "an" or c.startswith("an_")
 
     def is_numeric_col(col: str, df: pd.DataFrame) -> bool:
-        """Detectează coloane numerice (INTEGER/FLOAT) după dtype și nume."""
         c = (col or "").lower()
         numeric_keywords = (
             "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
@@ -113,13 +167,17 @@ def porneste_motorul(supabase):
                 row[c] = y
         return row
 
-    def load_single_row(table_name: str, cod: str):
+    def load_single_row(table_name: str, cod_local: str):
         cols = get_table_columns(table_name)
         if not cols:
             return pd.DataFrame(), [], False
 
-        res = supabase.table(table_name).select("*").eq("cod_identificare", cod).execute()
-        data = res.data or []
+        try:
+            res = supabase.table(table_name).select("*").eq("cod_identificare", cod_local).execute()
+            data = res.data or []
+        except Exception:
+            data = []
+
         df = pd.DataFrame(data)
 
         if df.empty:
@@ -147,12 +205,12 @@ def porneste_motorul(supabase):
 
         return df, cols, True
 
-    def prepare_empty_single_row(cols: list, cod: str):
+    def prepare_empty_single_row(cols: list, cod_local: str):
         if not cols:
             return pd.DataFrame()
         r = empty_row(cols)
         if "cod_identificare" in r:
-            r["cod_identificare"] = cod
+            r["cod_identificare"] = cod_local
         import datetime as _dt
         df = pd.DataFrame([r], columns=cols)
         for c in df.columns:
@@ -191,12 +249,9 @@ def porneste_motorul(supabase):
             pass
         return out
 
-    def fmt_bool(v):
-        return "DA" if bool(v) else "NU"
-
     def is_row_effectively_empty(d: dict) -> bool:
-        cod = d.get("cod_identificare")
-        if cod is None or (isinstance(cod, str) and cod.strip() == ""):
+        cod_local = d.get("cod_identificare")
+        if cod_local is None or (isinstance(cod_local, str) and cod_local.strip() == ""):
             return True
         return False
 
@@ -221,25 +276,17 @@ def porneste_motorul(supabase):
             out[k] = v
         return out
 
-    def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
+    def direct_upsert_single_row(table_name: str, payload: dict, cod_local: str):
         try:
-            check = supabase.table(table_name).select("cod_identificare").eq("cod_identificare", cod).limit(1).execute()
+            check = supabase.table(table_name).select("cod_identificare").eq("cod_identificare", cod_local).limit(1).execute()
             exists = bool(check.data)
         except Exception:
             exists = False
 
         if exists:
-            try:
-                supabase.table(table_name).update(payload).eq("cod_identificare", cod).execute()
-                return
-            except Exception as e:
-                raise Exception(f"Update eșuat pe {table_name}: {e}")
+            supabase.table(table_name).update(payload).eq("cod_identificare", cod_local).execute()
         else:
-            try:
-                supabase.table(table_name).insert(payload).execute()
-                return
-            except Exception as e:
-                raise Exception(f"Insert eșuat pe {table_name}: {e}")
+            supabase.table(table_name).insert(payload).execute()
 
     def direct_save_all_tables(items: list, operator: str) -> tuple[bool, str]:
         if not items:
@@ -266,12 +313,12 @@ def porneste_motorul(supabase):
 
                 clean_payloads = []
                 for p in payloads:
-                    cod = str(p.get("cod_identificare", "")).strip()
-                    if not cod:
+                    cod_local = str(p.get("cod_identificare", "")).strip()
+                    if not cod_local:
                         continue
 
                     cp = {k: p.get(k) for k in cols_real if k in p}
-                    cp["cod_identificare"] = cod
+                    cp["cod_identificare"] = cod_local
 
                     if "data_ultimei_modificari" in cols_real:
                         cp["data_ultimei_modificari"] = now_iso()
@@ -314,7 +361,7 @@ def porneste_motorul(supabase):
             return True, "Salvare parțială (cu unele avertismente)."
         return True, "Salvarea realizată cu succes!"
 
-    def direct_validate_all_tables(cod: str, table_names: list[str], operator: str) -> tuple[bool, str]:
+    def direct_validate_all_tables(cod_local: str, table_names: list[str], operator: str) -> tuple[bool, str]:
         ok_any = False
         errors = []
         msg = f"Validat de {operator} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -335,7 +382,7 @@ def porneste_motorul(supabase):
                         cur = (
                             supabase.table(t)
                             .select("observatii_idbdc")
-                            .eq("cod_identificare", cod)
+                            .eq("cod_identificare", cod_local)
                             .limit(1)
                             .execute()
                         )
@@ -350,7 +397,7 @@ def porneste_motorul(supabase):
                 if not payload:
                     continue
 
-                supabase.table(t).update(payload).eq("cod_identificare", cod).execute()
+                supabase.table(t).update(payload).eq("cod_identificare", cod_local).execute()
                 ok_any = True
 
             except Exception as e:
@@ -364,7 +411,7 @@ def porneste_motorul(supabase):
             return True, "Validare parțială (cu unele avertismente)."
         return True, "Validare realizată."
 
-    def direct_delete_all_tables(cod: str, table_names: list[str]) -> tuple[bool, str]:
+    def direct_delete_all_tables(cod_local: str, table_names: list[str]) -> tuple[bool, str]:
         ok_any = False
         errors = []
         for t in table_names:
@@ -372,7 +419,7 @@ def porneste_motorul(supabase):
                 cols = set(get_table_columns(t))
                 if "cod_identificare" not in cols:
                     continue
-                supabase.table(t).delete().eq("cod_identificare", cod).execute()
+                supabase.table(t).delete().eq("cod_identificare", cod_local).execute()
                 ok_any = True
             except Exception as e:
                 errors.append(f"{t}: {e}")
@@ -405,9 +452,11 @@ def porneste_motorul(supabase):
     @st.cache_data(show_spinner=False, ttl=600)
     def load_functie_map() -> dict:
         try:
-            res = supabase.table("det_resurse_umane") \
-                .select("nume_prenume,acronim_functie_upt,acronim_departament") \
+            res = (
+                supabase.table("det_resurse_umane")
+                .select("nume_prenume,acronim_functie_upt,acronim_departament")
                 .execute()
+            )
             result = {}
             for r in (res.data or []):
                 if r.get("nume_prenume"):
@@ -441,131 +490,56 @@ def porneste_motorul(supabase):
                         df.at[idx, "acronim_departament"] = dept
         return df
 
-    def build_column_config_for_table(table_name: str, df: pd.DataFrame, tabela_baza_ctx: str = None):
-        """
-        tabela_baza_ctx: tabela de baza activa (ex: 'base_contracte_cep') — pentru override etichete
-        in tabelele auxiliare (com_echipe_proiect, com_date_financiare, etc.)
-        """
-        DROPDOWN_MAP = {
-            "base_contracte_cep": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_contracte_terti": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_contracte_speciale": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_proiecte_fdi": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-                "cod_domeniu_fdi": ("nom_domenii_fdi", "cod_domeniu_fdi"),
-            },
-            "base_proiecte_internationale": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_proiecte_interreg": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_proiecte_noneu": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_proiecte_see": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_proiecte_pncdi": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_proiecte_pnrr": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
-                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
-            },
-            "base_evenimente_stiintifice": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "natura_eveniment": ("nom_evenimente_stiintifice", "natura_eveniment"),
-                "format_eveniment": ("nom_format_evenimente", "format_eveniment"),
-            },
-            "base_prop_intelect": {
-                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
-                "acronim_prop_intelect": ("nom_prop_intelect", "acronim_prop_intelect"),
-            },
-            "com_echipe_proiect": {
-                "nume_prenume": ("det_resurse_umane", "nume_prenume"),
-                "status_personal": ("nom_status_personal", "status_personal"),
-            },
-            "com_date_financiare": {
-                "valuta": ("__STATIC__", "VALUTA_3"),
-            },
-            "det_resurse_umane": {
-                "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
-                "acronim_departament": ("nom_departament", "acronim_departament"),
-            },
-            "det_evaluare_fdi": {
-                "cod_universitate": ("nom_universitati", "cod_universitate"),
-            },
-        }
+    def _base_ctx_is_contract_like(ctx: str) -> bool:
+        return ctx in TABELE_CONTRACTE
+
+    def _col_label_admin(col: str, tbl: str = None, tabela_baza_ctx: str = None) -> str:
+        ctx = tabela_baza_ctx or tbl
+        is_contract_ctx = _base_ctx_is_contract_like(ctx)
 
         COL_LABELS_ADMIN = {
-            "denumire_categorie":         "🔽 CATEGORIE",
+            "denumire_categorie": "🔽 CATEGORIE",
             "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT",
-            "status_contract_proiect":    "🔽 STATUS CONTRACT/PROIECT",
-            "cod_domeniu_fdi":            "🔽 COD DOMENIU FDI",
-            "natura_eveniment":           "🔽 NATURA EVENIMENTULUI STIINTIFIC",
-            "format_eveniment":           "🔽 FORMATUL EVENIMENTULUI STIINTIFIC",
-            "acronim_prop_intelect":      "🔽 FORME DE PROTECTIE",
-            "nume_prenume":               "🔽 NUME SI PRENUME",
-            "status_personal":            "🔽 STATUS PERSONAL",
-            "valuta":                     "🔽 VALUTA",
-            "acronim_functie_upt":        "🔽 ABREVIERE FUNCTIE UPT",
-            "acronim_departament":        "🔽 ACRONIM DEPARTAMENT",
-            "cod_universitate":           "🔽 COD UNIVERSITATE",
-            "persoana_contact":           "PERSOANA DE CONTACT",
-            "functie_upt":                "Abreviere functie UPT (auto)",
-            "data_contract":              "📅 DATA CONTRACTULUI",
-            "data_inceput":               "📅 DATA DE INCEPUT",
-            "data_sfarsit":               "📅 DATA DE SFARSIT",
-            "data_semnare":               "📅 DATA SEMNARE",
-            "data_depunere":              "📅 DATA DEPUNERE",
-            "data_acordare":              "📅 DATA ACORDARE",
-            "data_eveniment":             "📅 DATA EVENIMENT",
-            "data_inceput_rol":           "📅 DATA DE INCEPUT ROL",
-            "data_sfarsit_rol":           "📅 DATA DE SFARSIT ROL",
-            "data_depozit_cerere":        "📅 DATA DEPUNERE CERERE LA OSIM",
-            "data_oficiala_acordare":     "📅 DATA OFICIALA DE ACORDARE",
-            "data_inceput_valabilitate":  "📅 DATA DE INCEPUT VALABILITATE",
-            "data_sfarsit_valabilitate":  "📅 DATA DE SFARSIT VALABILITATE",
-            "data_apel":                  "📅 DATA APELULUI",
+            "status_contract_proiect": "🔽 STATUS CONTRACT/PROIECT",
+            "cod_domeniu_fdi": "🔽 COD DOMENIU FDI",
+            "natura_eveniment": "🔽 NATURA EVENIMENTULUI STIINTIFIC",
+            "format_eveniment": "🔽 FORMATUL EVENIMENTULUI STIINTIFIC",
+            "acronim_prop_intelect": "🔽 FORME DE PROTECTIE",
+            "nume_prenume": "🔽 NUME SI PRENUME",
+            "status_personal": "🔽 STATUS PERSONAL",
+            "valuta": "🔽 VALUTA",
+            "acronim_functie_upt": "🔽 ABREVIERE FUNCTIE UPT",
+            "acronim_departament": "🔽 ACRONIM DEPARTAMENT",
+            "cod_universitate": "🔽 COD UNIVERSITATE",
+            "persoana_contact": "PERSOANA DE CONTACT",
+            "functie_upt": "Abreviere functie UPT (auto)",
+            "data_contract": "📅 DATA CONTRACTULUI",
+            "data_inceput": "📅 DATA DE INCEPUT",
+            "data_sfarsit": "📅 DATA DE SFARSIT",
+            "data_semnare": "📅 DATA SEMNARE",
+            "data_depunere": "📅 DATA DEPUNERE",
+            "data_acordare": "📅 DATA ACORDARE",
+            "data_eveniment": "📅 DATA EVENIMENT",
+            "data_inceput_rol": "📅 DATA DE INCEPUT ROL",
+            "data_sfarsit_rol": "📅 DATA DE SFARSIT ROL",
+            "data_depozit_cerere": "📅 DATA DEPUNERE CERERE LA OSIM",
+            "data_oficiala_acordare": "📅 DATA OFICIALA DE ACORDARE",
+            "data_inceput_valabilitate": "📅 DATA DE INCEPUT VALABILITATE",
+            "data_sfarsit_valabilitate": "📅 DATA DE SFARSIT VALABILITATE",
+            "data_apel": "📅 DATA APELULUI",
             "abreviere_domeniu_fdi": "DOMENIUL FDI",
-            "program":               "PROGRAM",
-            "subprogram":            "SUBPROGRAM",
-            "instrument_finantare":  "INSTRUMENT DE FINANTARE",
-            "apel":                  "APEL",
-            "pilon":                 "PILON",
-            "componenta":            "COMPONENTA",
-            "reforma":               "REFORMA",
-            "investitie":            "INVESTITIE",
-            "sursa_finantare":       "SURSA DE FINANTARE",
-            "programul_tematic":     "PROGRAMUL TEMATIC",
-            "componenta_axa":        "COMPONENTA / AXA",
-            "obiectiv_specific":     "OBIECTIV SPECIFIC",
+            "program": "PROGRAM",
+            "subprogram": "SUBPROGRAM",
+            "instrument_finantare": "INSTRUMENT DE FINANTARE",
+            "apel": "APEL",
+            "pilon": "PILON",
+            "componenta": "COMPONENTA",
+            "reforma": "REFORMA",
+            "investitie": "INVESTITIE",
+            "sursa_finantare": "SURSA DE FINANTARE",
+            "programul_tematic": "PROGRAMUL TEMATIC",
+            "componenta_axa": "COMPONENTA / AXA",
+            "obiectiv_specific": "OBIECTIV SPECIFIC",
             "acronim_tip_contract": "ACRONIM TIP CONTRACT",
             "acronim_proiect": "ACRONIM PROIECT",
             "acronim_tip_proiect": "ACRONIM TIP PROIECT",
@@ -663,137 +637,216 @@ def porneste_motorul(supabase):
             "website": "WEBSITE",
         }
 
-        # Override etichete pentru tabela de baza
         COL_LABELS_PER_TABLE_ADMIN = {
             "base_contracte_cep": {
-                "cod_identificare":           "NR. CONTRACT",
+                "cod_identificare": "NR. CONTRACT",
                 "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT",
-                "status_contract_proiect":    "🔽 STATUS CONTRACT",
-                "titlul_proiect":             "OBIECTUL CONTRACTULUI",
+                "status_contract_proiect": "🔽 STATUS CONTRACT",
+                "titlul_proiect": "OBIECTUL CONTRACTULUI",
             },
             "base_contracte_terti": {
-                "cod_identificare":           "NR. CONTRACT",
+                "cod_identificare": "NR. CONTRACT",
                 "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT",
-                "status_contract_proiect":    "🔽 STATUS CONTRACT",
-                "titlul_proiect":             "OBIECTUL CONTRACTULUI",
+                "status_contract_proiect": "🔽 STATUS CONTRACT",
+                "titlul_proiect": "OBIECTUL CONTRACTULUI",
             },
             "base_contracte_speciale": {
-                "cod_identificare":           "NR. CONTRACT",
+                "cod_identificare": "NR. CONTRACT",
                 "acronim_contracte_proiecte": "🔽 TIPUL DE CONTRACT",
-                "status_contract_proiect":    "🔽 STATUS CONTRACT",
-                "titlul_proiect":             "OBIECTUL CONTRACTULUI",
+                "status_contract_proiect": "🔽 STATUS CONTRACT",
+                "titlul_proiect": "OBIECTUL CONTRACTULUI",
             },
             "base_proiecte_fdi": {
-                "cod_identificare":        "ID PROIECT FDI",
-                "status_contract_proiect": "🔽 STATUS PROIECT",
-                "titlul_proiect":          "TITLUL PROIECTULUI",
-                "suma_solicitata_fdi":     "SUMA SOLICITATA",
-                "cofinantare_upt_fdi":     "COFINANTARE UPT",
+                "nr_crt": "NR.CRT.",
+                "denumire_categorie": "CATEGORIE",
+                "acronim_contracte_proiecte": "TIPUL DE PROIECT",
+                "cod_identificare": "ID PROIECT",
+                "cod_temporar": "COD DEPUNERE",
+                "titlul_proiect": "TITLUL PROIECTULUI",
+                "acronim_proiect": "ACRONIMUL PROIECTULUI",
+                "data_inceput": "DATA DE INCEPUT",
+                "data_sfarsit": "DATA DE SFARSIT",
+                "status_contract_proiect": "STATUS PROIECT",
+                "program": "PROGRAM",
+                "cod_domeniu_fdi": "COD DOMENIU FDI",
+                "validat_idbdc": "VALIDAT IDBDC",
+                "observatii_idbdc": "OBSERVATII IDBDC",
             },
             "base_proiecte_pncdi": {
-                "cod_identificare":        "NR.CONTRACT / COD PROIECT",
-                "program":             "PROGRAM",
-                "subprogram":          "SUBPROGRAM",
-                "instrument_finantare":"INSTRUMENT DE FINANTARE",
-                "apel":                "APEL",
+                "cod_identificare": "NR.CONTRACT / COD PROIECT",
+                "program": "PROGRAM",
+                "subprogram": "SUBPROGRAM",
+                "instrument_finantare": "INSTRUMENT DE FINANTARE",
+                "apel": "APEL",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
-                "titlul_proiect":          "TITLUL PROIECTULUI",
+                "titlul_proiect": "TITLUL PROIECTULUI",
             },
             "base_proiecte_pnrr": {
-                "cod_identificare":        "COD PROIECT PNRR",
-                "pilon":               "PILON",
-                "componenta":          "COMPONENTA",
-                "reforma":             "REFORMA",
-                "investitie":          "INVESTITIE",
-                "apel":                "APEL",
+                "cod_identificare": "COD PROIECT PNRR",
+                "pilon": "PILON",
+                "componenta": "COMPONENTA",
+                "reforma": "REFORMA",
+                "investitie": "INVESTITIE",
+                "apel": "APEL",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
-                "titlul_proiect":          "TITLUL PROIECTULUI",
+                "titlul_proiect": "TITLUL PROIECTULUI",
             },
             "base_proiecte_internationale": {
-                "cod_identificare":        "COD / NR. PROIECT",
+                "cod_identificare": "COD / NR. PROIECT",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
-                "titlul_proiect":          "TITLUL PROIECTULUI",
-                "rol_upt":                 "ROL UPT IN PROIECT",
+                "titlul_proiect": "TITLUL PROIECTULUI",
+                "rol_upt": "ROL UPT IN PROIECT",
             },
             "base_proiecte_interreg": {
-                "cod_identificare":        "COD PROIECT INTERREG",
+                "cod_identificare": "COD PROIECT INTERREG",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
-                "titlul_proiect":          "TITLUL PROIECTULUI",
-                "rol_upt":                 "ROL UPT IN PROIECT",
+                "titlul_proiect": "TITLUL PROIECTULUI",
+                "rol_upt": "ROL UPT IN PROIECT",
             },
             "base_proiecte_noneu": {
-                "cod_identificare":        "COD / NR. PROIECT",
+                "cod_identificare": "COD / NR. PROIECT",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
-                "titlul_proiect":          "TITLUL PROIECTULUI",
-                "rol_upt":                 "ROL UPT IN PROIECT",
+                "titlul_proiect": "TITLUL PROIECTULUI",
+                "rol_upt": "ROL UPT IN PROIECT",
             },
             "base_proiecte_see": {
-                "cod_identificare":        "COD / NR. PROIECT",
+                "cod_identificare": "COD / NR. PROIECT",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
-                "titlul_proiect":          "TITLUL PROIECTULUI",
-                "rol_upt":                 "ROL UPT IN PROIECT",
+                "titlul_proiect": "TITLUL PROIECTULUI",
+                "rol_upt": "ROL UPT IN PROIECT",
             },
             "base_evenimente_stiintifice": {
-                "cod_identificare":  "COD EVENIMENT",
-                "titlul_eveniment":  "TITLUL EVENIMENTULUI",
-                "natura_eveniment":  "NATURA EVENIMENTULUI",
-                "format_eveniment":  "FORMATUL EVENIMENTULUI",
-                "loc_desfasurare":   "LOCUL DE DESFASURARE",
+                "cod_identificare": "COD EVENIMENT",
+                "titlul_eveniment": "TITLUL EVENIMENTULUI",
+                "natura_eveniment": "NATURA EVENIMENTULUI",
+                "format_eveniment": "FORMATUL EVENIMENTULUI",
+                "loc_desfasurare": "LOCUL DE DESFASURARE",
             },
             "base_prop_intelect": {
-                "cod_identificare":       "NR. CERERE / BREVET",
-                "acronim_prop_intelect":  "FORMA DE PROTECTIE",
-                "titlul_proiect":         "TITLUL INVENTIEI / LUCRARII",
-                "data_depozit_cerere":    "DATA DEPUNERE LA OSIM",
+                "cod_identificare": "NR. CERERE / BREVET",
+                "acronim_prop_intelect": "FORMA DE PROTECTIE",
+                "titlul_proiect": "TITLUL INVENTIEI / LUCRARII",
+                "data_depozit_cerere": "DATA DEPUNERE LA OSIM",
                 "data_oficiala_acordare": "DATA ACORDARE",
                 "numar_oficial_acordare": "NR. OFICIAL ACORDARE",
             },
         }
 
-        # [FIX-6] Override etichete in tabele auxiliare pe baza contextului (contract vs proiect)
-        # ctx = tabela_baza_ctx sau table_name insusi
-        ctx = tabela_baza_ctx or table_name
-        is_contract_ctx = ctx in TABELE_CONTRACTE
+        if tbl and tbl in COL_LABELS_PER_TABLE_ADMIN and col in COL_LABELS_PER_TABLE_ADMIN[tbl]:
+            return COL_LABELS_PER_TABLE_ADMIN[tbl][col]
 
-        def _col_label_admin(col: str, tbl: str = None) -> str:
-            # 1. Override per tabela de baza (cel mai specific)
-            if tbl and tbl in COL_LABELS_PER_TABLE_ADMIN:
-                if col in COL_LABELS_PER_TABLE_ADMIN[tbl]:
-                    return COL_LABELS_PER_TABLE_ADMIN[tbl][col]
-            # 2. Override contextual pentru tabele auxiliare (echipa, financiar, etc.)
-            if is_contract_ctx and tbl not in COL_LABELS_PER_TABLE_ADMIN:
-                if col == "cod_identificare":
-                    return "NR. CONTRACT"
-                if col == "functia_specifica":
-                    return "ROLUL IN CONTRACT"
-            # 3. Label generic
-            return COL_LABELS_ADMIN.get(col, col.replace("_", " ").capitalize())
+        if is_contract_ctx and tbl not in COL_LABELS_PER_TABLE_ADMIN:
+            if col == "cod_identificare":
+                return "NR. CONTRACT"
+            if col == "functia_specifica":
+                return "ROLUL IN CONTRACT"
+
+        return COL_LABELS_ADMIN.get(col, col.replace("_", " ").capitalize())
+
+    def build_column_config_for_table(table_name: str, df: pd.DataFrame, tabela_baza_ctx: str = None):
+        DROPDOWN_MAP = {
+            "base_contracte_cep": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_contracte_terti": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_contracte_speciale": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_contracte", "acronim_tip_contract"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_fdi": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+                "cod_domeniu_fdi": ("nom_domenii_fdi", "cod_domeniu_fdi"),
+            },
+            "base_proiecte_internationale": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_interreg": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_noneu": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_see": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_pncdi": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_proiecte_pnrr": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_contracte_proiecte": ("nom_proiecte", "acronim_tip_proiect"),
+                "status_contract_proiect": ("nom_status_proiect", "status_contract_proiect"),
+            },
+            "base_evenimente_stiintifice": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "natura_eveniment": ("nom_evenimente_stiintifice", "natura_eveniment"),
+                "format_eveniment": ("nom_format_evenimente", "format_eveniment"),
+            },
+            "base_prop_intelect": {
+                "denumire_categorie": ("nom_categorie", "denumire_categorie"),
+                "acronim_prop_intelect": ("nom_prop_intelect", "acronim_prop_intelect"),
+            },
+            "com_echipe_proiect": {
+                "nume_prenume": ("det_resurse_umane", "nume_prenume"),
+                "status_personal": ("nom_status_personal", "status_personal"),
+            },
+            "com_date_financiare": {
+                "valuta": ("__STATIC__", "VALUTA_3"),
+            },
+            "det_resurse_umane": {
+                "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
+                "acronim_departament": ("nom_departament", "acronim_departament"),
+            },
+            "det_evaluare_fdi": {
+                "cod_universitate": ("nom_universitati", "cod_universitate"),
+            },
+        }
 
         rel = DROPDOWN_MAP.get(table_name, {})
         cfg = {}
-
-        # [3] Coloanele auto-preluate din selectoare nu mai au dropdown — sunt TextColumn disabled
         AUTO_FILLED_COLS = {"denumire_categorie", "acronim_contracte_proiecte"}
 
         for target_col, (src_table, src_col) in rel.items():
             if target_col not in df.columns:
                 continue
-            # [3] Daca e coloana auto-completata, afisam ca text readonly
+
             if target_col in AUTO_FILLED_COLS:
                 cfg[target_col] = st.column_config.TextColumn(
-                    label=_col_label_admin(target_col, table_name),
+                    label=_col_label_admin(target_col, table_name, tabela_baza_ctx),
                     disabled=True,
                     help="Completat automat din selectoarele de sus",
                 )
                 continue
+
             if src_table == "__STATIC__":
                 options = STATIC_OPTIONS.get(src_col, [])
             else:
                 options = load_dropdown_options(src_table, src_col)
+
             if not options:
                 continue
+
             cfg[target_col] = st.column_config.SelectboxColumn(
-                label=_col_label_admin(target_col, table_name),
+                label=_col_label_admin(target_col, table_name, tabela_baza_ctx),
                 options=options,
                 required=False,
                 help="🔽 Selectează din listă",
@@ -803,17 +856,15 @@ def porneste_motorul(supabase):
             df["persoana_contact"] = df["persoana_contact"].apply(
                 lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
             )
-            # [FIX-6iv] Ascundem coloana persoana_contact pentru contracte
-            if not is_contract_ctx:
-                cfg["persoana_contact"] = st.column_config.CheckboxColumn(
-                    label=_col_label_admin("persoana_contact", table_name),
-                    help="Bifează dacă persoana reprezintă IDBDC în proiect",
-                    default=False,
-                )
+            cfg["persoana_contact"] = st.column_config.CheckboxColumn(
+                label="PERSOANA DE CONTACT",
+                help="Bifeaza daca persoana este persoana de contact pentru acest contract/proiect",
+                default=False,
+            )
 
         if table_name == "com_echipe_proiect" and "functie_upt" in df.columns:
             cfg["functie_upt"] = st.column_config.TextColumn(
-                label=_col_label_admin("functie_upt", table_name),
+                label=_col_label_admin("functie_upt", table_name, tabela_baza_ctx),
                 help="Completat automat din det_resurse_umane",
                 disabled=True,
             )
@@ -823,7 +874,7 @@ def porneste_motorul(supabase):
                 continue
             if is_date_col(c):
                 cfg[c] = st.column_config.DateColumn(
-                    label=_col_label_admin(c, table_name),
+                    label=_col_label_admin(c, table_name, tabela_baza_ctx),
                     format="YYYY-MM-DD",
                     step=1,
                     help="📅 Click pentru a selecta data din calendar",
@@ -834,7 +885,7 @@ def porneste_motorul(supabase):
                 continue
             if is_year_col(c):
                 cfg[c] = st.column_config.NumberColumn(
-                    label=_col_label_admin(c, table_name),
+                    label=_col_label_admin(c, table_name, tabela_baza_ctx),
                     min_value=1900,
                     max_value=2100,
                     step=1,
@@ -843,45 +894,35 @@ def porneste_motorul(supabase):
 
         if "nr_crt" in df.columns and "nr_crt" not in cfg:
             cfg["nr_crt"] = st.column_config.NumberColumn(
-                label="NR.CRT.",
+                label=_col_label_admin("nr_crt", table_name, tabela_baza_ctx),
                 disabled=True,
                 format="%d",
             )
 
-        # Campuri de valori financiare — format cu 2 zecimale
         VALUE_COLS_KEYWORDS = (
             "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
             "contributie_", "total_",
         )
         for c in df.columns:
-            if c in cfg:
-                continue
-            if c in CONTROL_COLS:
+            if c in cfg or c in CONTROL_COLS:
                 continue
             if is_numeric_col(c, df):
                 c_lower = c.lower()
-                is_value_col = any(c_lower.startswith(k) or c_lower == k
-                                   for k in VALUE_COLS_KEYWORDS)
+                is_value_col = any(c_lower.startswith(k) or c_lower == k for k in VALUE_COLS_KEYWORDS)
                 cfg[c] = st.column_config.NumberColumn(
-                    label=_col_label_admin(c, table_name),
+                    label=_col_label_admin(c, table_name, tabela_baza_ctx),
                     step=0.01 if is_value_col else 1,
                     format="%.2f" if is_value_col else "%d",
                 )
 
         for c in df.columns:
-            if c in cfg:
-                continue
-            if c in CONTROL_COLS:
+            if c in cfg or c in CONTROL_COLS:
                 continue
             cfg[c] = st.column_config.TextColumn(
-                label=_col_label_admin(c, table_name),
+                label=_col_label_admin(c, table_name, tabela_baza_ctx),
             )
 
         return cfg
-
-    # ============================
-    # NOMENCLATOARE & DETALII (ADMIN ONLY)
-    # ============================
 
     def _nomdet_detect_pk(cols: list[str]) -> str:
         if "nr_crt" in cols:
@@ -901,6 +942,25 @@ def porneste_motorul(supabase):
         return out
 
     def _nomdet_build_column_config(table_name: str, df: pd.DataFrame):
+        NOMDET_WHITELIST = [
+            "nom_categorie",
+            "nom_status_proiect",
+            "nom_contracte",
+            "nom_proiecte",
+            "nom_departament",
+            "nom_functie_upt",
+            "nom_domenii_fdi",
+            "nom_universitati",
+            "det_resurse_umane",
+        ]
+
+        NOMDET_DROPDOWN_MAP = {
+            "det_resurse_umane": {
+                "acronim_functie_upt": ("nom_functie_upt", "acronim_functie_upt"),
+                "acronim_departament": ("nom_departament", "acronim_departament"),
+            }
+        }
+
         cfg = {}
         rel = NOMDET_DROPDOWN_MAP.get(table_name, {})
         for target_col, (src_table, src_col) in rel.items():
@@ -929,6 +989,18 @@ def porneste_motorul(supabase):
         return cfg
 
     def render_nomenclatoare_admin_box():
+        NOMDET_WHITELIST = [
+            "nom_categorie",
+            "nom_status_proiect",
+            "nom_contracte",
+            "nom_proiecte",
+            "nom_departament",
+            "nom_functie_upt",
+            "nom_domenii_fdi",
+            "nom_universitati",
+            "det_resurse_umane",
+        ]
+
         rol = (st.session_state.get("operator_rol") or "").strip().upper()
         if rol != "ADMIN":
             return
@@ -978,14 +1050,14 @@ def porneste_motorul(supabase):
 
             if st.button("💾 SALVARE", key="nomdet_save"):
                 try:
-                    to_delete = edited[edited["__STERGE__"] == True]  # noqa: E712
+                    to_delete = edited[edited["__STERGE__"] == True]
                     for _, row in to_delete.iterrows():
                         key_val = row.get(pk)
                         if key_val is None or str(key_val).strip() == "":
                             continue
                         supabase.table(tabela).delete().eq(pk, key_val).execute()
 
-                    to_upsert = edited[edited["__STERGE__"] != True].copy()  # noqa: E712
+                    to_upsert = edited[edited["__STERGE__"] != True].copy()
                     payloads = []
                     for _, row in to_upsert.iterrows():
                         d = _nomdet_clean_payload(row.to_dict())
@@ -1002,6 +1074,140 @@ def porneste_motorul(supabase):
 
                 except Exception as e:
                     st.error(f"Eroare la salvare: {e}")
+
+    def _safe_float(v):
+        if v is None:
+            return 0.0
+        try:
+            return float(str(v).replace(",", ".").strip())
+        except Exception:
+            return 0.0
+
+    def _apply_auto_values(df: pd.DataFrame) -> pd.DataFrame:
+        if "denumire_categorie" in df.columns:
+            df["denumire_categorie"] = map_categorie_label.get(cat_admin, cat_admin)
+        if "acronim_contracte_proiecte" in df.columns:
+            df["acronim_contracte_proiecte"] = map_tip_label.get(tip_admin, tip_admin)
+        if "cod_identificare" in df.columns:
+            df["cod_identificare"] = cod
+        return df
+
+    def _reorder_df(df: pd.DataFrame, first_cols: list[str]) -> pd.DataFrame:
+        ordered = [c for c in first_cols if c in df.columns]
+        rest = [c for c in df.columns if c not in ordered]
+        return df[ordered + rest]
+
+    def _prepare_display_df(table_name: str, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+
+        if table_name == "base_proiecte_fdi":
+            out = out.drop(columns=[c for c in FDI_BASE_EXCLUDE if c in out.columns], errors="ignore")
+            out = _reorder_df(out, FDI_BASE_ORDER)
+
+        if table_name == "com_aspecte_tehnice":
+            out = _reorder_df(out, TECHNIC_ORDER)
+
+        if table_name == "com_date_financiare" and tabela_baza == "base_proiecte_fdi":
+            keep = [c for c in FDI_FIN_ORDER if c in out.columns]
+            extras = [c for c in out.columns if c in CONTROL_COLS or c == "cod_identificare"]
+            out = out[[c for c in ["cod_identificare"] + keep + extras if c in out.columns]]
+            total_values = []
+            for _, r in out.iterrows():
+                total_values.append(_safe_float(r.get("suma_aprobata_mec")) + _safe_float(r.get("cofinantare_upt_fdi")))
+            out["total_buget_calc"] = total_values
+
+        return out
+
+    def _render_editor_standard(table_name: str, df_show: pd.DataFrame, editing_blocked: bool):
+        col_cfg = build_column_config_for_table(table_name, df_show, tabela_baza)
+        key_editor = f"editor_{table_name}_{cod}"
+        return st.data_editor(
+            df_show,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            column_config=col_cfg,
+            disabled=editing_blocked,
+            key=key_editor,
+            height=420,
+        )
+
+    def _render_editor_echipa(table_name: str, df_show: pd.DataFrame, editing_blocked: bool):
+        col_cfg_echipa = build_column_config_for_table(table_name, df_show, tabela_baza)
+
+        cols_echipa_show = [c for c in df_show.columns if c != "cod_identificare"]
+        df_show_edit = df_show[cols_echipa_show].copy()
+        col_cfg_echipa.pop("cod_identificare", None)
+
+        if "persoana_contact" in df_show_edit.columns:
+            df_show_edit["persoana_contact"] = df_show_edit["persoana_contact"].apply(
+                lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
+            )
+
+        nr_membri = len(df_show_edit)
+        st.markdown(
+            f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
+            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
+            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>👥 Echipa</span> "
+            f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_membri} persoane</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        key_editor = f"editor_echipa_{cod}"
+        edited_echipa = st.data_editor(
+            df_show_edit,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            column_config=col_cfg_echipa,
+            disabled=editing_blocked,
+            key=key_editor,
+            height=420,
+        )
+
+        edited_echipa = edited_echipa.copy()
+        edited_echipa["cod_identificare"] = cod
+
+        if "persoana_contact" not in edited_echipa.columns:
+            edited_echipa["persoana_contact"] = False
+
+        if "nume_prenume" in edited_echipa.columns:
+            edited_echipa = edited_echipa[
+                edited_echipa["nume_prenume"].notna() &
+                (edited_echipa["nume_prenume"].astype(str).str.strip() != "")
+            ].reset_index(drop=True)
+
+        st.session_state[f"echipa_reunited_{cod}"] = edited_echipa
+        return edited_echipa
+
+    def _render_fdi_financial_preview(df_show: pd.DataFrame):
+        if tabela_baza != "base_proiecte_fdi":
+            return
+        if "total_buget_calc" not in df_show.columns:
+            return
+
+        vals = df_show.iloc[0].to_dict() if len(df_show) else {}
+        suma_sol = _fmt_numeric(vals.get("suma_solicitata_fdi"), "suma_solicitata_fdi")
+        suma_apr = _fmt_numeric(vals.get("suma_aprobata_mec"), "suma_aprobata_mec")
+        cofin = _fmt_numeric(vals.get("cofinantare_upt_fdi"), "cofinantare_upt_fdi")
+        total = _fmt_numeric(vals.get("total_buget_calc"), "total_buget_calc")
+
+        st.markdown(
+            f"""
+            <div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);
+                        border-radius:10px;padding:10px 14px;margin-bottom:8px;'>
+                <div style='color:#ffffff;font-weight:800;font-size:0.92rem;margin-bottom:6px;'>💰 Date financiare FDI</div>
+                <div style='color:rgba(255,255,255,0.90);font-size:0.90rem;line-height:1.8;'>
+                    <b>SUMA SOLICITATA:</b> {suma_sol or "-"}<br/>
+                    <b>SUMA APROBATA MINISTER:</b> {suma_apr or "-"}<br/>
+                    <b>COFINANTARE UPT:</b> {cofin or "-"}<br/>
+                    <b>TOTAL BUGET:</b> {total or "-"}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # ============================
     # STYLE
@@ -1040,23 +1246,16 @@ def porneste_motorul(supabase):
     )
 
     render_nomenclatoare_admin_box()
-
     st.divider()
 
     # ============================
     # SELECTOARE
     # ============================
 
-    # ============================
-    # FILTRE OPERATOR din session_state
-    # ============================
-    _rol_c2            = (st.session_state.get("operator_rol") or "").strip().upper()
-    _filtru_categorii  = st.session_state.get("operator_filtru_categorie") or []
-    _filtru_tipuri     = st.session_state.get("operator_filtru_tipuri") or []
+    _filtru_categorii = st.session_state.get("operator_filtru_categorie") or []
+    _filtru_tipuri = st.session_state.get("operator_filtru_tipuri") or []
 
-    # Toate categoriile posibile
     _toate_cat = ["Contracte", "Proiecte", "Evenimente stiintifice", "Proprietate intelectuala"]
-    # Daca operatorul are filtru_categorie completat, limitam; altfel (ADMIN fara filtru) arata tot
     _cat_disponibile = [""] + [c for c in _toate_cat if not _filtru_categorii or c in _filtru_categorii]
 
     c1, c2, c3 = st.columns(3)
@@ -1101,7 +1300,6 @@ def porneste_motorul(supabase):
 
         if st.button("🔍 Afișează lista", key="spec_btn_lista"):
             try:
-                # ── 1. Date de bază ──────────────────────────────────────
                 q = supabase.table("base_contracte_speciale").select(
                     "cod_identificare, titlul_proiect, denumire_beneficiar, "
                     "derulat_prin, responsabil_idbdc, data_contract, "
@@ -1124,77 +1322,69 @@ def porneste_motorul(supabase):
                     st.info("Niciun contract SPECIAL găsit pentru filtrele selectate.")
                 else:
                     _coduri = _df_base["cod_identificare"].tolist()
-
-                    # ── 2. Date financiare ───────────────────────────────
                     try:
-                        _res_fin = (supabase.table("com_date_financiare")
-                                    .select("cod_identificare, valoare_totala_contract, "
-                                            "cofinantare_totala_contract, valuta")
-                                    .in_("cod_identificare", _coduri)
-                                    .execute())
+                        _res_fin = (
+                            supabase.table("com_date_financiare")
+                            .select("cod_identificare, valoare_totala_contract, cofinantare_totala_contract, valuta")
+                            .in_("cod_identificare", _coduri)
+                            .execute()
+                        )
                         _df_fin = pd.DataFrame(_res_fin.data or [])
                         if not _df_fin.empty:
-                            # Pastreaza doar coloanele cu cel putin o valoare non-nula
                             _df_fin = _df_fin.dropna(axis=1, how="all")
                             _df_fin = _df_fin.groupby("cod_identificare", as_index=False).first()
                     except Exception:
                         _df_fin = pd.DataFrame()
 
-                    # ── 3. Echipă — concatenare membri per contract ──────
                     try:
-                        _res_ech = (supabase.table("com_echipe_proiect")
-                                    .select("cod_identificare, nume_prenume, "
-                                            "functia_specifica, persoana_contact")
-                                    .in_("cod_identificare", _coduri)
-                                    .execute())
+                        _res_ech = (
+                            supabase.table("com_echipe_proiect")
+                            .select("cod_identificare, nume_prenume, functia_specifica, persoana_contact")
+                            .in_("cod_identificare", _coduri)
+                            .execute()
+                        )
                         _df_ech = pd.DataFrame(_res_ech.data or [])
                         if not _df_ech.empty:
-                            # Persoana de contact prima, apoi restul alfabetic
-                            _df_ech = _df_ech.sort_values(
-                                ["cod_identificare", "persoana_contact"],
-                                ascending=[True, False]
+                            _df_ech = _df_ech.sort_values(["cod_identificare", "persoana_contact"], ascending=[True, False])
+                            _df_ech_grp = (
+                                _df_ech.groupby("cod_identificare", as_index=False)
+                                .agg(membri_echipa=("nume_prenume", lambda x: ", ".join(x.dropna())))
                             )
-                            _df_ech_grp = (_df_ech.groupby("cod_identificare", as_index=False)
-                                           .agg(membri_echipa=("nume_prenume", lambda x: ", ".join(x.dropna()))))
                         else:
                             _df_ech_grp = pd.DataFrame()
                     except Exception:
                         _df_ech_grp = pd.DataFrame()
 
-                    # ── 4. Join toate ────────────────────────────────────
                     _df_final = _df_base.copy()
                     if not _df_fin.empty and "cod_identificare" in _df_fin.columns:
                         _df_final = _df_final.merge(_df_fin, on="cod_identificare", how="left")
                     if not _df_ech_grp.empty and "cod_identificare" in _df_ech_grp.columns:
                         _df_final = _df_final.merge(_df_ech_grp, on="cod_identificare", how="left")
 
-                    # ── 5. Elimina coloanele complet goale ───────────────
                     _df_final = _df_final.dropna(axis=1, how="all")
                     _df_final = _df_final.loc[:, (_df_final != "").any(axis=0)]
 
-                    # ── 6. Etichete frumoase ─────────────────────────────
                     _rename_spec = {
-                        "cod_identificare":           "NR. CONTRACT",
-                        "titlul_proiect":             "OBIECTUL CONTRACTULUI",
-                        "denumire_beneficiar":        "BENEFICIAR",
-                        "derulat_prin":               "DERULAT PRIN",
-                        "responsabil_idbdc":          "RESPONSABIL",
-                        "data_contract":              "DATA CONTRACT",
-                        "data_inceput":               "DATA ÎNCEPUT",
-                        "data_sfarsit":               "DATA SFÂRȘIT",
-                        "status_contract_proiect":    "STATUS",
-                        "valoare_totala_contract":    "VALOARE TOTALĂ",
-                        "cofinantare_totala_contract":"COFINANȚARE",
-                        "valuta":                     "VALUTĂ",
-                        "membri_echipa":              "MEMBRI ECHIPĂ",
+                        "cod_identificare": "NR. CONTRACT",
+                        "titlul_proiect": "OBIECTUL CONTRACTULUI",
+                        "denumire_beneficiar": "BENEFICIAR",
+                        "derulat_prin": "DERULAT PRIN",
+                        "responsabil_idbdc": "RESPONSABIL",
+                        "data_contract": "DATA CONTRACT",
+                        "data_inceput": "DATA ÎNCEPUT",
+                        "data_sfarsit": "DATA SFÂRȘIT",
+                        "status_contract_proiect": "STATUS",
+                        "valoare_totala_contract": "VALOARE TOTALĂ",
+                        "cofinantare_totala_contract": "COFINANȚARE",
+                        "valuta": "VALUTĂ",
+                        "membri_echipa": "MEMBRI ECHIPĂ",
                     }
                     _df_final = _df_final.rename(columns={k: v for k, v in _rename_spec.items() if k in _df_final.columns})
 
-                    # Format numeric pentru coloanele de valori
                     for _val_col in ["VALOARE TOTALĂ", "COFINANȚARE"]:
                         if _val_col in _df_final.columns:
                             _df_final[_val_col] = _df_final[_val_col].apply(
-                                lambda v: _fmt_numeric(v) if v is not None and str(v).strip() not in ("", "None", "nan") else ""
+                                lambda v: _fmt_numeric(v, _val_col) if v is not None and str(v).strip() not in ("", "None", "nan") else ""
                             )
 
                     st.dataframe(_df_final, use_container_width=True, height=400)
@@ -1204,7 +1394,6 @@ def porneste_motorul(supabase):
                 st.error(f"Eroare la încărcarea listei: {e}")
         st.markdown("---")
 
-    # [4] Avertismente daca operatorul introduce cod fara sa selecteze categoria/tipul
     if id_admin and str(id_admin).strip():
         if not cat_admin:
             st.warning("Nu ati selectat categoria de date.")
@@ -1225,16 +1414,15 @@ def porneste_motorul(supabase):
         "INTERNATIONALE": "base_proiecte_internationale",
         "INTERREG": "base_proiecte_interreg",
         "NONEU": "base_proiecte_noneu",
-        "SEE":  "base_proiecte_see",
+        "SEE": "base_proiecte_see",
         "PNCDI": "base_proiecte_pncdi",
     }
 
-    # [1][2] Mapari pentru auto-preluare in gridul Date de baza
     map_categorie_label = {
-        "Contracte":               "Contracte",
-        "Proiecte":                "Proiecte",
-        "Evenimente stiintifice":  "Evenimente stiintifice",
-        "Proprietate intelectuala":"Proprietate intelectuala",
+        "Contracte": "Contracte",
+        "Proiecte": "Proiecte",
+        "Evenimente stiintifice": "Evenimente stiintifice",
+        "Proprietate intelectuala": "Proprietate intelectuala",
     }
     map_tip_label = {
         "CEP": "CEP", "TERTI": "TERTI", "SPECIALE": "SPECIALE",
@@ -1281,240 +1469,94 @@ def porneste_motorul(supabase):
 
     if cat_admin in ("Contracte", "Proiecte"):
         tabele = [
-            ("Date de bază", tabela_baza),
+            ("Date de baza", tabela_baza),
             ("Date financiare", "com_date_financiare"),
-            ("Echipă", "com_echipe_proiect"),
+            ("Echipa", "com_echipe_proiect"),
+            ("Aspecte tehnice", "com_aspecte_tehnice"),
+        ]
+    elif cat_admin == "Evenimente stiintifice":
+        tabele = [
+            ("Date de baza", tabela_baza),
             ("Aspecte tehnice", "com_aspecte_tehnice"),
         ]
     else:
         tabele = [
-            ("Date de bază", tabela_baza),
-            ("Echipă", "com_echipe_proiect"),
+            ("Date de baza", tabela_baza),
+            ("Aspecte tehnice", "com_aspecte_tehnice"),
         ]
 
-    table_names = [t for _, t in tabele]
-
     # ============================
-    # [FIX-4] Curățare session_state la schimbarea codului
+    # LOAD / INIT STATE
     # ============================
-
-    _prev_cod_key = "admin_prev_cod"
-    _prev_tabela_key = "admin_prev_tabela"
-    prev_cod = st.session_state.get(_prev_cod_key)
-    prev_tabela = st.session_state.get(_prev_tabela_key)
-
-    if prev_cod != cod or prev_tabela != tabela_baza:
-        # Cod sau categoria s-a schimbat — ștergem datele vechi din session_state
-        for _, tn in tabele:
-            for k in (f"df_admin__{tn}", f"df_admin_raw__{tn}",
-                      f"editor_{tn}_{prev_cod}", f"editor_echipa_rep_{prev_cod}",
-                      f"editor_echipa_rest_{prev_cod}",
-                      f"toggle_deblocat_{prev_cod}", f"echipa_reunited_{prev_cod}"):
-                if k in st.session_state:
-                    del st.session_state[k]
-        st.session_state[_prev_cod_key] = cod
-        st.session_state[_prev_tabela_key] = tabela_baza
-
-    # ============================
-    # ÎNCĂRCARE
-    # ============================
-
-    state_key = lambda t: f"df_admin__{t}"
-    state_key_raw = lambda t: f"df_admin_raw__{t}"
 
     loaded = {}
-    exists_map = {}
+    any_existing = False
 
     for _, table_name in tabele:
-        df, cols, exista = load_single_row(table_name, cod)
-        loaded[table_name] = (df, cols)
-        exists_map[table_name] = exista
+        df_loaded, cols_real, exists = load_single_row(table_name, cod)
 
-    base_exists = exists_map.get(tabela_baza, False)
-    if actiune == "Modificare / completare fișă existentă" and not base_exists:
-        st.warning("Nu există fișă pentru acest cod în baza de date. Alege «Fișă nouă» dacă vrei să creezi.")
-        return
-
-    for _, table_name in tabele:
-        # Nu suprascrie session_state dacă datele sunt deja încărcate pentru același cod
-        # (evităm pierderea editărilor la rerun-uri intermediare)
-        if state_key_raw(table_name) in st.session_state:
-            continue
-
-        df, cols = loaded[table_name]
-        if df.empty and cols:
-            df_full = prepare_empty_single_row(cols, cod)
+        if actiune == "Fișă nouă" and not exists:
+            if cols_real:
+                df_work = prepare_empty_single_row(cols_real, cod)
+            else:
+                df_work = pd.DataFrame()
         else:
-            df_full = df.copy()
-
-        # [1][2] Auto-preluare categorie si tip din selectoarele de sus — pentru tabela de baza
-        if table_name == tabela_baza:
-            if "denumire_categorie" in df_full.columns and cat_admin:
-                # Cautam valoarea exacta din nomenclator care corespunde categoriei selectate
-                opts_cat = load_dropdown_options("nom_categorie", "denumire_categorie")
-                match_cat = next((o for o in opts_cat if cat_admin.upper() in o.upper()), None)
-                if match_cat:
-                    df_full["denumire_categorie"] = match_cat
-            if "acronim_contracte_proiecte" in df_full.columns and tip_admin:
-                # Contracte sau Proiecte — sursa diferita
-                src_tip = "nom_contracte" if cat_admin == "Contracte" else "nom_proiecte"
-                col_tip = "acronim_tip_contract" if cat_admin == "Contracte" else "acronim_tip_proiect"
-                opts_tip = load_dropdown_options(src_tip, col_tip)
-                match_tip = next((o for o in opts_tip if tip_admin.upper() in o.upper()), None)
-                if match_tip:
-                    df_full["acronim_contracte_proiecte"] = match_tip
+            if exists:
+                df_work = df_loaded.copy()
+                any_existing = True
+            else:
+                if cols_real:
+                    df_work = prepare_empty_single_row(cols_real, cod)
                 else:
-                    # Fallback direct — dacă nomenclatorul nu are valoarea exactă
-                    df_full["acronim_contracte_proiecte"] = tip_admin
-        st.session_state[state_key_raw(table_name)] = df_full.copy()
-        st.session_state[state_key(table_name)] = hide_control_cols(df_full)
+                    df_work = pd.DataFrame()
 
-        # Initializare echipa_reunited la prima incarcare — evita KeyError la salvare
-        # daca tab-ul Echipa nu a fost deschis/interactionat inainte de salvare
-        if table_name == "com_echipe_proiect":
-            echipa_key = f"echipa_reunited_{cod}"
-            if echipa_key not in st.session_state:
-                df_echipa_init = df_full.copy()
-                df_echipa_init["cod_identificare"] = cod
-                if "persoana_contact" not in df_echipa_init.columns:
-                    df_echipa_init["persoana_contact"] = False
-                st.session_state[echipa_key] = df_echipa_init
+        if table_name == tabela_baza and not df_work.empty:
+            df_work = _apply_auto_values(df_work)
 
-    base_full = st.session_state[state_key_raw(tabela_baza)]
+        st.session_state[state_key(table_name)] = df_work.copy()
+        st.session_state[state_key_raw(table_name)] = df_work.copy()
+        loaded[table_name] = (df_work.copy(), cols_real)
 
-    # ============================
-    # BLOCARE / DEBLOCARE FIȘĂ
-    # ============================
+    validated_any = False
+    detaliu_err = ""
 
-    toggle_key = f"toggle_deblocat_{cod}"
+    for _, table_name in tabele:
+        df_raw = st.session_state.get(state_key_raw(table_name), pd.DataFrame())
+        if "validat_idbdc" in df_raw.columns and len(df_raw):
+            try:
+                if bool(df_raw["validat_idbdc"].iloc[0]):
+                    validated_any = True
+                    break
+            except Exception:
+                pass
 
-    if toggle_key not in st.session_state:
-        st.session_state[toggle_key] = True
+    editing_blocked = bool(validated_any and not is_admin)
 
-    _toggle_color = "#22c55e" if st.session_state[toggle_key] else "#ef4444"
-    st.markdown(
-        f"""
-        <style>
-        div[data-testid="stToggle"] input:checked + div,
-        div[data-testid="stToggle"] input:checked ~ div[data-baseweb="toggle"] > div {{
-            background-color: #22c55e !important;
-        }}
-        div[data-testid="stToggle"] input:not(:checked) + div,
-        div[data-testid="stToggle"] input:not(:checked) ~ div[data-baseweb="toggle"] > div {{
-            background-color: #ef4444 !important;
-        }}
-        div[data-baseweb="toggle"] > div {{
-            background-color: {_toggle_color} !important;
-            border-color: {_toggle_color} !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    deblocat = st.toggle(
-        "🔓 Fișa este deblocată" if st.session_state[toggle_key] else "🔒 Fișa este blocată",
-        key=toggle_key,
-        help="OFF = Fișa este blocată (doar citire). ON = Fișa este deblocată (editare activă).",
-    )
-
-    editing_blocked = not deblocat
-
-    if deblocat:
+    if any_existing:
         st.markdown(
-            "<div style='background:rgba(34,197,94,0.18);border:1px solid rgba(34,197,94,0.60);"
-            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
-            "<span style='color:#4ade80;font-weight:700;font-size:0.97rem;'>"
-            "✅ Fișa este deblocată. Editarea este activă."
-            "</span></div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<div style='background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.60);"
-            "border-radius:10px;padding:8px 16px;margin-bottom:6px;'>"
-            "<span style='color:#f87171;font-weight:700;font-size:0.97rem;'>"
-            "🔒 Fișa este blocată. Mută toggle-ul pe ON pentru a edita."
-            "</span></div>",
+            """
+            <div style='background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.45);
+                        border-radius:10px;padding:7px 14px;margin-bottom:4px;display:inline-block;'>
+                <span style='color:#4ade80;font-weight:700;font-size:0.92rem;'>
+                    ✅ Fișa a fost identificată și este pregătită pentru administrare.
+                </span>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
 
-    # ============================
-    # EDITOR ECHIPĂ — două zone separate
-    # ============================
-
-    def _render_echipa_editor(df_show, col_cfg, cod, editing_blocked, edited_data, state_key, table_name):
-        """
-        Un singur tabel pentru toata echipa.
-        Coloana persoana_contact (True/False) vizibila doar operatorului — determina cine e persoana de contact.
-        """
-        persoane_disponibile = load_dropdown_options("det_resurse_umane", "nume_prenume")
-
-        col_cfg_echipa = dict(col_cfg)
-
-        if "nume_prenume" in df_show.columns:
-            col_cfg_echipa["nume_prenume"] = st.column_config.SelectboxColumn(
-                label="🔽 NUME SI PRENUME",
-                options=persoane_disponibile,
-                required=True,
-                help="🔽 Selecteaza persoana din lista angajatilor",
-            )
-
-        if "persoana_contact" in df_show.columns:
-            col_cfg_echipa["persoana_contact"] = st.column_config.CheckboxColumn(
-                label="PERSOANA DE CONTACT",
-                help="Bifeaza daca persoana este persoana de contact pentru acest contract/proiect",
-                default=False,
-            )
-
-        # cod_identificare ascuns din editor — se completeaza automat la salvare
-        cols_echipa_show = [c for c in df_show.columns if c != "cod_identificare"]
-        df_show_edit = df_show[cols_echipa_show].copy()
-        col_cfg_echipa.pop("cod_identificare", None)
-
-        # Asiguram ca persoana_contact e boolean
-        if "persoana_contact" in df_show_edit.columns:
-            df_show_edit["persoana_contact"] = df_show_edit["persoana_contact"].apply(
-                lambda v: True if v is True or str(v).strip().upper() in ("TRUE", "DA", "1") else False
-            )
-
-        df_filtered = df_show_edit.copy()
-        nr_membri = len(df_show_edit)
+    if editing_blocked:
         st.markdown(
-            f"<div style='background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);"
-            f"border-radius:10px;padding:8px 14px;margin-bottom:6px;'>"
-            f"<span style='color:#ffffff;font-weight:800;font-size:0.92rem;'>👥 Echipa</span> "
-            f"<span style='color:rgba(255,255,255,0.55);font-size:0.80rem;'>{nr_membri} persoane</span>"
-            f"</div>",
+            f"""
+            <div style='background:rgba(255,90,90,0.10);border:1px solid rgba(255,90,90,0.45);
+                        border-radius:10px;padding:10px 14px;margin-bottom:8px;'>
+                <span style='color:#ffb4b4;font-weight:800;font-size:0.96rem;'>⛔ Fișa este validată și blocată pentru modificare.</span>
+                {("<span style='color:rgba(255,255,255,0.85);font-size:0.95rem;font-weight:600;margin-top:6px;display:block;'>Motiv: " + detaliu_err + "</span>") if detaliu_err else ""}
+            </div>
+            """,
             unsafe_allow_html=True,
         )
 
-        key_editor = f"editor_echipa_{cod}"
-        edited_echipa = st.data_editor(
-            df_filtered,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="dynamic",
-            column_config=col_cfg_echipa,
-            disabled=editing_blocked,
-            key=key_editor,
-            height=420,
-        )
-
-        # Completam cod_identificare pe toate randurile
-        edited_echipa = edited_echipa.copy()
-        edited_echipa["cod_identificare"] = cod
-
-        if "persoana_contact" not in edited_echipa.columns:
-            edited_echipa["persoana_contact"] = False
-
-        if "nume_prenume" in edited_echipa.columns:
-            edited_echipa = edited_echipa[
-                edited_echipa["nume_prenume"].notna() &
-                (edited_echipa["nume_prenume"].astype(str).str.strip() != "")
-            ].reset_index(drop=True)
-
-        st.session_state[f"echipa_reunited_{cod}"] = edited_echipa
-        edited_data[table_name] = edited_echipa
     # ============================
     # TAB-URI + EDITOR
     # ============================
@@ -1525,161 +1567,35 @@ def porneste_motorul(supabase):
     for i, (label, table_name) in enumerate(tabele):
         with tabs[i]:
             df_show = st.session_state[state_key(table_name)].copy()
-
-            # Ascunde an_referinta din Date de baza pentru tabele de contracte
-            if table_name in ("base_contracte_terti", "base_contracte_speciale", "base_contracte_cep"):
-                df_show = df_show.drop(columns=["an_referinta"], errors="ignore")
-
-            # Ascunde an_referinta din Date financiare pentru contracte
-            if table_name == "com_date_financiare" and tabela_baza in TABELE_CONTRACTE:
-                df_show = df_show.drop(columns=["an_referinta"], errors="ignore")
-
-            if table_name == "com_date_financiare" and "valuta" in df_show.columns and "cod_identificare" in df_show.columns:
-                cols = list(df_show.columns)
-                cols.remove("valuta")
-                idx = cols.index("cod_identificare") + 1
-                cols.insert(idx, "valuta")
-                df_show = df_show[cols]
-
-            # Reordonare coloane sursa finantare PNCDI dupa cod_identificare
-            if table_name == "base_proiecte_pncdi" and "cod_identificare" in df_show.columns:
-                _pncdi_cols = [c for c in ["program", "subprogram", "instrument_finantare", "apel"] if c in df_show.columns]
-                if _pncdi_cols:
-                    cols = list(df_show.columns)
-                    for c in _pncdi_cols:
-                        cols.remove(c)
-                    idx = cols.index("cod_identificare") + 1
-                    for c in reversed(_pncdi_cols):
-                        cols.insert(idx, c)
-                    df_show = df_show[cols]
-
-            # Reordonare coloane sursa finantare PNRR dupa cod_identificare
-            if table_name == "base_proiecte_pnrr" and "cod_identificare" in df_show.columns:
-                _pnrr_cols = [c for c in ["pilon", "componenta", "reforma", "investitie", "apel"] if c in df_show.columns]
-                if _pnrr_cols:
-                    cols = list(df_show.columns)
-                    for c in _pnrr_cols:
-                        cols.remove(c)
-                    idx = cols.index("cod_identificare") + 1
-                    for c in reversed(_pnrr_cols):
-                        cols.insert(idx, c)
-                    df_show = df_show[cols]
-
-            # Reordonare coloane sursa finantare SEE dupa cod_identificare
-            if table_name == "base_proiecte_see" and "cod_identificare" in df_show.columns:
-                _see_cols = [c for c in ["sursa_finantare", "program", "apel", "programul_tematic", "componenta_axa", "obiectiv_specific"] if c in df_show.columns]
-                if _see_cols:
-                    cols = list(df_show.columns)
-                    for c in _see_cols:
-                        cols.remove(c)
-                    idx = cols.index("cod_identificare") + 1
-                    for c in reversed(_see_cols):
-                        cols.insert(idx, c)
-                    df_show = df_show[cols]
-
-            col_cfg = build_column_config_for_table(table_name, df_show, tabela_baza_ctx=tabela_baza)
+            df_show = hide_control_cols(df_show)
+            df_show = _prepare_display_df(table_name, df_show)
 
             if table_name == "com_echipe_proiect":
-                _render_echipa_editor(
-                    df_show, col_cfg, cod, editing_blocked,
-                    edited_data, state_key, table_name,
-                )
+                edited_data[table_name] = _render_editor_echipa(table_name, df_show, editing_blocked)
                 continue
 
-            num_rows_mode = "dynamic" if table_name == "com_date_financiare" else "fixed"
-            editor_key = f"editor_{table_name}_{cod}"
+            if table_name == "com_date_financiare" and tabela_baza == "base_proiecte_fdi":
+                _render_fdi_financial_preview(df_show)
 
-            edited = st.data_editor(
-                df_show,
-                use_container_width=True,
-                hide_index=True,
-                num_rows=num_rows_mode,
-                column_config=col_cfg,
-                disabled=editing_blocked,
-                key=editor_key,
-            )
-            edited_data[table_name] = edited
+            if table_name == "base_proiecte_fdi":
+                df_show = _reorder_df(df_show, FDI_BASE_ORDER)
 
-    # ============================
-    # STATUS FIȘĂ
-    # ============================
+            if table_name == "com_aspecte_tehnice":
+                df_show = _reorder_df(df_show, TECHNIC_ORDER)
 
-    if len(base_full) > 0 and st.session_state.get("operator_rol") == "ADMIN":
-        with st.expander("Status fișă (ADMIN)", expanded=False):
-            r = base_full.iloc[0].to_dict()
-            s1, s2, s3, s4 = st.columns([1.2, 2.2, 1.0, 1.6])
-            with s1:
-                st.caption("Responsabil")
-                st.write(r.get("responsabil_idbdc", "") or "")
-            with s2:
-                st.caption("Observații")
-                obs = (r.get("observatii_idbdc", "") or "").strip()
-                st.write(obs if obs else "-")
-            with s3:
-                st.caption("Confirmare")
-                st.write(fmt_bool(r.get("status_confirmare", False)))
-            with s4:
-                st.caption("Ultima modificare")
-                st.write(r.get("data_ultimei_modificari", "") or "-")
-
-    # ============================
-    # MESAJ PERSISTENT
-    # ============================
-
-    if "admin_msg" in st.session_state:
-        msg_type, msg_text = st.session_state.pop("admin_msg")
-        if msg_type == "success":
-            st.markdown(
-                f"""
-                <div style='
-                    background: rgba(30,180,80,0.22);
-                    border: 2px solid rgba(30,220,100,0.75);
-                    border-radius: 14px;
-                    padding: 18px 28px;
-                    margin: 12px 0 16px 0;
-                    text-align: center;
-                '>
-                    <span style='font-size:2.2rem;'>✅</span><br>
-                    <span style='color:#80ffb0;font-size:1.35rem;font-weight:900;letter-spacing:0.02em;'>
-                        {msg_text}
-                    </span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            parts = str(msg_text).split(":", 1)
-            titlu_err = parts[0].strip()
-            detaliu_err = parts[1].strip() if len(parts) > 1 else ""
-            st.markdown(
-                f"""
-                <div style='
-                    background: rgba(220,50,50,0.20);
-                    border: 2px solid rgba(255,80,80,0.70);
-                    border-radius: 14px;
-                    padding: 18px 28px;
-                    margin: 12px 0 16px 0;
-                    text-align: center;
-                '>
-                    <span style='font-size:2.2rem;'>❌</span><br>
-                    <span style='color:#ffaaaa;font-size:1.35rem;font-weight:900;'>
-                        {titlu_err}
-                    </span>
-                    {"<br><span style='color:rgba(255,180,180,0.85);font-size:0.95rem;font-weight:600;margin-top:6px;display:block;'>Motiv: " + detaliu_err + "</span>" if detaliu_err else ""}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            edited_data[table_name] = _render_editor_standard(table_name, df_show, editing_blocked)
 
     # ============================
     # BUTOANE
     # ============================
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    b1, b2 = st.columns(2)
+    b1, b2, b3 = st.columns(3)
     with b1:
         btn_save = st.button("💾 SALVARE FIȘĂ", disabled=editing_blocked)
     with b2:
+        btn_validate = st.button("✅ VALIDARE FIȘĂ")
+    with b3:
         btn_delete = st.button("🗑️ ȘTERGE FIȘA")
 
     # ============================
@@ -1698,7 +1614,6 @@ def porneste_motorul(supabase):
                 df_base = st.session_state[state_key(table_name)].copy()
 
                 if table_name == "com_echipe_proiect":
-                    # [FIX-3] Citim din session_state — supraviețuiește rerun-ului
                     df_edit_visible = st.session_state.get(
                         f"echipa_reunited_{cod}",
                         edited_data.get(table_name, df_base)
@@ -1708,8 +1623,8 @@ def porneste_motorul(supabase):
                     editor_state = st.session_state.get(editor_key)
 
                     if editor_state is not None and isinstance(editor_state, dict):
-                        edited_rows  = editor_state.get("edited_rows", {})
-                        added_rows   = editor_state.get("added_rows", [])
+                        edited_rows = editor_state.get("edited_rows", {})
+                        added_rows = editor_state.get("added_rows", [])
                         deleted_rows = editor_state.get("deleted_rows", [])
 
                         for idx_str, changes in edited_rows.items():
@@ -1736,59 +1651,55 @@ def porneste_motorul(supabase):
                     continue
 
                 if table_name == "com_echipe_proiect":
-                    # Echipa: nu folosim merge_back (ar trunchia rândurile)
-                    # Setăm cod_identificare direct pe toate rândurile
                     df_for_save = df_edit_visible.copy()
                     df_for_save["cod_identificare"] = cod
                     df_for_save = autofill_functie_upt(df_for_save)
                 else:
+                    if table_name == "com_date_financiare" and "total_buget_calc" in df_edit_visible.columns:
+                        df_edit_visible = df_edit_visible.drop(columns=["total_buget_calc"], errors="ignore")
+
                     df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
                     if "cod_identificare" in df_for_save.columns:
                         df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
                         df_for_save["cod_identificare"] = df_for_save["cod_identificare"].astype(str).replace("nan", cod)
 
+                    if table_name == tabela_baza:
+                        df_for_save = _apply_auto_values(df_for_save)
+
                 for _, row in df_for_save.iterrows():
-                    data = row.to_dict()
-                    cod_row = data.get("cod_identificare")
-                    if cod_row is None or str(cod_row).strip() == "":
-                        continue
-                    payload = {k: data.get(k) for k in cols_real if k in data}
-                    payload["cod_identificare"] = str(cod_row).strip()
-                    items.append({"table": table_name, "payload": payload})
+                    items.append({
+                        "table": table_name,
+                        "payload": row.to_dict(),
+                    })
 
             ok, msg = direct_save_all_tables(items, operator)
             if ok:
-                st.session_state["admin_msg"] = ("success", "✅ Fișa a fost salvată")
+                st.success(msg)
             else:
-                st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {msg}")
-            st.rerun()
+                st.error(msg)
 
         except Exception as e:
-            st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {e}")
-            st.rerun()
+            st.error(f"Eroare la salvare: {e}")
 
     # ============================
-    # ȘTERGERE + CONFIRMARE
+    # VALIDARE
+    # ============================
+
+    if btn_validate:
+        operator = st.session_state.operator_identificat
+        ok, msg = direct_validate_all_tables(cod, [t for _, t in tabele], operator)
+        if ok:
+            st.success(msg)
+        else:
+            st.error(msg)
+
+    # ============================
+    # ȘTERGERE
     # ============================
 
     if btn_delete:
-        st.warning("Ștergerea este definitivă.")
-        confirm = st.checkbox("Confirm că vreau să șterg definitiv fișa (din toate tabelele).")
-        typed = st.text_input("Reintrodu cod_identificare pentru confirmare:", value="")
-        if confirm and typed.strip() == cod:
-            try:
-                ok, msg = direct_delete_all_tables(cod, table_names)
-                if ok:
-                    for _, table_name in tabele:
-                        for k in (state_key(table_name), state_key_raw(table_name)):
-                            if k in st.session_state:
-                                del st.session_state[k]
-                    st.session_state["admin_msg"] = ("success", msg)
-                else:
-                    st.session_state["admin_msg"] = ("error", f"Eroare la ștergere: {msg}")
-                st.rerun()
-            except Exception as e:
-                st.session_state["admin_msg"] = ("error", f"Eroare la ștergere: {e}")
-                st.rerun()
+        ok, msg = direct_delete_all_tables(cod, [t for _, t in tabele])
+        if ok:
+            st.success(msg)
         else:
-            st.info("Bifează confirmarea și tastează exact codul pentru a executa ștergerea.")
+            st.error(msg)
