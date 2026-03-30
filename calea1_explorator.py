@@ -1,7 +1,8 @@
-```python
 import streamlit as st
+from supabase import create_client
 
-from tab1_fisa_completa import render_tab1_fisa_completa
+from config import Config
+from tab1_fisa_completa import render_fisa_completa
 from tab2_explorare_avansata import render_tab2_explorare_avansata
 from tab3_rapoarte_analiza import render_tab3_rapoarte_analiza
 
@@ -30,11 +31,20 @@ def render_calea1_explorator(supabase):
     )
 
     with tab1:
-        render_tab1_fisa_completa(supabase)
+        render_fisa_completa(supabase)
 
     with tab2:
         render_tab2_explorare_avansata(supabase)
 
     with tab3:
         render_tab3_rapoarte_analiza(supabase)
-```
+
+
+def run():
+    try:
+        supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
+    except Exception as e:
+        st.error(f"Eroare la inițializarea conexiunii Supabase: {e}")
+        return
+
+    render_calea1_explorator(supabase)
