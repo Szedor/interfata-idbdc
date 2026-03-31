@@ -2,6 +2,23 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
+from modules.admin.admin_helpers import (
+    append_observatii,
+    build_fdi_financial_df as _build_fdi_financial_df,
+    cleanup_payload,
+    current_year,
+    fmt_bool,
+    fmt_numeric as _fmt_numeric,
+    is_date_col,
+    is_numeric_col,
+    is_row_effectively_empty,
+    is_year_col,
+    now_iso,
+    prepare_empty_single_row,
+    reorder_columns,
+    to_float_safe,
+)
+
 
 def porneste_motorul(supabase):
 
@@ -9,15 +26,6 @@ def porneste_motorul(supabase):
     # CONFIG
     # ============================
 
-    def _fmt_numeric(val) -> str:
-        """Formatează valorile numerice cu separator de mii și 2 zecimale (format românesc)."""
-        if val is None:
-            return ""
-        try:
-            f = float(str(val).replace(",", ".").strip())
-            return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        except (ValueError, TypeError):
-            return str(val)
     ADMIN_ONLY_COLS = {
         "responsabil_idbdc", "observatii_idbdc",
         "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
@@ -91,56 +99,12 @@ def porneste_motorul(supabase):
     # HELPERS
     # ============================
 
-    def now_iso():
-        return datetime.now().isoformat()
-
-    def current_year():
-        return datetime.now().year
-
     def get_table_columns(table_name: str):
         try:
             res = supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
             return [r["column_name"] for r in (res.data or []) if r.get("column_name")]
         except Exception:
             return []
-
-    def is_date_col(col: str) -> bool:
-        c = (col or "").lower()
-        if c in ("data_ultimei_modificari",):
-            return False
-        return c.startswith("data_") or c.endswith("_data") or c.startswith("dt_")
-
-    def is_year_col(col: str) -> bool:
-        c = (col or "").lower()
-        return c == "an" or c.startswith("an_")
-
-    def is_numeric_col(col: str, df: pd.DataFrame) -> bool:
-        """Detectează coloane numerice (INTEGER/FLOAT) după dtype și nume."""
-        c = (col or "").lower()
-        numeric_keywords = (
-            "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
-            "contributie_", "numar_", "nr_", "punctaj", "scor_",
-            "interval_", "total_", "pozitie_", "perioada_valabilitate_ani",
-        )
-        if any(c.startswith(k) or c == k for k in numeric_keywords):
-            return True
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            return True
-        return False
-
-    def empty_row(columns):
-        row = {c: None for c in columns}
-        if "status_confirmare" in row:
-            row["status_confirmare"] = False
-        if "validat_idbdc" in row:
-            row["validat_idbdc"] = False
-        if "persoana_contact" in row:
-            row["persoana_contact"] = False
-        y = current_year()
-        for c in columns:
-            if c == "an" or c.startswith("an_"):
-                row[c] = y
-        return row
 
     def load_single_row(table_name: str, cod: str):
         cols = get_table_columns(table_name)
@@ -176,25 +140,6 @@ def porneste_motorul(supabase):
 
         return df, cols, True
 
-    def prepare_empty_single_row(cols: list, cod: str):
-        if not cols:
-            return pd.DataFrame()
-        r = empty_row(cols)
-        if "cod_identificare" in r:
-            r["cod_identificare"] = cod
-        import datetime as _dt
-        df = pd.DataFrame([r], columns=cols)
-        for c in df.columns:
-            if is_date_col(c):
-                df[c] = df[c].apply(lambda v: None if v is None else (v if isinstance(v, _dt.date) else None))
-        return df
-
-    def append_observatii(existing: str, msg: str) -> str:
-        base = (existing or "").strip()
-        if not base:
-            return msg
-        return base + "\n" + msg
-
     def hide_control_cols(df: pd.DataFrame) -> pd.DataFrame:
         if is_admin:
             return df
@@ -221,70 +166,10 @@ def porneste_motorul(supabase):
         return out
 
     def _to_float_safe(val):
-        if val is None:
-            return None
-        if isinstance(val, str) and val.strip() == "":
-            return None
-        try:
-            return float(str(val).replace(".", "").replace(",", ".")) if isinstance(val, str) and (val.count(",") == 1 and val.count(".") >= 1) else float(str(val).replace(",", "."))
-        except Exception:
-            return None
+        return to_float_safe(val)
 
     def build_fdi_financial_df(df_source: pd.DataFrame, cod: str) -> pd.DataFrame:
-        cols = ["cod_identificare"] + FDI_FINANCIAL_FIELDS + ["total_buget"]
-        if df_source is None or df_source.empty:
-            row = {c: None for c in cols}
-            row["cod_identificare"] = cod
-            return pd.DataFrame([row], columns=cols)
-
-        src = df_source.copy()
-        if "cod_identificare" not in src.columns:
-            src["cod_identificare"] = cod
-        row = src.iloc[0].to_dict()
-        out = {c: row.get(c) for c in cols if c != "total_buget"}
-        out["cod_identificare"] = row.get("cod_identificare") or cod
-        suma_aprobata = _to_float_safe(out.get("suma_aprobata_mec"))
-        cofin = _to_float_safe(out.get("cofinantare_upt_fdi"))
-        out["total_buget"] = (suma_aprobata or 0.0) + (cofin or 0.0)
-        return pd.DataFrame([out], columns=cols)
-
-    def reorder_columns(df: pd.DataFrame, priority_cols: list[str], drop_cols: list[str] | None = None) -> pd.DataFrame:
-        if df is None or df.empty:
-            return df
-        cols = [c for c in df.columns if not drop_cols or c not in drop_cols]
-        ordered = [c for c in priority_cols if c in cols]
-        ordered += [c for c in cols if c not in ordered]
-        return df[ordered]
-
-    def fmt_bool(v):
-        return "DA" if bool(v) else "NU"
-
-    def is_row_effectively_empty(d: dict) -> bool:
-        cod = d.get("cod_identificare")
-        if cod is None or (isinstance(cod, str) and cod.strip() == ""):
-            return True
-        return False
-
-    def cleanup_payload(payload: dict) -> dict:
-        out = {}
-        for k, v in (payload or {}).items():
-            if k == "nr_crt":
-                if v is None:
-                    continue
-                if isinstance(v, str) and v.strip() == "":
-                    continue
-                out[k] = v
-                continue
-            if k == "cod_identificare":
-                if v is not None and str(v).strip():
-                    out[k] = str(v).strip()
-                continue
-            if v is None:
-                continue
-            if isinstance(v, str) and v.strip() == "":
-                continue
-            out[k] = v
-        return out
+        return _build_fdi_financial_df(df_source, cod, FDI_FINANCIAL_FIELDS)
 
     def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
         try:
