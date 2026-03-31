@@ -1,48 +1,113 @@
-from modules.admin.admin_config import NOMDET_WHITELIST
+from __future__ import annotations
+
+"""
+Nomenclatoare comune pentru modulul admin.
+
+În această etapă păstrăm doar liste și mapări declarative
+care sunt sigure și generale pentru arhitectura nouă.
+Fără nomenclatoare speculative sau neconfirmate de sistemul existent.
+"""
+
+from modules.admin.admin_config import (
+    TIP_CONTRACT,
+    TIP_EVENIMENT,
+    TIP_FDI,
+    TIP_INTERREG,
+    TIP_INTERNATIONALE,
+    TIP_NONEU,
+    TIP_PNCDI,
+    TIP_PNRR,
+    TIP_PROPRIETATE_INDUSTRIALA,
+    TIP_SEE,
+)
 
 
-def is_allowed_nomenclator(table_name: str) -> bool:
-    return table_name in NOMDET_WHITELIST
+STATUSURI_GENERALE = [
+    "În pregătire",
+    "Depus",
+    "În evaluare",
+    "Aprobat",
+    "Respins",
+    "Contractat",
+    "În derulare",
+    "Suspendat",
+    "Finalizat",
+    "Închis",
+]
 
 
-def get_default_nomenclatoare():
-    return {
-        "nom_categorie": "denumire_categorie",
-        "nom_status_proiect": "status_contract_proiect",
-        "nom_contracte": "acronim_tip_contract",
-        "nom_proiecte": "acronim_tip_proiect",
-        "nom_departament": "acronim_departament",
-        "nom_functie_upt": "acronim_functie_upt",
-        "nom_domenii_fdi": "cod_domeniu_fdi",
-        "nom_universitati": "cod_universitate",
-    }
+OPT_DA_NU = [
+    "Da",
+    "Nu",
+]
 
 
-def get_nomenclator_label(table_name: str) -> str:
-    labels = {
-        "nom_categorie": "Categorii",
-        "nom_status_proiect": "Status contract / proiect",
-        "nom_contracte": "Tipuri contracte",
-        "nom_proiecte": "Tipuri proiecte",
-        "nom_departament": "Departamente",
-        "nom_functie_upt": "Funcții UPT",
-        "nom_domenii_fdi": "Domenii FDI",
-        "nom_universitati": "Universități",
-        "det_resurse_umane": "Resurse umane",
-    }
-    return labels.get(table_name, table_name)
+TIPURI_ENTITATI = [
+    TIP_CONTRACT,
+    TIP_FDI,
+    TIP_INTERNATIONALE,
+    TIP_INTERREG,
+    TIP_NONEU,
+    TIP_SEE,
+    TIP_PNCDI,
+    TIP_PNRR,
+    TIP_EVENIMENT,
+    TIP_PROPRIETATE_INDUSTRIALA,
+]
 
 
-def get_nomenclator_sort_column(table_name: str) -> str:
-    mapping = {
-        "nom_categorie": "denumire_categorie",
-        "nom_status_proiect": "status_contract_proiect",
-        "nom_contracte": "acronim_tip_contract",
-        "nom_proiecte": "acronim_tip_proiect",
-        "nom_departament": "acronim_departament",
-        "nom_functie_upt": "acronim_functie_upt",
-        "nom_domenii_fdi": "cod_domeniu_fdi",
-        "nom_universitati": "cod_universitate",
-        "det_resurse_umane": "nume_prenume",
-    }
-    return mapping.get(table_name, "id")
+TIPURI_ENTITATI_LABELS = {
+    TIP_CONTRACT: "Contract",
+    TIP_FDI: "FDI",
+    TIP_INTERNATIONALE: "Internaționale",
+    TIP_INTERREG: "Interreg",
+    TIP_NONEU: "NonEU",
+    TIP_SEE: "SEE",
+    TIP_PNCDI: "PNCDI",
+    TIP_PNRR: "PNRR",
+    TIP_EVENIMENT: "Eveniment științific",
+    TIP_PROPRIETATE_INDUSTRIALA: "Proprietate industrială",
+}
+
+
+STATUSURI_PROPRIETATE_INDUSTRIALA = [
+    "În pregătire",
+    "Depus",
+    "În examinare",
+    "Acordat",
+    "Respins",
+    "Expirat",
+]
+
+
+STATUS_BY_ENTITY_TYPE = {
+    TIP_CONTRACT: STATUSURI_GENERALE,
+    TIP_FDI: STATUSURI_GENERALE,
+    TIP_INTERNATIONALE: STATUSURI_GENERALE,
+    TIP_INTERREG: STATUSURI_GENERALE,
+    TIP_NONEU: STATUSURI_GENERALE,
+    TIP_SEE: STATUSURI_GENERALE,
+    TIP_PNCDI: STATUSURI_GENERALE,
+    TIP_PNRR: STATUSURI_GENERALE,
+    TIP_EVENIMENT: [
+        "Planificat",
+        "În desfășurare",
+        "Finalizat",
+        "Anulat",
+    ],
+    TIP_PROPRIETATE_INDUSTRIALA: STATUSURI_PROPRIETATE_INDUSTRIALA,
+}
+
+
+EXTRA_OPTIONS_BY_ENTITY_TYPE = {
+    TIP_CONTRACT: {},
+    TIP_FDI: {},
+    TIP_INTERNATIONALE: {},
+    TIP_INTERREG: {},
+    TIP_NONEU: {},
+    TIP_SEE: {},
+    TIP_PNCDI: {},
+    TIP_PNRR: {},
+    TIP_EVENIMENT: {},
+    TIP_PROPRIETATE_INDUSTRIALA: {},
+}
