@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -19,10 +18,6 @@ from modules.admin.contract_proiect_like.contract_proiect_like_builder import (
 
 
 def porneste_motorul(supabase):
-    # ============================
-    # CONFIG
-    # ============================
-
     ADMIN_ONLY_COLS = {
         "responsabil_idbdc",
         "observatii_idbdc",
@@ -36,10 +31,6 @@ def porneste_motorul(supabase):
     }
 
     is_admin = st.session_state.get("operator_rol") == "ADMIN"
-
-    # ============================
-    # HELPERS DB
-    # ============================
 
     def get_table_columns(table_name: str) -> list[str]:
         try:
@@ -163,8 +154,8 @@ def porneste_motorul(supabase):
         if not ok_any:
             return False, "Nu s-a putut salva (nicio operație aplicată)."
         if errors:
-            return True, "Salvare parțială (cu unele avertismente)."
-        return True, "Salvarea realizată cu succes!"
+            return True, f"Salvare parțială: {' | '.join(errors)}"
+        return True, "Salvarea realizată cu succes."
 
     def direct_validate_all_tables(cod: str, table_names: list[str], operator: str) -> tuple[bool, str]:
         ok_any = False
@@ -214,7 +205,7 @@ def porneste_motorul(supabase):
         if not ok_any:
             return False, "Nu s-a putut valida (nu există coloane compatibile în tabelele selectate)."
         if errors:
-            return True, "Validare parțială (cu unele avertismente)."
+            return True, f"Validare parțială: {' | '.join(errors)}"
         return True, "Validare realizată."
 
     def direct_delete_all_tables(cod: str, table_names: list[str]) -> tuple[bool, str]:
@@ -236,12 +227,8 @@ def porneste_motorul(supabase):
         if not ok_any:
             return False, "Nu s-a șters nimic."
         if errors:
-            return True, "Ștergere parțială (cu unele avertismente)."
+            return True, f"Ștergere parțială: {' | '.join(errors)}"
         return True, "Fișa a fost ștearsă."
-
-    # ============================
-    # STYLE
-    # ============================
 
     st.markdown(
         """
@@ -266,20 +253,12 @@ def porneste_motorul(supabase):
         unsafe_allow_html=True,
     )
 
-    # ============================
-    # HEADER
-    # ============================
-
     st.markdown(
         f"<h3 style='text-align: center;'> 🛠️ Administrare IDBDC: {st.session_state.operator_identificat}</h3>",
         unsafe_allow_html=True,
     )
 
     st.divider()
-
-    # ============================
-    # SELECTOARE
-    # ============================
 
     _filtru_categorii = st.session_state.get("operator_filtru_categorie") or []
     _filtru_tipuri = st.session_state.get("operator_filtru_tipuri") or []
@@ -396,10 +375,6 @@ def porneste_motorul(supabase):
         "SEE": "see",
     }
 
-    # ============================
-    # FAMILII NEFINALIZATE ÎN ACEST MOTOR
-    # ============================
-
     if tip_admin not in contract_proiect_like_types:
         st.info(
             "În acest motor nou este activă doar familia contract_proiect_like "
@@ -407,10 +382,6 @@ def porneste_motorul(supabase):
             "PNCDI, PNRR, evenimentele și proprietatea industrială rămân pentru etapele următoare."
         )
         return
-
-    # ============================
-    # BUILD RESULT
-    # ============================
 
     try:
         result = build_contract_proiect_like(
@@ -431,10 +402,6 @@ def porneste_motorul(supabase):
 
     state_key = lambda t: f"df_admin__{t}"
     state_key_raw = lambda t: f"df_admin_raw__{t}"
-
-    # ============================
-    # CURĂȚARE SESSION_STATE LA SCHIMBAREA CODULUI
-    # ============================
 
     _prev_cod_key = "admin_prev_cod"
     _prev_tabela_key = "admin_prev_tabela"
@@ -472,10 +439,6 @@ def porneste_motorul(supabase):
         st.error(f"Eroare la popularea session_state: {e}")
         return
 
-    # ============================
-    # MESAJE
-    # ============================
-
     admin_msg = st.session_state.pop("admin_msg", None)
     if admin_msg and isinstance(admin_msg, tuple) and len(admin_msg) == 2:
         level, text = admin_msg
@@ -486,16 +449,12 @@ def porneste_motorul(supabase):
         else:
             st.error(text)
 
-    # ============================
-    # TAB-URI
-    # ============================
-
     tab_labels = [label for label, _ in tabele]
     tabs_ui = st.tabs(tab_labels)
 
     edited_data: dict[str, pd.DataFrame] = {}
 
-    for idx, (label, table_name) in enumerate(tabele):
+    for idx, (_, table_name) in enumerate(tabele):
         with tabs_ui[idx]:
             prepared_entry = result["prepared"][table_name]
             df_visible = st.session_state[state_key(table_name)].copy()
@@ -518,10 +477,6 @@ def porneste_motorul(supabase):
 
     st.divider()
 
-    # ============================
-    # ACȚIUNI
-    # ============================
-
     bc1, bc2, bc3 = st.columns(3)
 
     with bc1:
@@ -535,10 +490,6 @@ def porneste_motorul(supabase):
 
     operator = st.session_state.get("operator_identificat", "necunoscut")
 
-    # ============================
-    # SALVARE
-    # ============================
-
     if btn_save:
         try:
             items = builder.collect_items_for_save_from_session(
@@ -550,8 +501,10 @@ def porneste_motorul(supabase):
 
             ok, msg = direct_save_all_tables(items, operator)
 
-            if ok:
-                st.session_state["admin_msg"] = ("success", "✅ Fișa a fost salvată")
+            if ok and "parțial" in msg.lower():
+                st.session_state["admin_msg"] = ("warning", msg)
+            elif ok:
+                st.session_state["admin_msg"] = ("success", msg)
             else:
                 st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {msg}")
 
@@ -561,15 +514,13 @@ def porneste_motorul(supabase):
             st.session_state["admin_msg"] = ("error", f"Fișa nu a putut fi salvată: {e}")
             st.rerun()
 
-    # ============================
-    # VALIDARE
-    # ============================
-
     if btn_validate:
         try:
             ok, msg = direct_validate_all_tables(cod, table_names, operator)
 
-            if ok:
+            if ok and "parțial" in msg.lower():
+                st.session_state["admin_msg"] = ("warning", msg)
+            elif ok:
                 st.session_state["admin_msg"] = ("success", msg)
             else:
                 st.session_state["admin_msg"] = ("error", msg)
@@ -579,10 +530,6 @@ def porneste_motorul(supabase):
         except Exception as e:
             st.session_state["admin_msg"] = ("error", f"Eroare la validare: {e}")
             st.rerun()
-
-    # ============================
-    # ȘTERGERE + CONFIRMARE
-    # ============================
 
     if btn_delete:
         st.warning("Ștergerea este definitivă.")
@@ -598,7 +545,9 @@ def porneste_motorul(supabase):
             try:
                 ok, msg = direct_delete_all_tables(cod, table_names)
 
-                if ok:
+                if ok and "parțial" in msg.lower():
+                    st.session_state["admin_msg"] = ("warning", msg)
+                elif ok:
                     for _, table_name in tabele:
                         for k in (state_key(table_name), state_key_raw(table_name)):
                             if k in st.session_state:
