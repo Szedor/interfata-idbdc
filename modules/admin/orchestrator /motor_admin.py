@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
+import math
 import pandas as pd
 import streamlit as st
 
@@ -47,6 +48,72 @@ def porneste_motorul(supabase):
             return df
         cols = [c for c in df.columns if c not in ADMIN_ONLY_COLS]
         return df[cols] if cols else df
+
+    def _is_missing(v) -> bool:
+        if v is None:
+            return True
+
+        try:
+            if pd.isna(v):
+                return True
+        except Exception:
+            pass
+
+        if isinstance(v, str) and v.strip() == "":
+            return True
+
+        return False
+
+    def _json_safe_value(v):
+        if v is None:
+            return None
+
+        try:
+            if pd.isna(v):
+                return None
+        except Exception:
+            pass
+
+        if isinstance(v, pd.Timestamp):
+            if pd.isna(v):
+                return None
+            return v.to_pydatetime().isoformat()
+
+        if isinstance(v, datetime):
+            return v.isoformat()
+
+        if isinstance(v, date):
+            return v.isoformat()
+
+        if hasattr(v, "item"):
+            try:
+                v = v.item()
+            except Exception:
+                pass
+
+        if isinstance(v, float):
+            if math.isnan(v) or math.isinf(v):
+                return None
+            return v
+
+        return v
+
+    def _sanitize_payload(payload: dict) -> dict:
+        out = {}
+        for k, v in (payload or {}).items():
+            out[k] = _json_safe_value(v)
+        return out
+
+    def _has_meaningful_data(payload: dict, *, ignore_fields: set[str] | None = None) -> bool:
+        ignore_fields = ignore_fields or set()
+
+        for k, v in (payload or {}).items():
+            if k in ignore_fields:
+                continue
+            if not _is_missing(v):
+                return True
+
+        return False
 
     def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
         try:
@@ -119,9 +186,37 @@ def porneste_motorul(supabase):
                         )
 
                     cp = cleanup_payload(cp)
+                    cp = _sanitize_payload(cp)
+
+                    ignore_fields = {
+                        "cod_identificare",
+                        "id_proiect_contract_sursa",
+                        "observatii_idbdc",
+                        "data_ultimei_modificari",
+                        "validat_idbdc",
+                        "status_confirmare",
+                        "responsabil_idbdc",
+                        "creat_de",
+                        "creat_la",
+                        "modificat_de",
+                        "modificat_la",
+                    }
+
+                    if table_name == "com_date_financiare":
+                        financial_meaningful = _has_meaningful_data(
+                            cp,
+                            ignore_fields=ignore_fields | {"valuta"},
+                        )
+
+                        if not financial_meaningful:
+                            continue
+
+                        if "valuta" in cols_real and _is_missing(cp.get("valuta")):
+                            cp["valuta"] = "LEI"
 
                     if is_row_effectively_empty(cp):
-                        continue
+                        if not _has_meaningful_data(cp, ignore_fields=ignore_fields):
+                            continue
 
                     clean_payloads.append(cp)
 
@@ -191,6 +286,8 @@ def porneste_motorul(supabase):
                         payload["observatii_idbdc"] = msg
 
                 payload = cleanup_payload(payload)
+                payload = _sanitize_payload(payload)
+
                 if not payload:
                     continue
 
