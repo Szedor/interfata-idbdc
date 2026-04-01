@@ -122,33 +122,43 @@ class ContractProiectLikeBuilder:
         hide_control_cols_callable,
     ) -> None:
         """
-        Populează session_state în același stil folosit de motor_admin.py.
-        Nu suprascrie datele deja încărcate pentru același cod.
+        Populează session_state fără să piardă tabele auxiliare.
         """
         cod = result["cod"]
-        tabela_baza = result["tabela_baza"]
 
         for _, table_name in result["tabele"]:
-            if state_key_raw(table_name) in st.session_state:
-                continue
-
             prepared_entry = result["prepared"][table_name]
             df_full = prepared_entry["df"].copy()
 
-            st.session_state[state_key_raw(table_name)] = df_full.copy()
-            st.session_state[state_key(table_name)] = hide_control_cols_callable(df_full)
+            raw_key = state_key_raw(table_name)
+            visible_key = state_key(table_name)
+
+            if raw_key not in st.session_state:
+                st.session_state[raw_key] = df_full.copy()
+
+            if visible_key not in st.session_state:
+                st.session_state[visible_key] = hide_control_cols_callable(
+                    st.session_state[raw_key].copy()
+                )
 
             if table_name == "com_echipe_proiect":
                 echipa_key = f"echipa_reunited_{cod}"
                 if echipa_key not in st.session_state:
-                    df_echipa_init = df_full.copy()
-                    df_echipa_init["cod_identificare"] = cod
-                    if "persoana_contact" not in df_echipa_init.columns:
-                        df_echipa_init["persoana_contact"] = False
-                    st.session_state[echipa_key] = df_echipa_init
+                    df_echipa_init = st.session_state[visible_key].copy()
 
-            if table_name == tabela_baza and state_key_raw(table_name) not in st.session_state:
-                st.session_state[state_key_raw(table_name)] = df_full.copy()
+                    if "cod_identificare" in df_echipa_init.columns:
+                        df_echipa_init["cod_identificare"] = cod
+                    else:
+                        df_echipa_init.insert(0, "cod_identificare", cod)
+
+                    if "persoana_contact" in df_echipa_init.columns:
+                        df_echipa_init["persoana_contact"] = df_echipa_init["persoana_contact"].apply(
+                            lambda v: True
+                            if v is True or str(v).strip().upper() in ("TRUE", "DA", "1")
+                            else False
+                        )
+
+                    st.session_state[echipa_key] = df_echipa_init
 
     def collect_items_for_save_from_session(
         self,
@@ -159,8 +169,12 @@ class ContractProiectLikeBuilder:
         edited_data: dict[str, pd.DataFrame],
     ) -> list[dict[str, Any]]:
         """
-        Construiește items pentru direct_save_all_tables(...) păstrând
-        cât mai fidel logica existentă din motor_admin.py.
+        Construiește items pentru direct_save_all_tables(...).
+
+        Variantă stabilizată:
+        - pornește din edited_data (grila deja editată),
+        - nu mai depinde de structura internă edited_rows / added_rows / deleted_rows,
+        - păstrează cazul special FDI.
         """
         items: list[dict[str, Any]] = []
 
@@ -168,108 +182,43 @@ class ContractProiectLikeBuilder:
         tabela_baza = result["tabela_baza"]
         config = result["config"]
         tabele = result["tabele"]
-        loaded = result["loaded"]
 
         for _, table_name in tabele:
-            _, cols_real_loaded = loaded[table_name]
-            if not cols_real_loaded:
+            df_edit_visible = edited_data.get(table_name)
+
+            if df_edit_visible is None:
+                df_edit_visible = st.session_state.get(state_key(table_name))
+
+            if df_edit_visible is None:
                 continue
 
-            df_base_visible = st.session_state[state_key(table_name)].copy()
+            df_edit_visible = df_edit_visible.copy()
 
             if table_name == "com_echipe_proiect":
-                df_edit_visible = st.session_state.get(
-                    f"echipa_reunited_{cod}",
-                    edited_data.get(table_name, df_base_visible),
-                )
+                echipa_key = f"echipa_reunited_{cod}"
+                df_edit_visible = st.session_state.get(echipa_key, df_edit_visible).copy()
 
-            elif table_name == "com_date_financiare" and config.get("uses_fdi_financial", False):
-                editor_key = f"editor_{table_name}_{cod}"
-                editor_state = st.session_state.get(editor_key)
-
-                df_fdi_fin = df_base_visible.copy()
-
-                if editor_state is not None and isinstance(editor_state, dict):
-                    edited_rows = editor_state.get("edited_rows", {})
-
-                    if 0 not in df_fdi_fin.index and len(df_fdi_fin) == 0:
-                        df_fdi_fin = pd.DataFrame(
-                            [{c: None for c in df_fdi_fin.columns}]
-                        )
-
-                    if len(df_fdi_fin) == 0:
-                        df_fdi_fin = pd.DataFrame([{"cod_identificare": cod}])
-
-                    for idx_str, changes in edited_rows.items():
-                        idx = int(idx_str)
-                        if idx < len(df_fdi_fin):
-                            for col, val in changes.items():
-                                df_fdi_fin.at[df_fdi_fin.index[idx], col] = val
-                else:
-                    df_fdi_fin = edited_data.get(table_name, df_base_visible)
-
-                if df_fdi_fin is None or len(df_fdi_fin) == 0:
-                    df_fdi_fin = pd.DataFrame([{"cod_identificare": cod}])
-
-                df_edit_visible = df_fdi_fin.copy()
-
-            else:
-                editor_key = f"editor_{table_name}_{cod}"
-                editor_state = st.session_state.get(editor_key)
-
-                if editor_state is not None and isinstance(editor_state, dict):
-                    edited_rows = editor_state.get("edited_rows", {})
-                    added_rows = editor_state.get("added_rows", [])
-                    deleted_rows = editor_state.get("deleted_rows", [])
-
-                    df_work = df_base_visible.copy()
-
-                    for idx_str, changes in edited_rows.items():
-                        idx = int(idx_str)
-                        if idx < len(df_work):
-                            for col, val in changes.items():
-                                df_work.at[df_work.index[idx], col] = val
-
-                    for new_row in added_rows:
-                        new_r = {c: None for c in df_work.columns}
-                        new_r.update(new_row)
-                        df_work = pd.concat(
-                            [df_work, pd.DataFrame([new_r])],
-                            ignore_index=True,
-                        )
-
-                    if deleted_rows:
-                        df_work = df_work.drop(
-                            index=[i for i in deleted_rows if i < len(df_work)]
-                        ).reset_index(drop=True)
-
-                    df_edit_visible = df_work
-                else:
-                    df_edit_visible = edited_data.get(table_name, df_base_visible)
-
-            df_raw_original = st.session_state[state_key_raw(table_name)]
-
-            if df_edit_visible is None or len(df_edit_visible) == 0:
+            if df_edit_visible.empty:
                 continue
 
-            if table_name == "com_echipe_proiect":
-                df_for_save = df_edit_visible.copy()
-                df_for_save["cod_identificare"] = cod
-                df_for_save = autofill_functie_upt(df_for_save)
-                table_name_for_save = table_name
-                cols_real = self._get_table_columns(table_name_for_save)
-
-            elif table_name == "com_date_financiare" and config.get("uses_fdi_financial", False):
-                df_for_save = st.session_state[state_key_raw(tabela_baza)].copy()
+            if table_name == "com_date_financiare" and config.get("uses_fdi_financial", False):
+                df_for_save = st.session_state.get(
+                    state_key_raw(tabela_baza),
+                    pd.DataFrame(),
+                ).copy()
 
                 if df_for_save.empty:
-                    df_for_save = prepare_empty_single_row(
-                        self._get_table_columns(tabela_baza),
-                        cod,
-                    )
+                    base_cols = self._get_table_columns(tabela_baza)
+                    if base_cols:
+                        df_for_save = prepare_empty_single_row(base_cols, cod)
+                    else:
+                        df_for_save = pd.DataFrame([{"cod_identificare": cod}])
 
                 if len(df_for_save) == 0:
                     df_for_save = pd.DataFrame([{"cod_identificare": cod}])
+
+                if len(df_edit_visible) == 0:
+                    continue
 
                 for c in FDI_FINANCIAL_FIELDS:
                     if c in df_edit_visible.columns:
@@ -277,36 +226,74 @@ class ContractProiectLikeBuilder:
                             df_for_save[c] = None
                         df_for_save.at[df_for_save.index[0], c] = df_edit_visible.iloc[0].get(c)
 
-                df_for_save["cod_identificare"] = cod
+                if "cod_identificare" in df_for_save.columns:
+                    df_for_save["cod_identificare"] = cod
+                else:
+                    df_for_save.insert(0, "cod_identificare", cod)
+
+                df_for_save = df_for_save.drop(columns=["total_buget"], errors="ignore")
                 table_name_for_save = tabela_baza
                 cols_real = self._get_table_columns(tabela_baza)
 
-            else:
-                df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
+            elif table_name == "com_echipe_proiect":
+                df_for_save = df_edit_visible.copy()
 
                 if "cod_identificare" in df_for_save.columns:
-                    df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
+                    df_for_save["cod_identificare"] = cod
+                else:
+                    df_for_save.insert(0, "cod_identificare", cod)
+
+                df_for_save = autofill_functie_upt(df_for_save)
+                table_name_for_save = table_name
+                cols_real = self._get_table_columns(table_name_for_save)
+
+            else:
+                df_raw_original = st.session_state.get(state_key_raw(table_name))
+
+                if isinstance(df_raw_original, pd.DataFrame) and not df_raw_original.empty:
+                    try:
+                        df_for_save = merge_back_control_cols(
+                            df_edit_visible.copy(),
+                            df_raw_original.copy(),
+                        )
+                    except Exception:
+                        df_for_save = df_edit_visible.copy()
+                else:
+                    df_for_save = df_edit_visible.copy()
+
+                if "cod_identificare" in df_for_save.columns:
                     df_for_save["cod_identificare"] = (
                         df_for_save["cod_identificare"]
+                        .fillna(cod)
                         .astype(str)
                         .replace("nan", cod)
                     )
+                    df_for_save.loc[
+                        df_for_save["cod_identificare"].str.strip() == "",
+                        "cod_identificare",
+                    ] = cod
+                else:
+                    df_for_save.insert(0, "cod_identificare", cod)
 
                 table_name_for_save = table_name
                 cols_real = self._get_table_columns(table_name_for_save)
 
-            if table_name == "com_date_financiare" and config.get("uses_fdi_financial", False):
-                df_for_save = df_for_save.drop(columns=["total_buget"], errors="ignore")
+            if not cols_real:
+                continue
 
             for _, row in df_for_save.iterrows():
                 data = row.to_dict()
-                cod_row = data.get("cod_identificare")
+                cod_row = str(data.get("cod_identificare", "") or "").strip()
 
-                if cod_row is None or str(cod_row).strip() == "":
+                if not cod_row:
                     continue
 
-                payload = {k: data.get(k) for k in cols_real if k in data}
-                payload["cod_identificare"] = str(cod_row).strip()
+                payload = {
+                    k: data.get(k)
+                    for k in cols_real
+                    if k in data
+                }
+                payload["cod_identificare"] = cod_row
 
                 items.append(
                     {
@@ -423,13 +410,16 @@ class ContractProiectLikeBuilder:
     ) -> None:
         base_exists = exists_map.get(tabela_baza, False)
 
-        if (
-            actiune == "Modificare / completare fișă existentă"
-            and not base_exists
-        ):
+        if actiune == "Modificare / completare fișă existentă" and not base_exists:
             raise ValueError(
                 "Nu există fișă pentru acest cod în baza de date. "
                 "Alege «Fișă nouă» dacă vrei să creezi."
+            )
+
+        if actiune == "Fișă nouă" and base_exists:
+            raise ValueError(
+                "Există deja o fișă pentru acest cod în baza de date. "
+                "Alege «Modificare / completare fișă existentă» dacă vrei să o editezi."
             )
 
     def _prepare_all_tables_for_editing(
@@ -614,51 +604,20 @@ class ContractProiectLikeBuilder:
         loaded_raw: dict[str, tuple[pd.DataFrame, list[str]]],
         config: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        items: list[dict[str, Any]] = []
+        _ = loaded_raw
+        result_like = {
+            "cod": cod,
+            "tabela_baza": tabela_baza,
+            "config": config,
+            "tabele": [(k, k) for k in edited_data.keys()],
+        }
 
-        for table_name, df_edit_visible in edited_data.items():
-            if df_edit_visible is None or len(df_edit_visible) == 0:
-                continue
-
-            if (
-                table_name == "com_date_financiare"
-                and config.get("uses_fdi_financial", False)
-            ):
-                target_table = tabela_baza
-                cols_real = self._get_table_columns(tabela_baza)
-                df_for_save = df_edit_visible.copy()
-                df_for_save["cod_identificare"] = cod
-                df_for_save = df_for_save.drop(
-                    columns=["total_buget"],
-                    errors="ignore",
-                )
-            else:
-                target_table = table_name
-                cols_real = self._get_table_columns(table_name)
-                df_for_save = df_edit_visible.copy()
-
-                if "cod_identificare" in df_for_save.columns:
-                    df_for_save["cod_identificare"] = cod
-
-            for _, row in df_for_save.iterrows():
-                data = row.to_dict()
-
-                payload = {
-                    k: data.get(k)
-                    for k in cols_real
-                    if k in data
-                }
-
-                payload["cod_identificare"] = cod
-
-                items.append(
-                    {
-                        "table": target_table,
-                        "payload": payload,
-                    }
-                )
-
-        return items
+        return self.collect_items_for_save_from_session(
+            result=result_like,
+            state_key=lambda t: f"df_admin__{t}",
+            state_key_raw=lambda t: f"df_admin_raw__{t}",
+            edited_data=edited_data,
+        )
 
 
 def build_contract_proiect_like(
