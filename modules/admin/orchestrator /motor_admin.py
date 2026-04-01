@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-
 import math
+
 import pandas as pd
 import streamlit as st
 
@@ -59,7 +59,7 @@ def porneste_motorul(supabase):
         except Exception:
             pass
 
-        if isinstance(v, str) and v.strip() == "":
+        if isinstance(v, str) and v.strip().lower() in ("", "nan", "nat", "none"):
             return True
 
         return False
@@ -77,13 +77,13 @@ def porneste_motorul(supabase):
         if isinstance(v, pd.Timestamp):
             if pd.isna(v):
                 return None
-            return v.to_pydatetime().isoformat()
+            return v.strftime("%Y-%m-%d")
 
         if isinstance(v, datetime):
-            return v.isoformat()
+            return v.strftime("%Y-%m-%d")
 
         if isinstance(v, date):
-            return v.isoformat()
+            return v.strftime("%Y-%m-%d")
 
         if hasattr(v, "item"):
             try:
@@ -91,10 +91,27 @@ def porneste_motorul(supabase):
             except Exception:
                 pass
 
+        try:
+            import numpy as np
+
+            if isinstance(v, np.integer):
+                return int(v)
+
+            if isinstance(v, np.floating):
+                v = float(v)
+        except Exception:
+            pass
+
         if isinstance(v, float):
             if math.isnan(v) or math.isinf(v):
                 return None
             return v
+
+        if isinstance(v, str):
+            s = v.strip()
+            if s.lower() in ("nan", "nat", "none", ""):
+                return None
+            return s
 
         return v
 
@@ -161,6 +178,21 @@ def porneste_motorul(supabase):
         ok_any = False
         edit_msg = f"Editat de {operator} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
+        ignore_fields_common = {
+            "cod_identificare",
+            "id_proiect_contract_sursa",
+            "nr_crt",
+            "observatii_idbdc",
+            "data_ultimei_modificari",
+            "validat_idbdc",
+            "status_confirmare",
+            "responsabil_idbdc",
+            "creat_de",
+            "creat_la",
+            "modificat_de",
+            "modificat_la",
+        }
+
         for table_name, payloads in by_table.items():
             try:
                 cols_real = set(get_table_columns(table_name))
@@ -168,6 +200,7 @@ def porneste_motorul(supabase):
                     continue
 
                 clean_payloads = []
+
                 for p in payloads:
                     cod_local = str(p.get("cod_identificare", "")).strip()
                     if not cod_local:
@@ -188,35 +221,52 @@ def porneste_motorul(supabase):
                     cp = cleanup_payload(cp)
                     cp = _sanitize_payload(cp)
 
-                    ignore_fields = {
-                        "cod_identificare",
-                        "id_proiect_contract_sursa",
-                        "observatii_idbdc",
-                        "data_ultimei_modificari",
-                        "validat_idbdc",
-                        "status_confirmare",
-                        "responsabil_idbdc",
-                        "creat_de",
-                        "creat_la",
-                        "modificat_de",
-                        "modificat_la",
+                    cp = {
+                        k: v
+                        for k, v in cp.items()
+                        if not (
+                            isinstance(v, str)
+                            and v.strip().lower() in ("nan", "nat", "none")
+                        )
                     }
 
                     if table_name == "com_date_financiare":
-                        financial_meaningful = _has_meaningful_data(
-                            cp,
-                            ignore_fields=ignore_fields | {"valuta"},
+                        financial_fields = {
+                            k: v for k, v in cp.items()
+                            if k not in ignore_fields_common | {"valuta"}
+                        }
+
+                        has_real_financial_data = any(
+                            v is not None and str(v).strip() not in ("", "nan", "None")
+                            for v in financial_fields.values()
                         )
 
-                        if not financial_meaningful:
+                        if not has_real_financial_data:
                             continue
 
-                        if "valuta" in cols_real and _is_missing(cp.get("valuta")):
-                            cp["valuta"] = "LEI"
+                        if "valuta" in cols_real:
+                            valuta_curenta = cp.get("valuta")
+                            if valuta_curenta is None or str(valuta_curenta).strip() in ("", "nan", "None"):
+                                cp["valuta"] = "LEI"
 
-                    if is_row_effectively_empty(cp):
-                        if not _has_meaningful_data(cp, ignore_fields=ignore_fields):
+                    elif table_name == "com_aspecte_tehnice":
+                        if not _has_meaningful_data(cp, ignore_fields=ignore_fields_common):
                             continue
+
+                    elif table_name == "com_echipe_proiect":
+                        team_ignore = ignore_fields_common | {"persoana_contact", "functie_upt"}
+                        if not _has_meaningful_data(cp, ignore_fields=team_ignore):
+                            continue
+
+                    else:
+                        if is_row_effectively_empty(cp):
+                            continue
+
+                    if is_row_effectively_empty(cp) and not _has_meaningful_data(
+                        cp,
+                        ignore_fields=ignore_fields_common,
+                    ):
+                        continue
 
                     clean_payloads.append(cp)
 
