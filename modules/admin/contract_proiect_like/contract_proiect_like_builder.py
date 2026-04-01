@@ -121,9 +121,6 @@ class ContractProiectLikeBuilder:
         state_key_raw,
         hide_control_cols_callable,
     ) -> None:
-        """
-        Populează session_state fără să piardă tabele auxiliare.
-        """
         cod = result["cod"]
 
         for _, table_name in result["tabele"]:
@@ -151,6 +148,9 @@ class ContractProiectLikeBuilder:
                     else:
                         df_echipa_init.insert(0, "cod_identificare", cod)
 
+                    if "id_proiect_contract_sursa" in df_echipa_init.columns:
+                        df_echipa_init["id_proiect_contract_sursa"] = cod
+
                     if "persoana_contact" in df_echipa_init.columns:
                         df_echipa_init["persoana_contact"] = df_echipa_init["persoana_contact"].apply(
                             lambda v: True
@@ -168,14 +168,6 @@ class ContractProiectLikeBuilder:
         state_key_raw,
         edited_data: dict[str, pd.DataFrame],
     ) -> list[dict[str, Any]]:
-        """
-        Construiește items pentru direct_save_all_tables(...).
-
-        Variantă stabilizată:
-        - pornește din edited_data (grila deja editată),
-        - nu mai depinde de structura internă edited_rows / added_rows / deleted_rows,
-        - păstrează cazul special FDI.
-        """
         items: list[dict[str, Any]] = []
 
         cod = result["cod"]
@@ -226,10 +218,7 @@ class ContractProiectLikeBuilder:
                             df_for_save[c] = None
                         df_for_save.at[df_for_save.index[0], c] = df_edit_visible.iloc[0].get(c)
 
-                if "cod_identificare" in df_for_save.columns:
-                    df_for_save["cod_identificare"] = cod
-                else:
-                    df_for_save.insert(0, "cod_identificare", cod)
+                df_for_save = self._assign_link_fields(df_for_save, cod)
 
                 df_for_save = df_for_save.drop(columns=["total_buget"], errors="ignore")
                 table_name_for_save = tabela_baza
@@ -237,12 +226,7 @@ class ContractProiectLikeBuilder:
 
             elif table_name == "com_echipe_proiect":
                 df_for_save = df_edit_visible.copy()
-
-                if "cod_identificare" in df_for_save.columns:
-                    df_for_save["cod_identificare"] = cod
-                else:
-                    df_for_save.insert(0, "cod_identificare", cod)
-
+                df_for_save = self._assign_link_fields(df_for_save, cod)
                 df_for_save = autofill_functie_upt(df_for_save)
                 table_name_for_save = table_name
                 cols_real = self._get_table_columns(table_name_for_save)
@@ -261,19 +245,7 @@ class ContractProiectLikeBuilder:
                 else:
                     df_for_save = df_edit_visible.copy()
 
-                if "cod_identificare" in df_for_save.columns:
-                    df_for_save["cod_identificare"] = (
-                        df_for_save["cod_identificare"]
-                        .fillna(cod)
-                        .astype(str)
-                        .replace("nan", cod)
-                    )
-                    df_for_save.loc[
-                        df_for_save["cod_identificare"].str.strip() == "",
-                        "cod_identificare",
-                    ] = cod
-                else:
-                    df_for_save.insert(0, "cod_identificare", cod)
+                df_for_save = self._assign_link_fields(df_for_save, cod)
 
                 table_name_for_save = table_name
                 cols_real = self._get_table_columns(table_name_for_save)
@@ -293,7 +265,12 @@ class ContractProiectLikeBuilder:
                     for k in cols_real
                     if k in data
                 }
-                payload["cod_identificare"] = cod_row
+
+                if "cod_identificare" in cols_real:
+                    payload["cod_identificare"] = cod_row
+
+                if "id_proiect_contract_sursa" in cols_real:
+                    payload["id_proiect_contract_sursa"] = cod
 
                 items.append(
                     {
@@ -363,14 +340,33 @@ class ContractProiectLikeBuilder:
         if not cols:
             return pd.DataFrame(), [], False
 
-        res = (
-            self.supabase.table(table_name)
-            .select("*")
-            .eq("cod_identificare", cod)
-            .execute()
-        )
+        data = []
 
-        data = res.data or []
+        try:
+            if "cod_identificare" in cols:
+                res = (
+                    self.supabase.table(table_name)
+                    .select("*")
+                    .eq("cod_identificare", cod)
+                    .execute()
+                )
+                data = res.data or []
+        except Exception:
+            data = []
+
+        if not data:
+            try:
+                if "id_proiect_contract_sursa" in cols:
+                    res = (
+                        self.supabase.table(table_name)
+                        .select("*")
+                        .eq("id_proiect_contract_sursa", cod)
+                        .execute()
+                    )
+                    data = res.data or []
+            except Exception:
+                data = []
+
         df = pd.DataFrame(data)
 
         if df.empty:
@@ -465,6 +461,8 @@ class ContractProiectLikeBuilder:
                         cat_admin=cat_admin,
                         tip_admin=tip_admin,
                     )
+                else:
+                    df_full = self._assign_link_fields(df_full, cod)
 
             df_for_editor = prepare_contract_proiect_like_df_for_editor(
                 table_name=table_name,
@@ -518,12 +516,13 @@ class ContractProiectLikeBuilder:
             )
 
         if df_fin.empty and cols_fin:
-            return prepare_empty_single_row(cols_fin, cod)
+            df_out = prepare_empty_single_row(cols_fin, cod)
+        elif df_fin.empty:
+            df_out = pd.DataFrame([{"cod_identificare": cod}])
+        else:
+            df_out = df_fin.copy()
 
-        if df_fin.empty:
-            return pd.DataFrame([{"cod_identificare": cod}])
-
-        return df_fin.copy()
+        return self._assign_link_fields(df_out, cod)
 
     def _prepare_tehnic_df(
         self,
@@ -537,12 +536,14 @@ class ContractProiectLikeBuilder:
             (pd.DataFrame(), []),
         )
 
-        return prepare_contract_proiect_like_tehnic_for_editor(
+        df_out = prepare_contract_proiect_like_tehnic_for_editor(
             df_tehnic_source=df_tehnic,
             cols_tehnic=cols_tehnic,
             cod=cod,
             config=config,
         )
+
+        return self._assign_link_fields(df_out, cod)
 
     def _autofill_base_table_fields(
         self,
@@ -565,6 +566,28 @@ class ContractProiectLikeBuilder:
                 .fillna("")
                 .astype(str)
             )
+
+        return out
+
+    def _assign_link_fields(
+        self,
+        df: pd.DataFrame,
+        cod: str,
+    ) -> pd.DataFrame:
+        out = df.copy()
+
+        if "cod_identificare" in out.columns:
+            out["cod_identificare"] = (
+                out["cod_identificare"]
+                .fillna(cod)
+                .astype(str)
+            )
+            out.loc[out["cod_identificare"].str.strip() == "", "cod_identificare"] = cod
+        else:
+            out.insert(0, "cod_identificare", cod)
+
+        if "id_proiect_contract_sursa" in out.columns:
+            out["id_proiect_contract_sursa"] = cod
 
         return out
 
