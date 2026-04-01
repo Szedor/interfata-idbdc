@@ -1,5 +1,3 @@
-# modules/admin/contract_proiect_like/contract_proiect_like_builder.py
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,6 +6,10 @@ from typing import Any
 import pandas as pd
 
 from modules.admin.admin_helpers import prepare_empty_single_row
+from modules.admin.contract_proiect_like.contract_proiect_like_column_config import (
+    build_contract_proiect_like_column_config,
+    prepare_contract_proiect_like_df_for_editor,
+)
 from modules.admin.contract_proiect_like.contract_proiect_like_config import (
     CONTRACT_PROIECT_LIKE_TYPES,
 )
@@ -48,10 +50,6 @@ class ContractProiectLikeBuilder:
     def __init__(self, supabase: Any):
         self.supabase = supabase
 
-    # =========================================================
-    # API public
-    # =========================================================
-
     def build(
         self,
         *,
@@ -64,12 +62,13 @@ class ContractProiectLikeBuilder:
         """
         Returnează o structură intermediară pentru orchestrator / UI.
 
-        Builderul NU face aici render Streamlit.
+        Builderul NU face render Streamlit.
         El pregătește:
           - config-ul rezolvat
           - tabelele active
           - datele încărcate
           - dataframes pregătite pentru editare
+          - column_config pentru fiecare tabel
           - metadate pentru save/validate
         """
         ctx = ContractProiectLikeContext(
@@ -123,15 +122,10 @@ class ContractProiectLikeBuilder:
             "base_exists": exists_map.get(tabela_baza, False),
         }
 
-    # =========================================================
-    # Config / rezolvare tip
-    # =========================================================
-
     def _normalize_entity_type(self, entity_type: str) -> str:
         value = (entity_type or "").strip().lower()
 
         aliases = {
-            "contract": "cep",   # fallback conservator; orchestratorul final va trimite explicit tipul
             "cep": "cep",
             "terti": "terti",
             "speciale": "speciale",
@@ -143,7 +137,9 @@ class ContractProiectLikeBuilder:
         }
 
         if value not in aliases:
-            raise ValueError(f"Entity type invalid pentru ContractProiectLikeBuilder: {entity_type}")
+            raise ValueError(
+                f"Entity type invalid pentru ContractProiectLikeBuilder: {entity_type}"
+            )
 
         return aliases[value]
 
@@ -155,12 +151,10 @@ class ContractProiectLikeBuilder:
     def _resolve_tabs(self, config: dict[str, Any]) -> list[tuple[str, str]]:
         tabs = config.get("tabs") or []
         if not tabs:
-            raise ValueError("Config invalid: lipsesc tab-urile pentru contract_proiect_like")
+            raise ValueError(
+                "Config invalid: lipsesc tab-urile pentru contract_proiect_like"
+            )
         return tabs
-
-    # =========================================================
-    # Încărcare DB
-    # =========================================================
 
     def _get_table_columns(self, table_name: str) -> list[str]:
         try:
@@ -219,10 +213,6 @@ class ContractProiectLikeBuilder:
                 "Alege «Fișă nouă» dacă vrei să creezi."
             )
 
-    # =========================================================
-    # Pregătire DF pentru editare
-    # =========================================================
-
     def _prepare_all_tables_for_editing(
         self,
         *,
@@ -233,36 +223,50 @@ class ContractProiectLikeBuilder:
         tip_admin: str,
         loaded: dict[str, tuple[pd.DataFrame, list[str]]],
         config: dict[str, Any],
-    ) -> dict[str, pd.DataFrame]:
-        prepared: dict[str, pd.DataFrame] = {}
+    ) -> dict[str, dict[str, Any]]:
+        prepared: dict[str, dict[str, Any]] = {}
 
         for _, table_name in tabele:
             df, cols = loaded[table_name]
 
             if table_name == "com_date_financiare":
-                prepared[table_name] = self._prepare_financial_df(
+                df_full = self._prepare_financial_df(
                     cod=cod,
                     tabela_baza=tabela_baza,
                     loaded=loaded,
                     config=config,
                 )
-                continue
-
-            if df.empty and cols:
-                df_full = prepare_empty_single_row(cols, cod)
-            elif df.empty:
-                df_full = pd.DataFrame([{"cod_identificare": cod}])
             else:
-                df_full = df.copy()
+                if df.empty and cols:
+                    df_full = prepare_empty_single_row(cols, cod)
+                elif df.empty:
+                    df_full = pd.DataFrame([{"cod_identificare": cod}])
+                else:
+                    df_full = df.copy()
 
-            if table_name == tabela_baza:
-                df_full = self._autofill_base_table_fields(
-                    df=df_full,
-                    cat_admin=cat_admin,
-                    tip_admin=tip_admin,
-                )
+                if table_name == tabela_baza:
+                    df_full = self._autofill_base_table_fields(
+                        df=df_full,
+                        cat_admin=cat_admin,
+                        tip_admin=tip_admin,
+                    )
 
-            prepared[table_name] = df_full
+            df_for_editor = prepare_contract_proiect_like_df_for_editor(
+                table_name=table_name,
+                df=df_full,
+            )
+
+            column_config = build_contract_proiect_like_column_config(
+                table_name=table_name,
+                df=df_for_editor,
+                tabela_baza_ctx=tabela_baza,
+                load_dropdown_options_callable=self._load_dropdown_options,
+            )
+
+            prepared[table_name] = {
+                "df": df_for_editor,
+                "column_config": column_config,
+            }
 
         return prepared
 
@@ -305,15 +309,6 @@ class ContractProiectLikeBuilder:
         cat_admin: str,
         tip_admin: str,
     ) -> pd.DataFrame:
-        """
-        Păstrează logica deja existentă din motor:
-          - denumire_categorie se auto-completează din selecția de sus
-          - acronim_contracte_proiecte se auto-completează din selecția de sus
-
-        În această fază punem valoarea selectată direct.
-        Dacă ai deja un resolver bazat pe nomenclatoare, îl poți muta ulterior aici
-        fără să schimbi contractul builderului.
-        """
         out = df.copy()
 
         if "denumire_categorie" in out.columns and cat_admin:
@@ -327,9 +322,25 @@ class ContractProiectLikeBuilder:
 
         return out
 
-    # =========================================================
-    # Helper pentru salvare ulterioară
-    # =========================================================
+    def _load_dropdown_options(self, source_table: str, source_col: str) -> list[str]:
+        try:
+            res = self.supabase.table(source_table).select(source_col).execute()
+            rows = res.data or []
+
+            values = []
+            for row in rows:
+                value = row.get(source_col)
+                if value is None:
+                    continue
+
+                value_str = str(value).strip()
+                if value_str:
+                    values.append(value_str)
+
+            return sorted(list(set(values)))
+
+        except Exception:
+            return []
 
     def build_items_for_save(
         self,
@@ -384,10 +395,6 @@ def build_contract_proiect_like(
     cat_admin: str,
     tip_admin: str,
 ) -> dict[str, Any]:
-    """
-    Wrapper procedural pentru orchestrator, dacă vrei apel simplu:
-        result = build_contract_proiect_like(...)
-    """
     builder = ContractProiectLikeBuilder(supabase)
     return builder.build(
         cod=cod,
