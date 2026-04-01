@@ -16,6 +16,9 @@ from modules.admin.contract_proiect_like.contract_proiect_like_config import (
 from modules.admin.contract_proiect_like.contract_proiect_like_financiar import (
     build_contract_proiect_like_financial_df,
 )
+from modules.admin.contract_proiect_like.contract_proiect_like_tehnic import (
+    prepare_contract_proiect_like_tehnic_for_editor,
+)
 
 
 @dataclass(frozen=True)
@@ -39,12 +42,6 @@ class ContractProiectLikeBuilder:
       - INTERREG
       - NONEU
       - SEE
-
-    Etapa 4:
-      - nu schimbă payload-urile;
-      - nu schimbă numele câmpurilor;
-      - nu schimbă schema DB;
-      - mută într-un loc comun logica de selecție / încărcare / pregătire.
     """
 
     def __init__(self, supabase: Any):
@@ -59,18 +56,6 @@ class ContractProiectLikeBuilder:
         cat_admin: str,
         tip_admin: str,
     ) -> dict[str, Any]:
-        """
-        Returnează o structură intermediară pentru orchestrator / UI.
-
-        Builderul NU face render Streamlit.
-        El pregătește:
-          - config-ul rezolvat
-          - tabelele active
-          - datele încărcate
-          - dataframes pregătite pentru editare
-          - column_config pentru fiecare tabel
-          - metadate pentru save/validate
-        """
         ctx = ContractProiectLikeContext(
             supabase=self.supabase,
             cod=str(cod).strip(),
@@ -158,17 +143,36 @@ class ContractProiectLikeBuilder:
 
     def _get_table_columns(self, table_name: str) -> list[str]:
         try:
-            res = self.supabase.rpc("idbdc_get_columns", {"p_table": table_name}).execute()
-            return [r["column_name"] for r in (res.data or []) if r.get("column_name")]
+            res = self.supabase.rpc(
+                "idbdc_get_columns",
+                {"p_table": table_name},
+            ).execute()
+
+            return [
+                r["column_name"]
+                for r in (res.data or [])
+                if r.get("column_name")
+            ]
         except Exception:
             return []
 
-    def _load_single_row(self, table_name: str, cod: str) -> tuple[pd.DataFrame, list[str], bool]:
+    def _load_single_row(
+        self,
+        table_name: str,
+        cod: str,
+    ) -> tuple[pd.DataFrame, list[str], bool]:
         cols = self._get_table_columns(table_name)
+
         if not cols:
             return pd.DataFrame(), [], False
 
-        res = self.supabase.table(table_name).select("*").eq("cod_identificare", cod).execute()
+        res = (
+            self.supabase.table(table_name)
+            .select("*")
+            .eq("cod_identificare", cod)
+            .execute()
+        )
+
         data = res.data or []
         df = pd.DataFrame(data)
 
@@ -179,6 +183,7 @@ class ContractProiectLikeBuilder:
         for c in cols:
             if c not in df.columns:
                 df[c] = None
+
         df = df[cols]
 
         return df, cols, True
@@ -207,7 +212,11 @@ class ContractProiectLikeBuilder:
         exists_map: dict[str, bool],
     ) -> None:
         base_exists = exists_map.get(tabela_baza, False)
-        if actiune == "Modificare / completare fișă existentă" and not base_exists:
+
+        if (
+            actiune == "Modificare / completare fișă existentă"
+            and not base_exists
+        ):
             raise ValueError(
                 "Nu există fișă pentru acest cod în baza de date. "
                 "Alege «Fișă nouă» dacă vrei să creezi."
@@ -233,6 +242,12 @@ class ContractProiectLikeBuilder:
                 df_full = self._prepare_financial_df(
                     cod=cod,
                     tabela_baza=tabela_baza,
+                    loaded=loaded,
+                    config=config,
+                )
+            elif table_name == "com_aspecte_tehnice":
+                df_full = self._prepare_tehnic_df(
+                    cod=cod,
                     loaded=loaded,
                     config=config,
                 )
@@ -278,8 +293,15 @@ class ContractProiectLikeBuilder:
         loaded: dict[str, tuple[pd.DataFrame, list[str]]],
         config: dict[str, Any],
     ) -> pd.DataFrame:
-        df_fin, cols_fin = loaded.get("com_date_financiare", (pd.DataFrame(), []))
-        df_base, cols_base = loaded.get(tabela_baza, (pd.DataFrame(), []))
+        df_fin, cols_fin = loaded.get(
+            "com_date_financiare",
+            (pd.DataFrame(), []),
+        )
+
+        df_base, cols_base = loaded.get(
+            tabela_baza,
+            (pd.DataFrame(), []),
+        )
 
         if config.get("uses_fdi_financial", False):
             if df_base.empty and cols_base:
@@ -297,10 +319,30 @@ class ContractProiectLikeBuilder:
 
         if df_fin.empty and cols_fin:
             return prepare_empty_single_row(cols_fin, cod)
+
         if df_fin.empty:
             return pd.DataFrame([{"cod_identificare": cod}])
 
         return df_fin.copy()
+
+    def _prepare_tehnic_df(
+        self,
+        *,
+        cod: str,
+        loaded: dict[str, tuple[pd.DataFrame, list[str]]],
+        config: dict[str, Any],
+    ) -> pd.DataFrame:
+        df_tehnic, cols_tehnic = loaded.get(
+            "com_aspecte_tehnice",
+            (pd.DataFrame(), []),
+        )
+
+        return prepare_contract_proiect_like_tehnic_for_editor(
+            df_tehnic_source=df_tehnic,
+            cols_tehnic=cols_tehnic,
+            cod=cod,
+            config=config,
+        )
 
     def _autofill_base_table_fields(
         self,
@@ -318,22 +360,33 @@ class ContractProiectLikeBuilder:
             out["acronim_contracte_proiecte"] = tip_admin
 
         if "cod_identificare" in out.columns:
-            out["cod_identificare"] = out["cod_identificare"].fillna("").astype(str)
+            out["cod_identificare"] = (
+                out["cod_identificare"]
+                .fillna("")
+                .astype(str)
+            )
 
         return out
 
-    def _load_dropdown_options(self, source_table: str, source_col: str) -> list[str]:
+    def _load_dropdown_options(
+        self,
+        source_table: str,
+        source_col: str,
+    ) -> list[str]:
         try:
             res = self.supabase.table(source_table).select(source_col).execute()
             rows = res.data or []
 
             values = []
+
             for row in rows:
                 value = row.get(source_col)
+
                 if value is None:
                     continue
 
                 value_str = str(value).strip()
+
                 if value_str:
                     values.append(value_str)
 
@@ -351,37 +404,49 @@ class ContractProiectLikeBuilder:
         loaded_raw: dict[str, tuple[pd.DataFrame, list[str]]],
         config: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        """
-        Pregătește payload-urile brute pentru direct_save_all_tables(...) din motor.
-
-        În Etapa 4 îl lăsăm minimal:
-          - pentru FDI, financiarul se salvează în tabela de bază;
-          - pentru restul, fiecare tab se salvează în tabela lui.
-        """
         items: list[dict[str, Any]] = []
 
         for table_name, df_edit_visible in edited_data.items():
             if df_edit_visible is None or len(df_edit_visible) == 0:
                 continue
 
-            if table_name == "com_date_financiare" and config.get("uses_fdi_financial", False):
+            if (
+                table_name == "com_date_financiare"
+                and config.get("uses_fdi_financial", False)
+            ):
                 target_table = tabela_baza
                 cols_real = self._get_table_columns(tabela_baza)
                 df_for_save = df_edit_visible.copy()
                 df_for_save["cod_identificare"] = cod
-                df_for_save = df_for_save.drop(columns=["total_buget"], errors="ignore")
+                df_for_save = df_for_save.drop(
+                    columns=["total_buget"],
+                    errors="ignore",
+                )
             else:
                 target_table = table_name
                 cols_real = self._get_table_columns(table_name)
                 df_for_save = df_edit_visible.copy()
+
                 if "cod_identificare" in df_for_save.columns:
                     df_for_save["cod_identificare"] = cod
 
             for _, row in df_for_save.iterrows():
                 data = row.to_dict()
-                payload = {k: data.get(k) for k in cols_real if k in data}
+
+                payload = {
+                    k: data.get(k)
+                    for k in cols_real
+                    if k in data
+                }
+
                 payload["cod_identificare"] = cod
-                items.append({"table": target_table, "payload": payload})
+
+                items.append(
+                    {
+                        "table": target_table,
+                        "payload": payload,
+                    }
+                )
 
         return items
 
@@ -396,6 +461,7 @@ def build_contract_proiect_like(
     tip_admin: str,
 ) -> dict[str, Any]:
     builder = ContractProiectLikeBuilder(supabase)
+
     return builder.build(
         cod=cod,
         actiune=actiune,
