@@ -74,6 +74,12 @@ def porneste_motorul(supabase):
         except Exception:
             pass
 
+        if hasattr(v, "item"):
+            try:
+                v = v.item()
+            except Exception:
+                pass
+
         if isinstance(v, pd.Timestamp):
             if pd.isna(v):
                 return None
@@ -84,12 +90,6 @@ def porneste_motorul(supabase):
 
         if isinstance(v, date):
             return v.strftime("%Y-%m-%d")
-
-        if hasattr(v, "item"):
-            try:
-                v = v.item()
-            except Exception:
-                pass
 
         try:
             import numpy as np
@@ -232,7 +232,8 @@ def porneste_motorul(supabase):
 
                     if table_name == "com_date_financiare":
                         financial_fields = {
-                            k: v for k, v in cp.items()
+                            k: v
+                            for k, v in cp.items()
                             if k not in ignore_fields_common | {"valuta"}
                         }
 
@@ -713,5 +714,3 @@ def porneste_motorul(supabase):
             except Exception as e:
                 st.session_state["admin_msg"] = ("error", f"Eroare la ștergere: {e}")
                 st.rerun()
-        else:
-            st.info("Bifează confirmarea și tastează exact codul pentru a executa ștergerea.")
