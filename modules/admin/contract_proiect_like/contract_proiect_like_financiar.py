@@ -1,4 +1,3 @@
-```python
 # modules/admin/contract_proiect_like/contract_proiect_like_financiar.py
 
 from __future__ import annotations
@@ -66,6 +65,7 @@ def build_standard_financial_df(
     Dacă nu există date:
       - folosește prepare_empty_single_row(...)
       - fallback minimal cu cod_identificare
+    🔧 FIX: adaugă valuta default "LEI" dacă coloana există
     """
     cols_fin = cols_fin or []
 
@@ -78,6 +78,10 @@ def build_standard_financial_df(
 
     if "cod_identificare" in df_out.columns:
         df_out["cod_identificare"] = cod
+
+    # 🔧 FIX: valuta default
+    if "valuta" in df_out.columns:
+        df_out["valuta"] = df_out["valuta"].fillna("LEI")
 
     return df_out
 
@@ -137,4 +141,3 @@ def get_fdi_base_priority_fields() -> list[str]:
     înainte de randare sau salvare.
     """
     return FDI_BASE_PRIORITY_FIELDS.copy()
-```
