@@ -237,10 +237,9 @@ class ContractProiectLikeBuilder:
                 if "id_proiect_contract_sursa" in cols_real:
                     payload["id_proiect_contract_sursa"] = cod
 
-                # sanitizare finală
+                # Sanitizare
                 payload = {k: _json_safe_value(v) for k, v in payload.items()}
 
-                # valuta default
                 if table_name_for_save == "com_date_financiare" and payload.get("valuta") is None:
                     payload["valuta"] = "LEI"
 
