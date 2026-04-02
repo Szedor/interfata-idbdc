@@ -33,23 +33,6 @@ def porneste_motorul(supabase):
 
     is_admin = st.session_state.get("operator_rol") == "ADMIN"
 
-    # Populează harta funcții UPT o singură dată per sesiune
-    if "_cache_functie_map" not in st.session_state:
-        try:
-            res = supabase.table("det_resurse_umane") \
-                .select("nume_prenume,acronim_functie_upt,acronim_departament") \
-                .execute()
-            functie_map = {}
-            for r in (res.data or []):
-                if r.get("nume_prenume"):
-                    functie_map[r["nume_prenume"]] = {
-                        "functie_upt": r.get("acronim_functie_upt", "") or "",
-                        "acronim_departament": r.get("acronim_departament", "") or "",
-                    }
-            st.session_state["_cache_functie_map"] = functie_map
-        except Exception:
-            st.session_state["_cache_functie_map"] = {}
-
     def get_table_columns(table_name: str) -> list[str]:
         try:
             res = supabase.rpc(
@@ -634,11 +617,22 @@ def porneste_motorul(supabase):
                 key=f"editor_{table_name}_{cod}",
             )
 
-            edited_data[table_name] = edited_df.copy()
-            st.session_state[state_key(table_name)] = edited_df.copy()
+            # Dacă editorul a returnat date (tab activ), salvăm în state.
+            # Dacă tab-ul nu era activ, editorul returnează gol — păstrăm ce era în state.
+            df_in_state = st.session_state.get(state_key(table_name))
+            if not edited_df.empty or (df_in_state is not None and df_in_state.empty):
+                st.session_state[state_key(table_name)] = edited_df.copy()
+                edited_data[table_name] = edited_df.copy()
+            else:
+                edited_data[table_name] = df_in_state.copy() if df_in_state is not None else edited_df.copy()
 
             if table_name == "com_echipe_proiect":
-                st.session_state[f"echipa_reunited_{cod}"] = edited_df.copy()
+                echipa_key = f"echipa_reunited_{cod}"
+                df_echipa = edited_data[table_name]
+                if not df_echipa.empty:
+                    st.session_state[echipa_key] = df_echipa.copy()
+                elif echipa_key not in st.session_state:
+                    st.session_state[echipa_key] = df_echipa.copy()
 
     st.divider()
 
