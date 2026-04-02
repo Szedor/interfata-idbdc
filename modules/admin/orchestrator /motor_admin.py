@@ -9,42 +9,58 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from modules.admin.admin_helpers import append_observatii, cleanup_payload, now_iso
+from modules.admin.admin_helpers import append_observatii, cleanup_payload, now_iso, sanitize_payload
 from modules.admin.contract_proiect_like.contract_proiect_like_builder import (
     build_contract_proiect_like,
     ContractProiectLikeBuilder,
 )
 
 
-def _json_safe_value(v: Any) -> Any:
-    """Convertește orice valoare în format JSON-serializable."""
-    if v is None:
-        return None
-    try:
-        if pd.isna(v):
-            return None
-    except Exception:
-        pass
-    if isinstance(v, (datetime, date)):
-        return v.strftime("%Y-%m-%d")
-    if isinstance(v, pd.Timestamp):
-        if pd.isna(v):
-            return None
-        return v.strftime("%Y-%m-%d")
-    if isinstance(v, float):
-        if math.isnan(v) or math.isinf(v):
-            return None
-    return v
-
-
-def _sanitize_payload(payload: dict[str, Any], table_name: str = "") -> dict[str, Any]:
-    """Sanitizează un payload înainte de trimitere la Supabase."""
+def _has_meaningful_data(payload: dict[str, Any], table_name: str) -> bool:
+    """Verifică dacă payload-ul are date reale (nu doar cod_identificare și câmpuri goale)."""
     if not payload:
-        return {}
-    result = {k: _json_safe_value(v) for k, v in payload.items()}
-    if table_name == "com_date_financiare" and result.get("valuta") is None:
-        result["valuta"] = "LEI"
-    return result
+        return False
+    
+    # Câmpuri care nu contează pentru verificare
+    skip_fields = {"cod_identificare", "id_proiect_contract_sursa", "nr_crt", 
+                   "responsabil_idbdc", "observatii_idbdc", "status_confirmare",
+                   "data_ultimei_modificari", "validat_idbdc", "creat_de", 
+                   "creat_la", "modificat_de", "modificat_la"}
+    
+    for k, v in payload.items():
+        if k in skip_fields:
+            continue
+        if v is None:
+            continue
+        if isinstance(v, str) and v.strip() == "":
+            continue
+        # Are date reale
+        return True
+    
+    # Pentru com_date_financiare, dacă nu are niciun câmp financiar completat, nu salvăm
+    if table_name == "com_date_financiare":
+        financial_fields = ["valoare_totala_contract", "valoare_anuala_contract", "cost_total_proiect",
+                           "cost_proiect_upt", "suma_solicitata", "suma_aprobata_mec", 
+                           "cofinantare_totala_contract", "cofinantare_anuala_contract"]
+        for f in financial_fields:
+            if payload.get(f) is not None and str(payload.get(f)).strip() not in ("", "None", "nan"):
+                return True
+        return False
+    
+    # Pentru com_aspecte_tehnice, dacă nu are nimic, nu salvăm
+    if table_name == "com_aspecte_tehnice":
+        technical_fields = ["obiectiv_general", "obiective_specifice", "activitati_proiect", "rezultate_proiect"]
+        for f in technical_fields:
+            if payload.get(f) is not None and str(payload.get(f)).strip() not in ("", "None", "nan"):
+                return True
+        return False
+    
+    # Pentru com_echipe_proiect, dacă nu are membri, nu salvăm
+    if table_name == "com_echipe_proiect":
+        if payload.get("nume_prenume") is None or str(payload.get("nume_prenume")).strip() == "":
+            return False
+    
+    return True
 
 
 def porneste_motorul(supabase):
@@ -113,8 +129,12 @@ def porneste_motorul(supabase):
                         cp["observatii_idbdc"] = append_observatii(cp.get("observatii_idbdc"), edit_msg)
 
                     cp = cleanup_payload(cp)
-                    cp = _sanitize_payload(cp, table_name)
-
+                    cp = sanitize_payload(cp, table_name)
+                    
+                    # Verifică dacă are date reale înainte de salvare
+                    if not _has_meaningful_data(cp, table_name):
+                        continue
+                        
                     if not cp:
                         continue
                     clean_payloads.append(cp)
@@ -182,7 +202,7 @@ def porneste_motorul(supabase):
                     except Exception:
                         payload["observatii_idbdc"] = msg
                 payload = cleanup_payload(payload)
-                payload = _sanitize_payload(payload, t)
+                payload = sanitize_payload(payload, t)
                 if not payload:
                     continue
                 supabase.table(t).update(payload).eq("cod_identificare", cod).execute()
@@ -275,15 +295,6 @@ def porneste_motorul(supabase):
                 st.warning("Nu ati selectat tipul de proiect.")
 
     st.divider()
-
-    if cat_admin in ("Contracte", "Proiecte"):
-        tabela_baza = None
-    elif cat_admin == "Evenimente stiintifice":
-        tabela_baza = "base_evenimente_stiintifice"
-    elif cat_admin == "Proprietate intelectuala":
-        tabela_baza = "base_prop_intelect"
-    else:
-        tabela_baza = None
 
     if cat_admin not in ("Contracte", "Proiecte"):
         st.info("În această versiune, doar Contracte și Proiecte sunt active.")
