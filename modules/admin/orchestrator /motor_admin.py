@@ -68,39 +68,49 @@ def porneste_motorul(supabase):
         if v is None:
             return None
 
+        # numpy types - convertim mai intai
+        try:
+            import numpy as np
+            if isinstance(v, np.integer):
+                return int(v)
+            if isinstance(v, np.floating):
+                if np.isnan(v) or np.isinf(v):
+                    return None
+                return float(v)
+            if isinstance(v, (np.bool_,)):
+                return bool(v)
+        except Exception:
+            pass
+
+        # pd.isna - prinde NaN, NaT, None din pandas
         try:
             if pd.isna(v):
                 return None
         except Exception:
             pass
 
+        # numpy item() - extrage valoarea scalara
         if hasattr(v, "item"):
             try:
                 v = v.item()
             except Exception:
                 pass
 
+        # Timestamp pandas
         if isinstance(v, pd.Timestamp):
-            if pd.isna(v):
-                return None
+            try:
+                if pd.isna(v):
+                    return None
+            except Exception:
+                pass
             return v.strftime("%Y-%m-%d")
 
+        # IMPORTANT: datetime inainte de date (datetime e subclasa a date)
         if isinstance(v, datetime):
             return v.strftime("%Y-%m-%d")
 
         if isinstance(v, date):
             return v.strftime("%Y-%m-%d")
-
-        try:
-            import numpy as np
-
-            if isinstance(v, np.integer):
-                return int(v)
-
-            if isinstance(v, np.floating):
-                v = float(v)
-        except Exception:
-            pass
 
         if isinstance(v, float):
             if math.isnan(v) or math.isinf(v):
@@ -217,6 +227,12 @@ def porneste_motorul(supabase):
                             cp.get("observatii_idbdc"),
                             edit_msg,
                         )
+
+                    # Fix valuta inainte de cleanup (cleanup elimina None)
+                    if table_name == "com_date_financiare" and "valuta" in cols_real:
+                        valuta_val = cp.get("valuta")
+                        if valuta_val is None or str(valuta_val).strip().lower() in ("", "nan", "none"):
+                            cp["valuta"] = "LEI"
 
                     cp = cleanup_payload(cp)
                     cp = _sanitize_payload(cp)
