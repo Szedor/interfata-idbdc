@@ -190,8 +190,15 @@ class ContractProiectLikeBuilder:
                 echipa_key = f"echipa_reunited_{cod}"
                 df_edit_visible = st.session_state.get(echipa_key, df_edit_visible).copy()
 
+            # Nu sărim peste tabel dacă are rânduri cu cod_identificare valid
+            # (rânduri nou introduse de utilizator)
             if df_edit_visible.empty:
-                continue
+                # Verificăm și în session_state dacă nu cumva există date salvate
+                _sk = state_key(table_name)
+                _df_state = st.session_state.get(_sk)
+                if _df_state is None or _df_state.empty:
+                    continue
+                df_edit_visible = _df_state.copy()
 
             if table_name == "com_date_financiare" and config.get("uses_fdi_financial", False):
                 df_for_save = st.session_state.get(
