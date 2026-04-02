@@ -223,6 +223,86 @@ def cleanup_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+CONTROL_COLS = [
+    "responsabil_idbdc",
+    "observatii_idbdc",
+    "status_confirmare",
+    "data_ultimei_modificari",
+    "validat_idbdc",
+]
+
+
+def merge_back_control_cols(
+    df_edited: pd.DataFrame,
+    df_original: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Reunește df_edited (ce a văzut și editat utilizatorul) cu df_original
+    (care conține coloanele de control ascunse: audit, status, observații).
+
+    Fără această funcție, coloanele de control se pierd la salvare.
+    """
+    out = df_edited.copy()
+
+    for c in CONTROL_COLS:
+        if c in df_original.columns:
+            if c not in out.columns:
+                out[c] = None
+            try:
+                vals = list(df_original[c]) + [None] * max(0, len(out) - len(df_original))
+                out[c] = vals[: len(out)]
+            except Exception:
+                out[c] = df_original[c].iloc[0] if len(df_original) else None
+
+    for c in df_original.columns:
+        if c not in out.columns:
+            out[c] = df_original[c]
+
+    try:
+        out = out[df_original.columns]
+    except Exception:
+        pass
+
+    return out
+
+
+def autofill_functie_upt(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Completează automat coloana 'functie_upt' (și 'acronim_departament')
+    pe baza câmpului 'nume_prenume', consultând tabelul det_resurse_umane
+    prin cache-ul din session_state (dacă există).
+
+    Dacă harta nu e disponibilă, returnează df neschimbat — nu crapă.
+    """
+    if "nume_prenume" not in df.columns:
+        return df
+
+    import streamlit as st
+
+    functie_map: dict = st.session_state.get("_cache_functie_map", {})
+
+    if not functie_map:
+        return df
+
+    has_functie = "functie_upt" in df.columns
+    has_dept = "acronim_departament" in df.columns
+
+    for idx, row in df.iterrows():
+        nume = row.get("nume_prenume")
+        if nume and str(nume).strip():
+            info = functie_map.get(str(nume).strip(), {})
+            if has_functie:
+                functie = info.get("functie_upt", "")
+                if functie:
+                    df.at[idx, "functie_upt"] = functie
+            if has_dept:
+                dept = info.get("acronim_departament", "")
+                if dept:
+                    df.at[idx, "acronim_departament"] = dept
+
+    return df
+
+
 def build_fdi_financial_df(
     df_source: pd.DataFrame,
     cod: str,
