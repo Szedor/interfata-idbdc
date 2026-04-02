@@ -1,3 +1,5 @@
+# modules/admin/contract_proiect_like/contract_proiect_like_tehnic.py
+
 from __future__ import annotations
 
 from typing import Any
@@ -5,6 +7,18 @@ from typing import Any
 import pandas as pd
 
 from modules.admin.admin_helpers import prepare_empty_single_row
+
+
+def _sanitize_nan(v: Any) -> Any:
+    """Înlocuiește NaN cu None."""
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+    return v
 
 
 def build_contract_proiect_like_tehnic_df(
@@ -25,12 +39,9 @@ def build_contract_proiect_like_tehnic_df(
       - NONEU
       - SEE
 
-    În Etapa 4 păstrăm comportamentul conservator:
-      - dacă există date, le returnăm ca atare;
-      - dacă nu există date, pregătim un singur rând gol;
-      - nu schimbăm schema și nu introducem logică nouă de business.
+    🔧 FIX: elimină NaN din DataFrame înainte de returnare
     """
-    _ = config  # păstrat pentru extinderi ulterioare, fără a schimba semnătura
+    _ = config  # păstrat pentru extinderi ulterioare
 
     cols_tehnic = cols_tehnic or []
 
@@ -44,6 +55,9 @@ def build_contract_proiect_like_tehnic_df(
     if "cod_identificare" in df_out.columns:
         df_out["cod_identificare"] = cod
 
+    # 🔧 FIX: înlocuiește NaN cu None în întregul DataFrame
+    df_out = df_out.applymap(_sanitize_nan)
+
     return df_out
 
 
@@ -53,12 +67,15 @@ def normalize_contract_proiect_like_tehnic_df(
 ) -> pd.DataFrame:
     """
     Normalizare minimă, non-invazivă, pentru editor.
-    În această etapă nu modificăm tipuri sau valori în mod agresiv.
+    🔧 FIX: elimină NaN înainte de randare
     """
     out = df.copy()
 
     if "cod_identificare" in out.columns:
         out["cod_identificare"] = out["cod_identificare"].fillna("").astype(str)
+
+    # 🔧 FIX: înlocuiește NaN cu None
+    out = out.applymap(_sanitize_nan)
 
     return out
 
