@@ -1,6 +1,9 @@
+# modules/admin/contract_proiect_like/contract_proiect_like_builder.py
+
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
@@ -25,6 +28,42 @@ from modules.admin.contract_proiect_like.contract_proiect_like_financiar import 
 from modules.admin.contract_proiect_like.contract_proiect_like_tehnic import (
     prepare_contract_proiect_like_tehnic_for_editor,
 )
+
+
+def _json_safe_value(v: Any) -> Any:
+    """Convertește orice valoare într-un format JSON-serializable."""
+    if v is None:
+        return None
+
+    # Pandas NaN
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+
+    # Datetime / Date → string ISO
+    if isinstance(v, (datetime, date)):
+        return v.strftime("%Y-%m-%d")
+
+    # Timestamp pandas
+    if isinstance(v, pd.Timestamp):
+        if pd.isna(v):
+            return None
+        return v.strftime("%Y-%m-%d")
+
+    # Float infinit
+    if isinstance(v, float):
+        import math
+        if math.isnan(v) or math.isinf(v):
+            return None
+
+    return v
+
+
+def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Curăță payload-ul pentru a fi JSON-serializable."""
+    return {k: _json_safe_value(v) for k, v in (payload or {}).items()}
 
 
 @dataclass(frozen=True)
@@ -190,15 +229,8 @@ class ContractProiectLikeBuilder:
                 echipa_key = f"echipa_reunited_{cod}"
                 df_edit_visible = st.session_state.get(echipa_key, df_edit_visible).copy()
 
-            # Nu sărim peste tabel dacă are rânduri cu cod_identificare valid
-            # (rânduri nou introduse de utilizator)
             if df_edit_visible.empty:
-                # Verificăm și în session_state dacă nu cumva există date salvate
-                _sk = state_key(table_name)
-                _df_state = st.session_state.get(_sk)
-                if _df_state is None or _df_state.empty:
-                    continue
-                df_edit_visible = _df_state.copy()
+                continue
 
             if table_name == "com_date_financiare" and config.get("uses_fdi_financial", False):
                 df_for_save = st.session_state.get(
@@ -278,6 +310,9 @@ class ContractProiectLikeBuilder:
 
                 if "id_proiect_contract_sursa" in cols_real:
                     payload["id_proiect_contract_sursa"] = cod
+
+                # 🔧 FIX: sanitizare JSON-serializable
+                payload = _sanitize_payload(payload)
 
                 items.append(
                     {
