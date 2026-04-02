@@ -33,6 +33,23 @@ def porneste_motorul(supabase):
 
     is_admin = st.session_state.get("operator_rol") == "ADMIN"
 
+    # Populează harta funcții UPT o singură dată per sesiune
+    if "_cache_functie_map" not in st.session_state:
+        try:
+            res = supabase.table("det_resurse_umane") \
+                .select("nume_prenume,acronim_functie_upt,acronim_departament") \
+                .execute()
+            functie_map = {}
+            for r in (res.data or []):
+                if r.get("nume_prenume"):
+                    functie_map[r["nume_prenume"]] = {
+                        "functie_upt": r.get("acronim_functie_upt", "") or "",
+                        "acronim_departament": r.get("acronim_departament", "") or "",
+                    }
+            st.session_state["_cache_functie_map"] = functie_map
+        except Exception:
+            st.session_state["_cache_functie_map"] = {}
+
     def get_table_columns(table_name: str) -> list[str]:
         try:
             res = supabase.rpc(
