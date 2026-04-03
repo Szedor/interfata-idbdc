@@ -487,7 +487,7 @@ def _apply_col_labels_and_sursa(df: pd.DataFrame, table: str = None) -> pd.DataF
 
 
 def render_explorare_criteriu(supabase: Client):
-    st.markdown("## 🔎 Explorare după criteriu")
+    st.markdown("## 🔎 Explorare universală")
     st.markdown(
         "<div style='color:rgba(255,255,255,0.88);font-size:1.02rem;font-weight:600;"
         "margin-bottom:0.85rem;'>Selectați un singur criteriu de căutare și obțineți toate "
@@ -786,372 +786,32 @@ def _render_ec_rezultate(supabase: Client):
 
 
 # =========================================================
-# TAB 3 — CĂUTARE APROFUNDATĂ + EXPORT
+# TAB 3 — RAPORTĂRI
 # =========================================================
 
-def _build_filters(supabase: Client, categorie: str, prefix: str):
-    """Construiește rândul de filtre specific categoriei. Returnează dict cu valorile."""
-    persoane     = fetch_idbdc_people(supabase)
-    current_year = dt.datetime.now().year
-    result       = {}
+mesaj_blocare = "Această secțiune se află în faza de testare finală. Accesul va fi reactivat în curând. Vă mulțumim pentru înțelegere."
 
-    if categorie == "Evenimente stiintifice":
-        natura_list = fetch_distinct_values(supabase, "nom_evenimente_stiintifice", "natura_eveniment")
-        format_list = fetch_distinct_values(supabase, "nom_format_evenimente", "format_eveniment")
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        with c1: result["keyword"]  = st.text_input("Cuvânt cheie", value="", key=f"{prefix}_kw").strip()
-        with c2: result["an_from"]  = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year-2, step=1, key=f"{prefix}_y1")
-        with c3: result["an_to"]    = st.number_input("Până la", min_value=1900, max_value=2100, value=current_year, step=1, key=f"{prefix}_y2")
-        with c4: result["natura"]   = st.selectbox("Natura evenimentului", [""]+natura_list, key=f"{prefix}_nat")
-        with c5: result["fmt"]      = st.selectbox("Format", [""]+format_list, key=f"{prefix}_fmt")
-        with c6: result["persoana"] = st.selectbox("Persoana contact", [""]+persoane, key=f"{prefix}_p")
-
-    elif categorie == "Proprietate industriala":
-        tip_pi_list = fetch_distinct_values(supabase, "nom_prop_intelect", "acronim_prop_intelect")
-        dep_list    = fetch_distinct_values(supabase, "nom_departament", "acronim_departament")
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        with c1: result["keyword"]  = st.text_input("Cuvânt cheie", value="", key=f"{prefix}_kw").strip()
-        with c2: result["an_from"]  = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year-5, step=1, key=f"{prefix}_y1")
-        with c3: result["an_to"]    = st.number_input("Până la", min_value=1900, max_value=2100, value=current_year, step=1, key=f"{prefix}_y2")
-        with c4: result["tip_pi"]   = st.selectbox("Tip proprietate", [""]+tip_pi_list, key=f"{prefix}_tpi")
-        with c5: result["dep"]      = st.selectbox("Departament", [""]+dep_list, key=f"{prefix}_dep")
-        with c6: result["persoana"] = st.selectbox("Persoana contact", [""]+persoane, key=f"{prefix}_p")
-
-    else:  # Contracte sau Proiecte
-        status_list = fetch_distinct_values(supabase, "nom_status_proiect", "status_contract_proiect")
-        dep_list    = fetch_distinct_values(supabase, "nom_departament", "acronim_departament")
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        with c1: result["keyword"]  = st.text_input("Cuvânt cheie", value="", key=f"{prefix}_kw").strip()
-        with c2: result["an_from"]  = st.number_input("Anul de la", min_value=1900, max_value=2100, value=current_year-2, step=1, key=f"{prefix}_y1")
-        with c3: result["an_to"]    = st.number_input("Până la", min_value=1900, max_value=2100, value=current_year, step=1, key=f"{prefix}_y2")
-        with c4: result["status"]   = st.selectbox("Status", [""]+status_list, key=f"{prefix}_st")
-        with c5: result["dep"]      = st.selectbox("Departament", [""]+dep_list, key=f"{prefix}_dep")
-        with c6: result["persoana"] = st.selectbox("Responsabil / Director", [""]+persoane, key=f"{prefix}_p")
-
-    return result
-
-
-def _apply_filters_to_query(q, cols: set, categorie: str, filters: dict, supabase: Client):
-    """Aplică filtrele pe query și returnează query-ul modificat sau None dacă niciun rezultat."""
-    keyword = filters.get("keyword", "")
-    an_from = filters.get("an_from", dt.datetime.now().year - 2)
-    an_to   = filters.get("an_to",   dt.datetime.now().year)
-
-    q = apply_keyword_filter(q, cols, keyword)
-    q = apply_year_range_best_effort(q, cols, _get_year_candidates(categorie), int(an_from), int(an_to))
-
-    if categorie == "Evenimente stiintifice":
-        natura   = filters.get("natura", "")
-        fmt      = filters.get("fmt", "")
-        persoana = filters.get("persoana", "")
-        if natura and "natura_eveniment" in cols:
-            q = q.eq("natura_eveniment", natura)
-        if fmt and "format_eveniment" in cols:
-            q = q.eq("format_eveniment", fmt)
-        if persoana:
-            ids = ids_for_person(supabase, persoana)
-            if not ids:
-                return None
-            if "cod_identificare" in cols:
-                q = q.in_("cod_identificare", ids)
-
-    elif categorie == "Proprietate industriala":
-        tip_pi   = filters.get("tip_pi", "")
-        dep      = filters.get("dep", "")
-        persoana = filters.get("persoana", "")
-        if tip_pi and "acronim_prop_intelect" in cols:
-            q = q.eq("acronim_prop_intelect", tip_pi)
-        if dep and "acronim_departament" in cols:
-            q = q.eq("acronim_departament", dep)
-        if persoana:
-            ids = ids_for_person(supabase, persoana)
-            if not ids:
-                return None
-            if "cod_identificare" in cols:
-                q = q.in_("cod_identificare", ids)
-
-    else:  # Contracte / Proiecte
-        status   = filters.get("status", "")
-        dep      = filters.get("dep", "")
-        persoana = filters.get("persoana", "")
-        if status:
-            for c in ["status_contract_proiect", "status_proiect", "status"]:
-                if c in cols:
-                    q = q.eq(c, status)
-                    break
-        if dep:
-            for c in ["acronim_departament", "departament", "departament_upt"]:
-                if c in cols:
-                    q = q.eq(c, dep)
-                    break
-        if persoana:
-            ids = ids_for_person(supabase, persoana)
-            if not ids:
-                return None
-            if "cod_identificare" in cols:
-                q = q.in_("cod_identificare", ids)
-
-    return q
-
-
-def _build_search_label(categorie: str, tip: str, filters: dict) -> str:
-    """Construiește un șir descriptiv cu criteriile active — folosit în antet export."""
-    parts = []
-    tip_label = tip or categorie
-    parts.append(TABLE_LABELS.get(
-        _resolve_base_table(categorie, tip) or "", tip_label
-    ) or tip_label)
-
-    an_from = filters.get("an_from", "")
-    an_to   = filters.get("an_to", "")
-    if an_from and an_to:
-        parts.append(f"{an_from}–{an_to}")
-
-    for key, label in [
-        ("keyword",  "Cuvânt cheie"),
-        ("status",   "Status"),
-        ("dep",      "Departament"),
-        ("persoana", "Responsabil"),
-        ("natura",   "Natură"),
-        ("fmt",      "Format"),
-        ("tip_pi",   "Tip PI"),
-    ]:
-        val = filters.get(key, "")
-        if val:
-            parts.append(f"{label}: {val}")
-
-    return "  ·  ".join(parts)
-
-
-def render_cautare_aprofundata(supabase: Client):
-    st.markdown("## 🔍 Căutare aprofundată")
+def render_raportari(supabase: Client):
+    st.markdown("## 📊 Raportări")
     st.markdown(
         "<div style='color:rgba(255,255,255,0.88);font-size:1.02rem;font-weight:600;"
-        "margin-bottom:0.85rem;'>Căutare cu filtre multiple. "
-        "Selectați câmpurile dorite și exportați rezultatele.</div>",
+        "margin-bottom:0.85rem;'>Rapoarte predefinite, statistici vizuale și alerte.</div>",
         unsafe_allow_html=True,
     )
-
-    nav1, nav2, nav3 = st.columns([1.2, 1.4, 1.4])
-    with nav1:
-        categorie = st.selectbox("Categorie", list(CATEGORII.keys()), key="ca_cat")
-
-    tip = None
-    cat_data = CATEGORII[categorie]
-    if cat_data.get("tipuri"):
-        with nav2:
-            tip = st.selectbox("Tip", list(cat_data["tipuri"].keys()), key="ca_tip")
-
-    base_table = _resolve_base_table(categorie, tip)
-
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-
-    filters = _build_filters(supabase, categorie, "ca")
-
-    # ── Validare interval ani — indicator inline, nu st.error care blochează ──
-    an_from = filters.get("an_from", dt.datetime.now().year - 2)
-    an_to   = filters.get("an_to",   dt.datetime.now().year)
-    interval_invalid = int(an_to) < int(an_from)
-    if interval_invalid:
-        st.markdown(
-            "<div style='color:rgba(255,140,140,0.95);font-size:0.88rem;font-weight:700;"
-            "margin-top:2px;margin-bottom:4px;'>"
-            "⚠️ Interval invalid: «Până la» trebuie să fie ≥ «De la».</div>",
-            unsafe_allow_html=True,
-        )
-
-    # ── Butoane: Caută + Golește ──────────────────────────────────────────────
-    b1, b2, _ = st.columns([1.0, 1.2, 3.8])
-    with b1:
-        btn_go    = st.button("🔎 Caută", key="ca_go", disabled=interval_invalid)
-    with b2:
-        btn_reset = st.button("🗑️ Golește rezultatele", key="ca_reset")
-
-    if btn_reset:
-        for k in ("ca_rezultate_df", "ca_search_label", "ca_filters_snapshot"):
-            st.session_state.pop(k, None)
-        st.rerun()
-
-    # ── Afișare rezultate persistente ────────────────────────────────────────
-    if not btn_go:
-        if "ca_rezultate_df" in st.session_state:
-            st.markdown(
-                "<div style='color:rgba(255,255,255,0.50);font-size:0.80rem;"
-                "margin-bottom:4px;'>↩ Rezultatele căutării anterioare:</div>",
-                unsafe_allow_html=True,
-            )
-            _render_ca_rezultate(supabase)
-        else:
-            st.info("Completați criteriile și apăsați «Caută».", icon="ℹ️")
-        return
-
-    if not base_table:
-        st.warning("Selectați un tip valid.")
-        return
-
-    cols = set(get_table_columns(supabase, base_table))
-    q    = supabase.table(base_table).select("*")
-    q    = _apply_filters_to_query(q, cols, categorie, filters, supabase)
-
-    if q is None:
-        st.info("Niciun rezultat (nicio persoană găsită cu acel cod).")
-        return
-
-    q = q.limit(800)
-
-    try:
-        res  = q.execute()
-        rows = res.data or []
-    except Exception as e:
-        st.error(f"Eroare interogare: {e}")
-        return
-
-    if not rows:
-        st.info("Niciun rezultat.")
-        return
-
-    df = pd.DataFrame(rows)
-
-    # ── enrich_reprezintant_idbdc optimizat: un singur query pentru tot df-ul ─
-    df = enrich_reprezentant_idbdc(supabase, df)
-
-    # Salvăm în session_state — supraviețuiesc navigării între tab-uri
-    search_label = _build_search_label(categorie, tip or "", filters)
-    st.session_state["ca_rezultate_df"]      = df
-    st.session_state["ca_search_label"]      = search_label
-    st.session_state["ca_filters_snapshot"]  = dict(filters)
-
-    _render_ca_rezultate(supabase)
-
-
-def _render_ca_rezultate(supabase: Client):
-    """Afișează tabelul cu etichete frumoase și exportul pentru Tab 3."""
-    df_raw       = st.session_state.get("ca_rezultate_df", pd.DataFrame())
-    search_label = st.session_state.get("ca_search_label", "Rezultate")
-    if df_raw.empty:
-        return
-
-    st.divider()
-    st.subheader(f"Rezultate — {search_label}")
-
-    # ── Selector coloane cu etichete frumoase ────────────────────────────────
-    available_cols = list(df_raw.columns)
-
-    # Etichete frumoase pentru multiselect: afișăm label dar reținem col_name
-    col_label_map  = {c: _col_label(c) for c in available_cols}           # col → label
-    label_col_map  = {v: k for k, v in col_label_map.items()}             # label → col
-    available_lbls = [col_label_map[c] for c in available_cols]
-
-    # Coloane implicite
-    default_cols = [c for c in ["cod_identificare", "reprezentant_idbdc"] if c in available_cols]
-    for c in ["titlul_proiect", "titlu_proiect", "titlu_eveniment", "denumire", "titlu"]:
-        if c in available_cols:
-            default_cols.append(c)
-            break
-    for c in ["status_contract_proiect", "data_inceput", "data_sfarsit"]:
-        if c in available_cols:
-            default_cols.append(c)
-            break
-    default_lbls = [col_label_map[c] for c in default_cols if c in col_label_map]
-
-    sel_lbls = st.multiselect(
-        "Selectează câmpurile pentru tabelul final:",
-        options=available_lbls,
-        default=default_lbls if default_lbls else available_lbls[:6],
-        key="ca_cols",
+    
+    st.info(mesaj_blocare)
+    st.markdown(
+        f"""
+        <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);
+        border-radius:12px;padding:24px 20px;text-align:center;margin-top:20px;'>
+            <span style='font-size:2rem;display:block;margin-bottom:12px;'>📊</span>
+            <span style='color:rgba(255,255,255,0.88);font-size:1.05rem;font-weight:500;'>
+                {mesaj_blocare}
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-
-    if not sel_lbls:
-        st.warning("Selectează cel puțin o coloană.")
-        return
-
-    # Reconstruim df cu coloanele selectate și aplicăm etichete frumoase
-    sel_cols  = [label_col_map[lbl] for lbl in sel_lbls if lbl in label_col_map]
-    df_final  = df_raw[sel_cols].copy()
-    df_final.columns = [_col_label(c) for c in df_final.columns]
-
-    st.dataframe(df_final, use_container_width=True, height=560)
-    st.caption(f"Total rezultate: {len(df_final)}")
-
-    # ── EXPORT ────────────────────────────────────────────────────────────────
-    st.divider()
-    if render_export_auth(supabase, tab_key="ca"):
-        st.subheader("📤 Export")
-
-        cA, cB, cC, cD = st.columns(4)
-
-        # Rând de antet cu criteriile căutării — adăugat în CSV, Excel și PDF
-        antet_row = pd.DataFrame(
-            [["Căutare: " + search_label] + [""] * (len(df_final.columns) - 1)],
-            columns=df_final.columns,
-        )
-        df_export = pd.concat([antet_row, df_final], ignore_index=True)
-
-        with cA:
-            csv_bytes = df_export.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                "⬇️ CSV", data=csv_bytes,
-                file_name="idbdc_rezultate.csv", mime="text/csv", key="exp_csv",
-            )
-
-        with cB:
-            buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                df_export.to_excel(writer, index=False, sheet_name="Rezultate")
-            buf.seek(0)
-            st.download_button(
-                "⬇️ Excel", data=buf,
-                file_name="idbdc_rezultate.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="exp_xlsx",
-            )
-
-        with cC:
-            try:
-                from reportlab.lib.pagesizes import A4, landscape
-                from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-                from reportlab.lib import colors
-                from reportlab.lib.styles import getSampleStyleSheet
-                from reportlab.lib.units import cm
-
-                pdf_buf = io.BytesIO()
-                doc = SimpleDocTemplate(pdf_buf, pagesize=landscape(A4),
-                                        leftMargin=20, rightMargin=20,
-                                        topMargin=20, bottomMargin=20)
-                styles   = getSampleStyleSheet()
-                elements = [
-                    Paragraph("IDBDC – Rezultate căutare aprofundată", styles["Title"]),
-                    Spacer(1, 0.2 * cm),
-                    Paragraph(f"Criterii: {search_label}", styles["Normal"]),
-                    Spacer(1, 0.3 * cm),
-                ]
-                data_rows = [list(df_final.columns)]
-                for _, row in df_final.iterrows():
-                    data_rows.append([str(v) if v is not None else "" for v in row])
-                t = Table(data_rows, repeatRows=1)
-                t.setStyle(TableStyle([
-                    ("BACKGROUND",     (0, 0), (-1, 0), colors.HexColor("#0b2a52")),
-                    ("TEXTCOLOR",      (0, 0), (-1, 0), colors.white),
-                    ("FONTSIZE",       (0, 0), (-1, -1), 7),
-                    ("GRID",           (0, 0), (-1, -1), 0.5, colors.grey),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0f4f8")]),
-                    ("VALIGN",         (0, 0), (-1, -1), "TOP"),
-                ]))
-                elements.append(t)
-                doc.build(elements)
-                pdf_buf.seek(0)
-                st.download_button(
-                    "⬇️ PDF", data=pdf_buf,
-                    file_name="idbdc_rezultate.pdf",
-                    mime="application/pdf", key="exp_pdf",
-                )
-            except ImportError:
-                st.caption("PDF indisponibil (reportlab lipsă)")
-
-        with cD:
-            if st.button("🖨️ Print", key="ca_print"):
-                html_doc = make_printable_html(df_final, f"IDBDC – {search_label}")
-                components.html(html_doc, height=700, scrolling=True)
 
 
 # =========================================================
@@ -1348,8 +1008,8 @@ def run():
 
     tab1, tab2, tab3 = st.tabs([
         "📄 Fișa completă (după cod)",
-        "🔎 Explorare după criteriu",
-        "🔍 Căutare aprofundată",
+        "🔎 Explorare universală",
+        "📊 Raportări",
     ])
 
     with tab1:
@@ -1359,7 +1019,7 @@ def run():
         render_explorare_criteriu(supabase)
 
     with tab3:
-        render_cautare_aprofundata(supabase)
+        render_raportari(supabase)
 
 
 if __name__ == "__main__":
