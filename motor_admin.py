@@ -2,23 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-from modules.admin.admin_helpers import (
-    append_observatii,
-    build_fdi_financial_df as _build_fdi_financial_df,
-    cleanup_payload,
-    current_year,
-    fmt_bool,
-    fmt_numeric as _fmt_numeric,
-    is_date_col,
-    is_numeric_col,
-    is_row_effectively_empty,
-    is_year_col,
-    now_iso,
-    prepare_empty_single_row,
-    reorder_columns,
-    to_float_safe,
-)
-
 
 def porneste_motorul(supabase):
 
@@ -26,6 +9,15 @@ def porneste_motorul(supabase):
     # CONFIG
     # ============================
 
+    def _fmt_numeric(val) -> str:
+        """Formatează valorile numerice cu separator de mii și 2 zecimale (format românesc)."""
+        if val is None:
+            return ""
+        try:
+            f = float(str(val).replace(",", ".").strip())
+            return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except (ValueError, TypeError):
+            return str(val)
     ADMIN_ONLY_COLS = {
         "responsabil_idbdc", "observatii_idbdc",
         "status_confirmare", "data_ultimei_modificari", "validat_idbdc",
@@ -66,38 +58,15 @@ def porneste_motorul(supabase):
     # Tabele baza pentru contracte — folosit pentru override etichete
     TABELE_CONTRACTE = {"base_contracte_cep", "base_contracte_terti", "base_contracte_speciale"}
 
-    FDI_FINANCIAL_FIELDS = ["suma_solicitata_fdi", "suma_aprobata_mec", "cofinantare_upt_fdi"]
-    FDI_BASE_PRIORITY_FIELDS = [
-        "cod_identificare",
-        "denumire_categorie",
-        "acronim_contracte_proiecte",
-        "cod_domeniu_fdi",
-        "abreviere_domeniu_fdi",
-        "denumire_domeniu_fdi",
-        "status_contract_proiect",
-        "titlul_proiect",
-        "data_depunere",
-        "data_inceput",
-        "data_sfarsit",
-        "durata_luni",
-        "durata",
-        "director_proiect",
-        "director",
-        "director_contract",
-        "rol_upt",
-        "obiectiv_general",
-        "obiective_specifice",
-        "activitati_proiect",
-        "rezultate_proiect",
-        "parteneri",
-        "institutii_organizare",
-        "comentarii_diverse",
-        "comentarii_document",
-    ]
-
     # ============================
     # HELPERS
     # ============================
+
+    def now_iso():
+        return datetime.now().isoformat()
+
+    def current_year():
+        return datetime.now().year
 
     def get_table_columns(table_name: str):
         try:
@@ -105,6 +74,44 @@ def porneste_motorul(supabase):
             return [r["column_name"] for r in (res.data or []) if r.get("column_name")]
         except Exception:
             return []
+
+    def is_date_col(col: str) -> bool:
+        c = (col or "").lower()
+        if c in ("data_ultimei_modificari",):
+            return False
+        return c.startswith("data_") or c.endswith("_data") or c.startswith("dt_")
+
+    def is_year_col(col: str) -> bool:
+        c = (col or "").lower()
+        return c == "an" or c.startswith("an_")
+
+    def is_numeric_col(col: str, df: pd.DataFrame) -> bool:
+        """Detectează coloane numerice (INTEGER/FLOAT) după dtype și nume."""
+        c = (col or "").lower()
+        numeric_keywords = (
+            "valoare_", "suma_", "cost_", "buget_", "cofinantare_",
+            "contributie_", "numar_", "nr_", "punctaj", "scor_",
+            "interval_", "total_", "pozitie_", "perioada_valabilitate_ani",
+        )
+        if any(c.startswith(k) or c == k for k in numeric_keywords):
+            return True
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            return True
+        return False
+
+    def empty_row(columns):
+        row = {c: None for c in columns}
+        if "status_confirmare" in row:
+            row["status_confirmare"] = False
+        if "validat_idbdc" in row:
+            row["validat_idbdc"] = False
+        if "persoana_contact" in row:
+            row["persoana_contact"] = False
+        y = current_year()
+        for c in columns:
+            if c == "an" or c.startswith("an_"):
+                row[c] = y
+        return row
 
     def load_single_row(table_name: str, cod: str):
         cols = get_table_columns(table_name)
@@ -140,6 +147,25 @@ def porneste_motorul(supabase):
 
         return df, cols, True
 
+    def prepare_empty_single_row(cols: list, cod: str):
+        if not cols:
+            return pd.DataFrame()
+        r = empty_row(cols)
+        if "cod_identificare" in r:
+            r["cod_identificare"] = cod
+        import datetime as _dt
+        df = pd.DataFrame([r], columns=cols)
+        for c in df.columns:
+            if is_date_col(c):
+                df[c] = df[c].apply(lambda v: None if v is None else (v if isinstance(v, _dt.date) else None))
+        return df
+
+    def append_observatii(existing: str, msg: str) -> str:
+        base = (existing or "").strip()
+        if not base:
+            return msg
+        return base + "\n" + msg
+
     def hide_control_cols(df: pd.DataFrame) -> pd.DataFrame:
         if is_admin:
             return df
@@ -165,11 +191,35 @@ def porneste_motorul(supabase):
             pass
         return out
 
-    def _to_float_safe(val):
-        return to_float_safe(val)
+    def fmt_bool(v):
+        return "DA" if bool(v) else "NU"
 
-    def build_fdi_financial_df(df_source: pd.DataFrame, cod: str) -> pd.DataFrame:
-        return _build_fdi_financial_df(df_source, cod, FDI_FINANCIAL_FIELDS)
+    def is_row_effectively_empty(d: dict) -> bool:
+        cod = d.get("cod_identificare")
+        if cod is None or (isinstance(cod, str) and cod.strip() == ""):
+            return True
+        return False
+
+    def cleanup_payload(payload: dict) -> dict:
+        out = {}
+        for k, v in (payload or {}).items():
+            if k == "nr_crt":
+                if v is None:
+                    continue
+                if isinstance(v, str) and v.strip() == "":
+                    continue
+                out[k] = v
+                continue
+            if k == "cod_identificare":
+                if v is not None and str(v).strip():
+                    out[k] = str(v).strip()
+                continue
+            if v is None:
+                continue
+            if isinstance(v, str) and v.strip() == "":
+                continue
+            out[k] = v
+        return out
 
     def direct_upsert_single_row(table_name: str, payload: dict, cod: str):
         try:
@@ -530,8 +580,7 @@ def porneste_motorul(supabase):
             "cod_temporar": "COD DEPUNERE",
             "cofinantare_anuala_contract": "COFINANTARE ANUALA CONTRACT",
             "cofinantare_totala_contract": "COFINANTARE TOTALA CONTRACT",
-            "cofinantare_upt_fdi": "COFINANTARE UPT",
-            "total_buget": "TOTAL BUGET",
+            "cofinantare_upt_fdi": "COFINANTARE UPT PROIECTE FDI",
             "comentarii_diverse": "COMENTARII DIVERSE",
             "comentarii_document": "COMENTARII DOCUMENTE",
             "contract_cesiune_inventatori_externi": "CONTRACT CESIUNE / INVENTATORI EXTERNI UPT",
@@ -594,7 +643,7 @@ def porneste_motorul(supabase):
             "status_activ": "STATUS ACTIV",
             "status_document": "STATUS DOCUMENT",
             "suma_aprobata": "SUMA APROBATA MEC",
-            "suma_aprobata_mec": "SUMA APROBATA MINISTER",
+            "suma_aprobata_mec": "SUMA APROBATA MEC",
             "suma_solicitata": "SUMA SOLICITATA",
             "suma_solicitata_fdi": "SUMA SOLICITATA",
             "telefon_mobil": "TELEFON MOBIL",
@@ -636,12 +685,10 @@ def porneste_motorul(supabase):
             },
             "base_proiecte_fdi": {
                 "cod_identificare":        "ID PROIECT FDI",
-                "acronim_contracte_proiecte": "🔽 TIPUL DE PROIECT",
-                "cod_domeniu_fdi":         "🔽 COD DOMENIU FDI",
-                "abreviere_domeniu_fdi":   "DOMENIUL FDI",
-                "denumire_domeniu_fdi":    "DENUMIREA DOMENIULUI FDI",
                 "status_contract_proiect": "🔽 STATUS PROIECT",
                 "titlul_proiect":          "TITLUL PROIECTULUI",
+                "suma_solicitata_fdi":     "SUMA SOLICITATA",
+                "cofinantare_upt_fdi":     "COFINANTARE UPT",
             },
             "base_proiecte_pncdi": {
                 "cod_identificare":        "NR.CONTRACT / COD PROIECT",
@@ -768,13 +815,6 @@ def porneste_motorul(supabase):
             cfg["functie_upt"] = st.column_config.TextColumn(
                 label=_col_label_admin("functie_upt", table_name),
                 help="Completat automat din det_resurse_umane",
-                disabled=True,
-            )
-
-        if table_name == "com_date_financiare" and tabela_baza_ctx == "base_proiecte_fdi" and "total_buget" in df.columns:
-            cfg["total_buget"] = st.column_config.NumberColumn(
-                label=_col_label_admin("total_buget", table_name),
-                format="%.2f",
                 disabled=True,
             )
 
@@ -1302,14 +1342,7 @@ def porneste_motorul(supabase):
             continue
 
         df, cols = loaded[table_name]
-        if table_name == "com_date_financiare" and tabela_baza == "base_proiecte_fdi":
-            df_base_fdi_src, cols_base_fdi = loaded.get(tabela_baza, (pd.DataFrame(), []))
-            if df_base_fdi_src.empty and cols_base_fdi:
-                df_base_fdi_src = prepare_empty_single_row(cols_base_fdi, cod)
-            elif df_base_fdi_src.empty:
-                df_base_fdi_src = pd.DataFrame([{"cod_identificare": cod}])
-            df_full = build_fdi_financial_df(df_base_fdi_src, cod)
-        elif df.empty and cols:
+        if df.empty and cols:
             df_full = prepare_empty_single_row(cols, cod)
         else:
             df_full = df.copy()
@@ -1501,15 +1534,7 @@ def porneste_motorul(supabase):
             if table_name == "com_date_financiare" and tabela_baza in TABELE_CONTRACTE:
                 df_show = df_show.drop(columns=["an_referinta"], errors="ignore")
 
-            if table_name == "base_proiecte_fdi":
-                df_show = df_show.drop(columns=["an_referinta", "responsabil_idbdc", *FDI_FINANCIAL_FIELDS], errors="ignore")
-                df_show = reorder_columns(df_show, FDI_BASE_PRIORITY_FIELDS)
-
-            if table_name == "com_date_financiare" and tabela_baza == "base_proiecte_fdi":
-                df_show = df_show.drop(columns=["an_referinta", "valuta"], errors="ignore")
-                df_show = reorder_columns(df_show, ["cod_identificare", *FDI_FINANCIAL_FIELDS, "total_buget"])
-
-            if table_name == "com_date_financiare" and tabela_baza != "base_proiecte_fdi" and "valuta" in df_show.columns and "cod_identificare" in df_show.columns:
+            if table_name == "com_date_financiare" and "valuta" in df_show.columns and "cod_identificare" in df_show.columns:
                 cols = list(df_show.columns)
                 cols.remove("valuta")
                 idx = cols.index("cod_identificare") + 1
@@ -1561,7 +1586,7 @@ def porneste_motorul(supabase):
                 )
                 continue
 
-            num_rows_mode = "fixed" if (table_name != "com_date_financiare" or tabela_baza == "base_proiecte_fdi") else "dynamic"
+            num_rows_mode = "dynamic" if table_name == "com_date_financiare" else "fixed"
             editor_key = f"editor_{table_name}_{cod}"
 
             edited = st.data_editor(
@@ -1678,26 +1703,6 @@ def porneste_motorul(supabase):
                         f"echipa_reunited_{cod}",
                         edited_data.get(table_name, df_base)
                     )
-                elif table_name == "com_date_financiare" and tabela_baza == "base_proiecte_fdi":
-                    editor_key = f"editor_{table_name}_{cod}"
-                    editor_state = st.session_state.get(editor_key)
-                    df_fdi_fin = df_base.copy()
-                    if editor_state is not None and isinstance(editor_state, dict):
-                        edited_rows = editor_state.get("edited_rows", {})
-                        if 0 not in df_fdi_fin.index and len(df_fdi_fin) == 0:
-                            df_fdi_fin = pd.DataFrame([{c: None for c in df_fdi_fin.columns}])
-                        if len(df_fdi_fin) == 0:
-                            df_fdi_fin = pd.DataFrame([{"cod_identificare": cod}])
-                        for idx_str, changes in edited_rows.items():
-                            idx = int(idx_str)
-                            if idx < len(df_fdi_fin):
-                                for col, val in changes.items():
-                                    df_fdi_fin.at[df_fdi_fin.index[idx], col] = val
-                    else:
-                        df_fdi_fin = edited_data.get(table_name, df_base)
-                    if df_fdi_fin is None or len(df_fdi_fin) == 0:
-                        df_fdi_fin = pd.DataFrame([{"cod_identificare": cod}])
-                    df_edit_visible = df_fdi_fin.copy()
                 else:
                     editor_key = f"editor_{table_name}_{cod}"
                     editor_state = st.session_state.get(editor_key)
@@ -1736,29 +1741,11 @@ def porneste_motorul(supabase):
                     df_for_save = df_edit_visible.copy()
                     df_for_save["cod_identificare"] = cod
                     df_for_save = autofill_functie_upt(df_for_save)
-                elif table_name == "com_date_financiare" and tabela_baza == "base_proiecte_fdi":
-                    df_for_save = st.session_state[state_key_raw(tabela_baza)].copy()
-                    if df_for_save.empty:
-                        df_for_save = prepare_empty_single_row(get_table_columns(tabela_baza), cod)
-                    if len(df_for_save) == 0:
-                        df_for_save = pd.DataFrame([{"cod_identificare": cod}])
-                    for c in FDI_FINANCIAL_FIELDS:
-                        if c in df_edit_visible.columns:
-                            if c not in df_for_save.columns:
-                                df_for_save[c] = None
-                            df_for_save.at[df_for_save.index[0], c] = df_edit_visible.iloc[0].get(c)
-                    df_for_save["cod_identificare"] = cod
-                    cols_real = get_table_columns(tabela_baza)
-                    table_name_for_save = tabela_baza
                 else:
                     df_for_save = merge_back_control_cols(df_edit_visible, df_raw_original)
                     if "cod_identificare" in df_for_save.columns:
                         df_for_save["cod_identificare"] = df_for_save["cod_identificare"].fillna(cod)
                         df_for_save["cod_identificare"] = df_for_save["cod_identificare"].astype(str).replace("nan", cod)
-                    table_name_for_save = table_name
-
-                if table_name == "com_date_financiare" and tabela_baza == "base_proiecte_fdi":
-                    df_for_save = df_for_save.drop(columns=["total_buget"], errors="ignore")
 
                 for _, row in df_for_save.iterrows():
                     data = row.to_dict()
@@ -1767,7 +1754,7 @@ def porneste_motorul(supabase):
                         continue
                     payload = {k: data.get(k) for k in cols_real if k in data}
                     payload["cod_identificare"] = str(cod_row).strip()
-                    items.append({"table": table_name_for_save, "payload": payload})
+                    items.append({"table": table_name, "payload": payload})
 
             ok, msg = direct_save_all_tables(items, operator)
             if ok:
