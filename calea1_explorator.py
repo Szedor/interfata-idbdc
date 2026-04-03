@@ -3,6 +3,8 @@ from supabase import create_client
 
 from config import Config
 from tab1_fisa_completa import render_fisa_completa
+from tab2_explorare_avansata import render_tab2_explorare_avansata
+from tab3_rapoarte_analiza import render_tab3_rapoarte_analiza
 
 
 def render_calea1_explorator(supabase):
@@ -20,13 +22,11 @@ def render_calea1_explorator(supabase):
         unsafe_allow_html=True,
     )
 
-    mesaj_blocare = "Această secțiune se află în faza de testare finală. Accesul va fi reactivat în curând. Vă mulțumim pentru înțelegere."
-
     tab1, tab2, tab3 = st.tabs(
         [
             "Fișă completă",
-            "Explorare avansată (indisponibil temporar)",
-            "Rapoarte și analiză (indisponibil temporar)",
+            "Explorare avansată",
+            "Rapoarte și analiză",
         ]
     )
 
@@ -34,34 +34,10 @@ def render_calea1_explorator(supabase):
         render_fisa_completa(supabase)
 
     with tab2:
-        st.info(mesaj_blocare)
-        st.markdown(
-            f"""
-            <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);
-            border-radius:12px;padding:24px 20px;text-align:center;margin-top:20px;'>
-                <span style='font-size:2rem;display:block;margin-bottom:12px;'>🔧</span>
-                <span style='color:rgba(255,255,255,0.88);font-size:1.05rem;font-weight:500;'>
-                    {mesaj_blocare}
-                </span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        render_tab2_explorare_avansata(supabase)
 
     with tab3:
-        st.info(mesaj_blocare)
-        st.markdown(
-            f"""
-            <div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);
-            border-radius:12px;padding:24px 20px;text-align:center;margin-top:20px;'>
-                <span style='font-size:2rem;display:block;margin-bottom:12px;'>📊</span>
-                <span style='color:rgba(255,255,255,0.88);font-size:1.05rem;font-weight:500;'>
-                    {mesaj_blocare}
-                </span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        render_tab3_rapoarte_analiza(supabase)
 
 
 def run():
