@@ -1535,7 +1535,7 @@ def porneste_motorul(supabase):
             column_config=col_cfg_echipa,
             disabled=editing_blocked,
             key=key_editor,
-            height=420,
+            height=245,
         )
 
         # Completam cod_identificare pe toate randurile
