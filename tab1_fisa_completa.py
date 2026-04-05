@@ -465,31 +465,36 @@ def _render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
 
     if persoane_cont:
         st.markdown(
-            "<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
+            "<div style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;'"
             "text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;'>"
             "⭐ Persoana de contact</div>",
             unsafe_allow_html=True,
         )
         for r in persoane_cont:
-            nume    = str(r.get("nume_prenume") or "").strip()
-            rol     = str(r.get("functia_specifica") or "").strip()
+            nume     = str(r.get("nume_prenume") or "").strip()
+            rol      = str(r.get("functia_specifica") or "").strip()
             dept_row = str(r.get("acronim_departament") or "").strip()
-            contact = _get_contact_info(supabase, nume)
+            contact  = _get_contact_info(supabase, nume)
             # Daca departamentul vine deja din randul echipei, nu il mai adaugam din contact
             if dept_row:
                 contact = [c for c in contact if not c.startswith("🏛")]
                 contact = [f"🏛 {dept_row}"] + contact
-            txt     = ", ".join(p for p in [nume, rol] if p)
+
+            titlu_contact = " · ".join(p for p in [nume, rol] if p)
             contact_html = ""
             if contact:
                 contact_html = (
-                    "  <span style='font-weight:800;color:#ffffff;'>" +
-                    "  ·  ".join(_html.escape(c) for c in contact) + "</span>"
+                    "<div style='margin-top:4px;color:rgba(255,255,255,0.82);font-size:0.86rem;line-height:1.55;'>" +
+                    "  ·  ".join(_html.escape(c) for c in contact) +
+                    "</div>"
                 )
+
             st.markdown(
-                f"<div style='padding:6px 12px;margin-bottom:3px;background:rgba(255,255,255,0.10);"
+                f"<div style='padding:7px 12px;margin-bottom:4px;background:rgba(255,255,255,0.08);" 
                 f"border-radius:8px;border-left:3px solid rgba(255,220,80,0.70);'>"
-                f"<span style='font-weight:800;color:#ffffff;'>⭐ {_html.escape(txt)}</span>"
+                f"<div style='color:#ffffff;font-size:0.96rem;line-height:1.45;'>"
+                f"⭐ {_html.escape(titlu_contact)}"
+                f"</div>"
                 f"{contact_html}</div>",
                 unsafe_allow_html=True,
             )
