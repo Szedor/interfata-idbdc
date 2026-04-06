@@ -86,4 +86,3 @@ def get_financial_mode(project_type: str) -> str:
 def tab_is_visible(category: str, tab_name: str) -> bool:
     hidden_tabs = get_hidden_tabs(category)
     return tab_name not in hidden_tabs
-```
