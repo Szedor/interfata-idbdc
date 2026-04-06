@@ -131,4 +131,3 @@ def create_tabs(category: str, tab_names: list[str]):
     streamlit_tabs = st.tabs(visible_tabs)
 
     return visible_tabs, streamlit_tabs
-```
