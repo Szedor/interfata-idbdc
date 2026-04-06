@@ -259,5 +259,3 @@ def direct_validate_all_tables(
         return True, "Validare partiala."
 
     return True, "Validare realizata."
-```
-
