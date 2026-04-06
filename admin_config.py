@@ -124,4 +124,3 @@ def get_tabs_for_category(category: str) -> list:
 
 def get_types_for_category(category: str) -> list:
     return CATEGORY_TYPES.get(category, [])
-```
