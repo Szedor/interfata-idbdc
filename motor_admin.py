@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - MOTOR ADMIN - ORCHESTRATOR PRINCIPAL
-# Versiune: 2.1 (Completă) - Respectă Protocol Colaborare
+# Versiune: 2.1 (Completă) - Rezolvare SyncRequestBuilder
 # =========================================================
 
 import streamlit as st
@@ -42,7 +42,7 @@ def porneste_motorul(supabase):
     # 3. Selecție Cod Identificare (Corecție eroare SyncRequestBuilder)
     with st.sidebar:
         try:
-            # S-a adăugat .table(base_table) pentru a corecta eroarea anterioară
+            # Corecție: Adăugat .table() înainte de .select()
             res_coduri = supabase.table(base_table).select("cod_identificare").execute()
             list_coduri = sorted([r["cod_identificare"] for r in res_coduri.data]) if res_coduri.data else []
         except Exception:
@@ -57,18 +57,19 @@ def porneste_motorul(supabase):
         if is_admin and cod_id != "- NOU -":
             btn_delete = st.button("🗑️ ȘTERGE FIȘA", use_container_width=True)
 
-    # 4. Logica de Încărcare Date din toate tabelele
+    # 4. Logica de Încărcare Date din toate tabelele (Bază + Complementare)
     data_dict = {}
     
     # Încărcare Tabel Bază
     if cod_id == "- NOU -":
         df_base = pd.DataFrame([{"cod_identificare": "", "validat_idbdc": False}])
     else:
+        # Corecție: Asigurat formatul client.table(nume).eq(...)
         res_b = supabase.table(base_table).eq("cod_identificare", cod_id).execute()
         df_base = pd.DataFrame(res_b.data)
     data_dict[base_table] = df_base
 
-    # Încărcare Tabele Complementare (Financiar, Echipă, Tehnice)
+    # Încărcare Tabele Complementare
     for label, t_name in cfg.COMPLEMENTARY_TABLES:
         if cod_id == "- NOU -":
             df_temp = pd.DataFrame([{"cod_identificare": ""}])
@@ -77,7 +78,7 @@ def porneste_motorul(supabase):
             df_temp = pd.DataFrame(res_temp.data)
         data_dict[t_name] = df_temp
 
-    # 5. Randare Interfață Tab-uri (Identic Vizual cu Versiunea Stabilă)
+    # 5. Randare Interfață Tab-uri (Păstrare aspect validat)
     list_tabs = cfg.get_tabs_for_category(cat_sel)
     st_tabs = st.tabs(list_tabs)
 
@@ -96,61 +97,63 @@ def porneste_motorul(supabase):
 
             elif tab_name == "Date financiare":
                 ui.render_financial_info_box(data_dict[base_table])
-                t_name = "det_date_financiare"
-                col_cfg = rules.get_column_config(data_dict[t_name])
-                data_dict[t_name] = st.data_editor(
-                    data_dict[t_name],
+                t_fin = "det_date_financiare"
+                col_cfg = rules.get_column_config(data_dict[t_fin])
+                data_dict[t_fin] = st.data_editor(
+                    data_dict[t_fin],
                     column_config=col_cfg,
                     hide_index=True,
                     use_container_width=True,
                     num_rows="dynamic",
-                    key=f"editor_{t_name}"
+                    key=f"editor_{t_fin}"
                 )
 
             elif tab_name == "Echipă":
                 ui.render_team_info_box(len(data_dict["det_echipa"]))
-                t_name = "det_echipa"
-                col_cfg = rules.get_column_config(data_dict[t_name])
-                data_dict[t_name] = st.data_editor(
-                    data_dict[t_name],
+                t_ech = "det_echipa"
+                col_cfg = rules.get_column_config(data_dict[t_ech])
+                data_dict[t_ech] = st.data_editor(
+                    data_dict[t_ech],
                     column_config=col_cfg,
                     hide_index=True,
                     use_container_width=True,
                     num_rows="dynamic",
-                    key=f"editor_{t_name}"
+                    key=f"editor_{t_ech}"
                 )
 
             elif tab_name == "Aspecte tehnice":
-                t_name = "det_aspecte_tehnice"
-                col_cfg = rules.get_column_config(data_dict[t_name])
-                data_dict[t_name] = st.data_editor(
-                    data_dict[t_name],
+                t_teh = "det_aspecte_tehnice"
+                col_cfg = rules.get_column_config(data_dict[t_teh])
+                data_dict[t_teh] = st.data_editor(
+                    data_dict[t_teh],
                     column_config=col_cfg,
                     hide_index=True,
                     use_container_width=True,
                     num_rows="dynamic",
-                    key=f"editor_{t_name}"
+                    key=f"editor_{t_teh}"
                 )
 
     # 6. Logica de Salvare
     if btn_save:
         with st.spinner("Se salvează datele..."):
-            # Extragere cod din tabelul de bază dacă e înregistrare nouă
-            final_cod = cod_id if cod_id != "- NOU -" else str(data_dict[base_table].iloc[0].get("cod_identificare", "")).strip()
+            # Identificare cod final (existent sau nou creat în editor)
+            df_b = data_dict[base_table]
+            raw_id = df_b.iloc[0].get("cod_identificare", "") if not df_b.empty else ""
+            final_cod = str(raw_id).strip()
             
-            if not final_cod:
-                st.error("Eroare: Câmpul 'cod_identificare' nu poate fi gol.")
+            if not final_cod or final_cod == "nan":
+                st.error("Eroare: Specificați un Cod Identificare valid.")
             else:
                 ok, msg = ops.direct_save_all_tables(supabase, final_cod, data_dict, base_table)
                 st.session_state["admin_msg"] = ("success" if ok else "error", msg)
                 st.rerun()
 
-    # 7. Logica de Ștergere (cu confirmare)
+    # 7. Logica de Ștergere
     if btn_delete:
-        st.warning(f"Sunteți pe cale să ștergeți definitiv codul {cod_id}!")
-        if st.checkbox("Confirm ștergerea ireversibilă"):
-            all_tables_to_clean = [base_table] + [t[1] for t in cfg.COMPLEMENTARY_TABLES]
-            ok, msg = ops.direct_delete_all_tables(supabase, cod_id, all_tables_to_clean)
+        st.warning(f"Atenție: Ștergeți definitiv fișa {cod_id}!")
+        if st.checkbox("Confirm eliminarea din toate tabelele"):
+            tabele_curatare = [base_table] + [t[1] for t in cfg.COMPLEMENTARY_TABLES]
+            ok, msg = ops.direct_delete_all_tables(supabase, cod_id, tabele_curatare)
             if ok:
                 st.session_state["admin_msg"] = ("success", "Înregistrarea a fost eliminată.")
                 st.rerun()
