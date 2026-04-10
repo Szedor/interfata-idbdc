@@ -1,261 +1,86 @@
 # =========================================================
-# ADMIN DATA OPS — operatii comune pentru c2
+# IDBDC - MODUL ADMIN - OPERAȚIUNI DATE (admin_data_ops.py)
+# Versiune: 1.0 - Logica de salvare și interogare CRUD
 # =========================================================
 
+import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-
-# ---------------------------------------------------------
-# HELPERI GENERALI
-# ---------------------------------------------------------
-
-def now_iso() -> str:
+def now_iso():
     return datetime.now().isoformat()
 
-
-def current_year() -> int:
+def current_year():
     return datetime.now().year
 
-
-def append_observatii(existing: str, msg: str) -> str:
-    base = (existing or "").strip()
-
-    if not base:
-        return msg
-
-    return base + "\n" + msg
-
-
-# ---------------------------------------------------------
-# NUMERIC / IDENTIFICATOR
-# ---------------------------------------------------------
-
-def normalize_identifier_column(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Forteaza cod_identificare sa fie tratat ca text.
-    """
-
-    if "cod_identificare" not in df.columns:
-        return df
-
-    def _normalize_code(v):
-        if v is None:
-            return None
-
-        if isinstance(v, float):
-            if pd.isna(v):
-                return None
-
-            if v.is_integer():
-                return str(int(v))
-
-            return str(v)
-
-        if isinstance(v, int):
-            return str(v)
-
-        s = str(v).strip()
-
-        if s == "" or s.lower() in ("none", "nan"):
-            return None
-
-        return s
-
-    out = df.copy()
-    out["cod_identificare"] = (
-        out["cod_identificare"]
-        .apply(_normalize_code)
-        .astype("object")
-    )
-
-    return out
-
-
-# ---------------------------------------------------------
-# RAND GOL
-# ---------------------------------------------------------
-
-def empty_row(columns: list[str]) -> dict:
-    row = {c: None for c in columns}
-
-    if "status_confirmare" in row:
-        row["status_confirmare"] = False
-
-    if "validat_idbdc" in row:
-        row["validat_idbdc"] = False
-
-    if "persoana_contact" in row:
-        row["persoana_contact"] = False
-
-    y = current_year()
-
-    for c in columns:
-        if c == "an" or c.startswith("an_"):
-            row[c] = y
-
-    return row
-
-
-def prepare_empty_single_row(columns: list[str], cod: str) -> pd.DataFrame:
-    if not columns:
-        return pd.DataFrame()
-
-    row = empty_row(columns)
-
-    if "cod_identificare" in row:
-        row["cod_identificare"] = cod
-
-    df = pd.DataFrame([row], columns=columns)
-    df = normalize_identifier_column(df)
-
+def normalize_identifier_column(df, column_name="cod_identificare"):
+    """Asigură că coloana de legătură este tratată ca string curat."""
+    if column_name in df.columns:
+        df[column_name] = df[column_name].astype(str).str.strip()
     return df
 
+def cleanup_payload(row_dict):
+    """Elimină câmpurile sistem sau nule înainte de trimiterea către Supabase."""
+    to_exclude = {"id", "creat_la", "creat_de", "modificat_la", "modificat_de"}
+    return {k: v for k, v in row_dict.items() if k not in to_exclude and pd.notnull(v)}
 
-# ---------------------------------------------------------
-# PAYLOAD
-# ---------------------------------------------------------
-
-def cleanup_payload(payload: dict) -> dict:
-    out = {}
-
-    for k, v in (payload or {}).items():
-        if k == "nr_crt":
-            if v is None:
-                continue
-
-            if isinstance(v, str) and v.strip() == "":
-                continue
-
-            out[k] = v
-            continue
-
-        if k == "cod_identificare":
-            if v is not None and str(v).strip():
-                out[k] = str(v).strip()
-            continue
-
-        if v is None:
-            continue
-
-        if isinstance(v, str) and v.strip() == "":
-            continue
-
-        out[k] = v
-
-    return out
-
-
-def is_row_effectively_empty(payload: dict) -> bool:
-    cod = payload.get("cod_identificare")
-
-    if cod is None:
-        return True
-
-    if isinstance(cod, str) and cod.strip() == "":
-        return True
-
-    return False
-
-
-# ---------------------------------------------------------
-# SALVARE / VALIDARE / STERGERE
-# ---------------------------------------------------------
-
-def direct_upsert_single_row(supabase, table_name: str, payload: dict, cod: str):
+def direct_upsert_single_row(supabase, table_name, row_data, match_col="cod_identificare"):
+    """Efectuează insert/update pentru un singur rând în tabelul specificat."""
+    payload = cleanup_payload(row_data)
+    if not payload.get(match_col):
+        return False, "Lipsă cod identificare."
+    
     try:
-        check = (
-            supabase.table(table_name)
-            .select("cod_identificare")
-            .eq("cod_identificare", cod)
-            .limit(1)
-            .execute()
-        )
+        res = supabase.table(table_name).upsert(payload, on_conflict=match_col).execute()
+        return True, "Succes"
+    except Exception as e:
+        return False, str(e)
 
-        exists = bool(check.data)
+def direct_save_all_tables(supabase, cod_id, data_dict, base_table):
+    """
+    Salvează în cascadă: Tabel Bază + Tabele Detaliu.
+    data_dict: { 'base_table_name': df_baza, 'det_table_1': df_det1, ... }
+    """
+    # 1. Salvare Tabel Bază
+    if base_table in data_dict:
+        df_base = data_dict[base_table]
+        if not df_base.empty:
+            row = df_base.iloc[0].to_dict()
+            row["cod_identificare"] = cod_id
+            row["data_ultimei_modificari"] = now_iso()
+            ok, msg = direct_upsert_single_row(supabase, base_table, row)
+            if not ok: return False, f"Eroare Bază: {msg}"
 
-    except Exception:
-        exists = False
+    # 2. Salvare Tabele Detaliu (Echipă, Finanțe, Tehnice)
+    # Notă: Aici se pot salva multiple rânduri dacă e cazul
+    for t_name, df_det in data_dict.items():
+        if t_name == base_table: continue
+        
+        # Curățare și marcare cu cod_identificare
+        df_det = normalize_identifier_column(df_det)
+        df_det["cod_identificare"] = cod_id
+        
+        # Upsert rând cu rând (sau bulk dacă Supabase permite conflict pe multiple rânduri)
+        for _, r in df_det.iterrows():
+            row_payload = r.to_dict()
+            ok, msg = direct_upsert_single_row(supabase, t_name, row_payload)
+            if not ok: return False, f"Eroare {t_name}: {msg}"
+            
+    return True, "Fișa a fost salvată cu succes în toate tabelele."
 
-    if exists:
-        supabase.table(table_name) \
-            .update(payload) \
-            .eq("cod_identificare", cod) \
-            .execute()
-    else:
-        supabase.table(table_name) \
-            .insert(payload) \
-            .execute()
+def direct_delete_all_tables(supabase, cod_id, all_tables):
+    """Șterge definitiv înregistrările asociate unui cod din toate tabelele listate."""
+    try:
+        for t_name in all_tables:
+            supabase.table(t_name).delete().eq("cod_identificare", cod_id).execute()
+        return True, "Înregistrarea a fost ștearsă din sistem."
+    except Exception as e:
+        return False, str(e)
 
-
-def direct_delete_all_tables(supabase, cod: str, table_names: list[str]) -> tuple[bool, str]:
-    ok_any = False
-    errors = []
-
-    for table_name in table_names:
-        try:
-            supabase.table(table_name) \
-                .delete() \
-                .eq("cod_identificare", cod) \
-                .execute()
-
-            ok_any = True
-
-        except Exception as e:
-            errors.append(f"{table_name}: {e}")
-
-    if not ok_any and errors:
-        return False, " | ".join(errors)
-
-    if not ok_any:
-        return False, "Nu s-a sters nimic."
-
-    if errors:
-        return True, "Stergere partiala."
-
-    return True, "Fisa a fost stearsa."
-
-
-def direct_validate_all_tables(
-    supabase,
-    cod: str,
-    table_names: list[str],
-    operator: str
-) -> tuple[bool, str]:
-
-    ok_any = False
-    errors = []
-
-    msg = (
-        f"Validat de {operator} @ "
-        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    )
-
-    for table_name in table_names:
-        try:
-            payload = {
-                "validat_idbdc": True,
-                "data_ultimei_modificari": now_iso(),
-                "observatii_idbdc": msg,
-            }
-
-            supabase.table(table_name) \
-                .update(payload) \
-                .eq("cod_identificare", cod) \
-                .execute()
-
-            ok_any = True
-
-        except Exception as e:
-            errors.append(f"{table_name}: {e}")
-
-    if not ok_any and errors:
-        return False, " | ".join(errors)
-
-    if not ok_any:
-        return False, "Nu s-a putut valida."
-
-    if errors:
-        return True, "Validare partiala."
-
-    return True, "Validare realizata."
+def append_observatii(old_obs, new_text, user_name):
+    """Logică pentru adăugarea de observații fără a șterge istoricul."""
+    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
+    header = f"--- {user_name} ({timestamp}) ---"
+    if not old_obs:
+        return f"{header}\n{new_text}"
+    return f"{old_obs}\n\n{header}\n{new_text}"
