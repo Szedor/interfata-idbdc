@@ -1,126 +1,87 @@
 # =========================================================
-# ADMIN CONFIG — configurari stabile pentru c2
+# IDBDC - MODUL ADMIN - CONFIGURARE STRUCTURĂ (admin_config.py)
+# Versiune: 1.0 - Restructurare logică (Fără modificări vizuale)
 # =========================================================
 
-# ---------------------------------------------------------
-# TABELE BAZA
-# ---------------------------------------------------------
+import streamlit as st
 
+# --- MAPARE TABELE BAZĂ (Identitate Vizuală păstrată) ---
 BASE_TABLE_MAP = {
-    # CONTRACTE
-    ("Contracte", "CEP"): "base_contracte_cep",
-    ("Contracte", "TERTI"): "base_contracte_terti",
-    ("Contracte", "SPECIALE"): "base_contracte_speciale",
-
-    # PROIECTE
-    ("Proiecte", "FDI"): "base_proiecte_fdi",
-    ("Proiecte", "PNCDI"): "base_proiecte_pncdi",
-    ("Proiecte", "PNRR"): "base_proiecte_pnrr",
-    ("Proiecte", "INTERNATIONALE"): "base_proiecte_internationale",
-    ("Proiecte", "INTERREG"): "base_proiecte_interreg",
-    ("Proiecte", "NONEU"): "base_proiecte_noneu",
-    ("Proiecte", "SEE"): "base_proiecte_see",
-
-    # EVENIMENTE
-    ("Evenimente stiintifice", ""): "base_evenimente_stiintifice",
-
-    # PROPRIETATE INDUSTRIALA
-    ("Proprietate intelectuala", ""): "base_prop_intelect",
+    "Contracte": {
+        "TERTI": "base_contracte_terti",
+        "CEP": "base_contracte_cep",
+    },
+    "Proiecte": {
+        "FDI": "base_proiecte_fdi",
+        "PNCDI": "base_proiecte_pncdi",
+        "PNRR": "base_proiecte_pnrr",
+        "INTERNATIONALE": "base_proiecte_internationale",
+        "ALTE": "base_proiecte_alte",
+    },
+    "Evenimente stiintifice": {
+        "CONFERINTE": "base_evenimente_conferinte",
+    },
+    "Proprietate industriala": {
+        "BREVETE": "base_proprietate_brevete",
+    }
 }
 
+# --- TABELE COMPLEMENTARE ---
+COMPLEMENTARY_TABLES = [
+    ("Date financiare", "det_date_financiare"),
+    ("Echipă", "det_echipa"),
+    ("Aspecte tehnice", "det_aspecte_tehnice"),
+]
 
-# ---------------------------------------------------------
-# TABELE COMPLEMENTARE
-# ---------------------------------------------------------
+# --- DEFINIRE TAB-URI PER CATEGORIE (Logica stabilă) ---
+def get_tabs_for_category(categorie):
+    """Returnează lista de tab-uri care trebuie afișate în funcție de categorie."""
+    if categorie in ["Evenimente stiintifice", "Proprietate industriala"]:
+        return ["Date de bază"]
+    return ["Date de bază", "Date financiare", "Echipă", "Aspecte tehnice"]
 
-COMPLEMENTARY_TABLES = {
-    "Date financiare": "com_date_financiare",
-    "Echipa": "com_echipe_proiect",
-    "Aspecte tehnice": "com_aspecte_tehnice",
+# --- NOMENCLATOARE WHITELIST (Pentru Dropdowns) ---
+NOMDET_WHITELIST = [
+    "nom_categorie",
+    "nom_status_proiect",
+    "nom_contracte",
+    "nom_proiecte",
+    "nom_departament",
+    "nom_functie_upt",
+    "nom_functie_proiect",
+    "nom_moneda",
+    "nom_sursa_finantare",
+    "nom_tip_rezultat",
+    "nom_stadiu_protectie",
+]
+
+# --- MAPARE DROPDOWNS ---
+NOMDET_DROPDOWN_MAP = {
+    "tip_contract": "nom_contracte",
+    "tip_proiect": "nom_proiecte",
+    "categorie_fdi": "nom_categorie",
+    "status_proiect": "nom_status_proiect",
+    "departament": "nom_departament",
+    "functie_upt": "nom_functie_upt",
+    "functie_in_proiect": "nom_functie_proiect",
+    "moneda": "nom_moneda",
+    "sursa_finantare": "nom_sursa_finantare",
+    "tip_rezultat": "nom_tip_rezultat",
+    "stadiu_protectie": "nom_stadiu_protectie",
 }
 
+# --- COLOANE DE CONTROL (ADMIN ONLY) ---
+CONTROL_COLS = [
+    "responsabil_idbdc",
+    "observatii_idbdc",
+    "status_confirmare",
+    "data_ultimei_modificari",
+    "validat_idbdc",
+]
 
-# ---------------------------------------------------------
-# TAB-URI AFISATE PE CATEGORIE
-# ---------------------------------------------------------
+# --- CONFIGURARE ETICHETE SPECIALE ---
+TABELE_CONTRACTE = ["base_contracte_terti", "base_contracte_cep"]
 
-CATEGORY_TABS = {
-    "Contracte": [
-        "Date de baza",
-        "Date financiare",
-        "Echipa",
-        "Aspecte tehnice",
-    ],
-
-    "Proiecte": [
-        "Date de baza",
-        "Date financiare",
-        "Echipa",
-        "Aspecte tehnice",
-    ],
-
-    "Evenimente stiintifice": [
-        "Date de baza",
-        "Date financiare",
-    ],
-
-    "Proprietate intelectuala": [
-        "Date de baza",
-        "Date financiare",
-    ],
-}
-
-
-# ---------------------------------------------------------
-# TIPURI DISPONIBILE PE CATEGORII
-# ---------------------------------------------------------
-
-CATEGORY_TYPES = {
-    "Contracte": [
-        "CEP",
-        "TERTI",
-        "SPECIALE",
-    ],
-
-    "Proiecte": [
-        "FDI",
-        "PNCDI",
-        "PNRR",
-        "INTERNATIONALE",
-        "INTERREG",
-        "NONEU",
-        "SEE",
-    ],
-
-    "Evenimente stiintifice": [],
-    "Proprietate intelectuala": [],
-}
-
-
-# ---------------------------------------------------------
-# LABEL-URI AFISARE
-# ---------------------------------------------------------
-
-CATEGORY_LABELS = {
-    "Contracte": "📄 Contracte",
-    "Proiecte": "🔬 Proiecte",
-    "Evenimente stiintifice": "🎓 Evenimente stiintifice",
-    "Proprietate intelectuala": "💡 Proprietate industriala",
-}
-
-
-# ---------------------------------------------------------
-# HELPER
-# ---------------------------------------------------------
-
-
-def get_base_table(category: str, tip: str = "") -> str:
-    return BASE_TABLE_MAP.get((category, tip), "")
-
-
-def get_tabs_for_category(category: str) -> list:
-    return CATEGORY_TABS.get(category, [])
-
-
-def get_types_for_category(category: str) -> list:
-    return CATEGORY_TYPES.get(category, [])
+def get_base_table(categorie, tip):
+    """Returnează numele tabelului SQL pe baza selecției din UI."""
+    return BASE_TABLE_MAP.get(categorie, {}).get(tip)
