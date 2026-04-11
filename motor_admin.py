@@ -65,7 +65,7 @@ def porneste_motorul(supabase):
         df_base = pd.DataFrame([{"cod_identificare": "", "validat_idbdc": False}])
     else:
         # Corecție: Asigurat formatul client.table(nume).eq(...)
-        res_b = supabase.table(base_table).eq("cod_identificare", cod_id).execute()
+        res_b = supabase.table(base_table).select("*").eq("cod_identificare", cod_id).execute()
         df_base = pd.DataFrame(res_b.data)
     data_dict[base_table] = df_base
 
@@ -74,7 +74,7 @@ def porneste_motorul(supabase):
         if cod_id == "- NOU -":
             df_temp = pd.DataFrame([{"cod_identificare": ""}])
         else:
-            res_temp = supabase.table(t_name).eq("cod_identificare", cod_id).execute()
+            res_temp = supabase.table(t_name).select("*").eq("cod_identificare", cod_id).execute()
             df_temp = pd.DataFrame(res_temp.data)
         data_dict[t_name] = df_temp
 
