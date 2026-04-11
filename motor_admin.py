@@ -85,6 +85,7 @@ def porneste_motorul(supabase):
     for i, tab_name in enumerate(list_tabs):
         with st_tabs[i]:
             if tab_name == "Date de bază":
+                ui.render_base_info_box()
                 col_cfg = rules.get_column_config(data_dict[base_table])
                 data_dict[base_table] = st.data_editor(
                     data_dict[base_table],
@@ -122,6 +123,7 @@ def porneste_motorul(supabase):
                 )
 
             elif tab_name == "Aspecte tehnice":
+                ui.render_technical_info_box()
                 t_teh = "com_aspecte_tehnice"
                 col_cfg = rules.get_column_config(data_dict[t_teh])
                 data_dict[t_teh] = st.data_editor(
