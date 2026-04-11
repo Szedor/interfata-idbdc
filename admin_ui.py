@@ -1,16 +1,14 @@
 # =========================================================
 # IDBDC - MODUL ADMIN - INTERFAȚĂ VIZUALĂ (admin_ui.py)
-# Versiune: 1.1 - Titluri toate tab-uri + corecție valoare financiară
+# Versiune: 1.2 - Valoare totală din com_date_financiare
 # =========================================================
 
 import streamlit as st
 
 def apply_admin_styles():
-    """Aplică stilul CSS specific pentru Calea 2 (Admin)."""
     st.markdown(
         """
         <style>
-            /* Stil containere info */
             .info-box {
                 padding: 1.2rem;
                 border-radius: 8px;
@@ -25,7 +23,6 @@ def apply_admin_styles():
                 border-bottom: 1px solid #4a90e2;
                 padding-bottom: 4px;
             }
-            /* Ajustări tabele editor */
             [data-testid="stDataEditor"] {
                 background-color: white;
                 border-radius: 4px;
@@ -36,7 +33,7 @@ def apply_admin_styles():
     )
 
 def render_base_info_box():
-    """Afișează titlul pentru tab-ul Date de bază."""
+    """Titlu tab Date de bază."""
     st.markdown(
         """
         <div class="info-box blue-box">
@@ -46,14 +43,16 @@ def render_base_info_box():
         unsafe_allow_html=True
     )
 
-def render_financial_info_box(df_base):
-    """Afișează titlul și valoarea totală pentru tab-ul Date financiare."""
-    if df_base is None or df_base.empty:
-        return
+def render_financial_info_box(df_fin):
+    """Titlu + valoare totală pentru tab Date financiare.
+    df_fin = DataFrame din com_date_financiare."""
+    val = 0
+    moneda = "RON"
 
-    row = df_base.iloc[0]
-    val = row.get("valoare_totala_contract") or row.get("valoare_totala") or 0
-    moneda = row.get("moneda", "RON") or "RON"
+    if df_fin is not None and not df_fin.empty:
+        row = df_fin.iloc[0]
+        val    = row.get("valoare_totala_contract") or row.get("valoare_totala") or 0
+        moneda = row.get("moneda") or "RON"
 
     try:
         val_fmt = f"{float(val):,.2f}"
@@ -73,7 +72,7 @@ def render_financial_info_box(df_base):
     )
 
 def render_team_info_box(count_membri):
-    """Afișează titlul și numărul de membri pentru tab-ul Echipă."""
+    """Titlu + număr membri pentru tab Echipă."""
     st.markdown(
         f"""
         <div class="info-box blue-box">
@@ -85,7 +84,7 @@ def render_team_info_box(count_membri):
     )
 
 def render_technical_info_box():
-    """Afișează titlul pentru tab-ul Aspecte tehnice."""
+    """Titlu tab Aspecte tehnice."""
     st.markdown(
         """
         <div class="info-box blue-box">
@@ -106,7 +105,6 @@ def display_admin_message():
         del st.session_state["admin_msg"]
 
 def render_sidebar_info(operator, rol):
-    """Afișează info operator în sidebar."""
     st.sidebar.markdown("---")
     st.sidebar.success(f"👤 Operator: {operator}")
     st.sidebar.info(f"🔑 Rol: {rol}")
