@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - MOTOR ADMIN - ORCHESTRATOR PRINCIPAL
-# Versiune: 2.1 (Completă) - Rezolvare SyncRequestBuilder
+# Versiune: 2.2 - Mesaje contextuale + corecții aspect
 # =========================================================
 
 import streamlit as st
@@ -14,62 +14,76 @@ def porneste_motorul(supabase):
     # 1. Inițializare Stil și Mesaje
     ui.apply_admin_styles()
     ui.display_admin_message()
-    
+
     is_admin = st.session_state.get("operator_rol") == "ADMIN"
     filtru_cat = st.session_state.get("operator_filtru_categorie", [])
     filtru_tip = st.session_state.get("operator_filtru_tipuri", [])
 
-    # 2. Sidebar - Selecție Categorie și Tip
+    # 2. Sidebar - Selecție Categorie
     with st.sidebar:
         st.header("📂 Selecție Date")
-        
-        lista_categorii = [c for c in cfg.BASE_TABLE_MAP.keys() if c in filtru_cat] if not is_admin else list(cfg.BASE_TABLE_MAP.keys())
+
+        lista_categorii = (
+            [c for c in cfg.BASE_TABLE_MAP.keys() if c in filtru_cat]
+            if not is_admin else list(cfg.BASE_TABLE_MAP.keys())
+        )
         cat_sel = st.selectbox("Categorie", ["- Alege -"] + lista_categorii)
 
-        tip_sel = "- Alege -"
-        if cat_sel != "- Alege -":
-            optiuni_tip = list(cfg.BASE_TABLE_MAP[cat_sel].keys())
-            if not is_admin:
-                optiuni_tip = [t for t in optiuni_tip if t in filtru_tip]
-            tip_sel = st.selectbox("Tip", ["- Alege -"] + optiuni_tip)
+    # [i] Doar categoria selectată — afișăm mesaj și oprim
+    if cat_sel == "- Alege -":
+        st.info("Selectați categoria din meniul lateral.")
+        return
 
-    if cat_sel == "- Alege -" or tip_sel == "- Alege -":
-        st.info("Selectați categoria și tipul de proiect din meniul lateral.")
+    # 3. Sidebar - Selecție Tip
+    with st.sidebar:
+        optiuni_tip = list(cfg.BASE_TABLE_MAP[cat_sel].keys())
+        if not is_admin:
+            optiuni_tip = [t for t in optiuni_tip if t in filtru_tip]
+        tip_sel = st.selectbox("Tip", ["- Alege -"] + optiuni_tip)
+
+    # [ii] Categoria aleasă, tipul nu — afișăm mesaj și oprim
+    if tip_sel == "- Alege -":
+        st.info("Selectați tipul de contract din meniul lateral.")
         return
 
     base_table = cfg.get_base_table(cat_sel, tip_sel)
 
-    # 3. Selecție Cod Identificare (Corecție eroare SyncRequestBuilder)
+    # 4. Sidebar - Selecție Cod Identificare
     with st.sidebar:
         try:
-            # Corecție: Adăugat .table() înainte de .select()
             res_coduri = supabase.table(base_table).select("cod_identificare").execute()
-            list_coduri = sorted([r["cod_identificare"] for r in res_coduri.data]) if res_coduri.data else []
+            list_coduri = sorted(
+                [r["cod_identificare"] for r in res_coduri.data]
+            ) if res_coduri.data else []
         except Exception:
             list_coduri = []
-            
-        cod_id = st.selectbox("Cod Identificare (IDBDC)", ["- NOU -"] + list_coduri)
-        
+
+        cod_id = st.selectbox("Cod Identificare", ["- Alege -", "- NOU -"] + list_coduri)
+
         st.divider()
         btn_save = st.button("💾 SALVEAZĂ TOATE DATELE", use_container_width=True, type="primary")
-        
+
         btn_delete = False
-        if is_admin and cod_id != "- NOU -":
+        if is_admin and cod_id not in ("- Alege -", "- NOU -"):
             btn_delete = st.button("🗑️ ȘTERGE FIȘA", use_container_width=True)
 
-    # 4. Logica de Încărcare Date din toate tabelele (Bază + Complementare)
+    # [iii] Tipul ales, codul nu — afișăm mesaj și oprim
+    if cod_id == "- Alege -":
+        st.info("Selectați «- NOU -» sau introduceți numărul contractului din meniul lateral.")
+        return
+
+    # [iv] De aici înainte — cod ales sau NOU — se deschid cele 4 taburi
+
+    # 5. Încărcare Date
     data_dict = {}
-    
-    # Încărcare Tabel Bază
+
     if cod_id == "- NOU -":
         df_base = pd.DataFrame([{"cod_identificare": "", "validat_idbdc": False}])
     else:
-        # Corecție: Asigurat formatul client.table(nume).eq(...)
         res_b = supabase.table(base_table).select("*").eq("cod_identificare", cod_id).execute()
         df_base = pd.DataFrame(res_b.data)
     data_dict[base_table] = df_base
 
-    # Încărcare Tabele Complementare
     for label, t_name in cfg.COMPLEMENTARY_TABLES:
         if cod_id == "- NOU -":
             df_temp = pd.DataFrame([{"cod_identificare": ""}])
@@ -78,7 +92,10 @@ def porneste_motorul(supabase):
             df_temp = pd.DataFrame(res_temp.data)
         data_dict[t_name] = df_temp
 
-    # 5. Randare Interfață Tab-uri (Păstrare aspect validat)
+    # 6. Valoare totală din tabelul com_date_financiare (coloana valoare_totala_contract)
+    df_fin = data_dict.get("com_date_financiare", pd.DataFrame())
+
+    # 7. Randare Tab-uri
     list_tabs = cfg.get_tabs_for_category(cat_sel)
     st_tabs = st.tabs(list_tabs)
 
@@ -97,7 +114,7 @@ def porneste_motorul(supabase):
                 )
 
             elif tab_name == "Date financiare":
-                ui.render_financial_info_box(data_dict[base_table])
+                ui.render_financial_info_box(df_fin)
                 t_fin = "com_date_financiare"
                 col_cfg = rules.get_column_config(data_dict[t_fin])
                 data_dict[t_fin] = st.data_editor(
@@ -135,14 +152,13 @@ def porneste_motorul(supabase):
                     key=f"editor_{t_teh}"
                 )
 
-    # 6. Logica de Salvare
+    # 8. Salvare
     if btn_save:
         with st.spinner("Se salvează datele..."):
-            # Identificare cod final (existent sau nou creat în editor)
             df_b = data_dict[base_table]
             raw_id = df_b.iloc[0].get("cod_identificare", "") if not df_b.empty else ""
             final_cod = str(raw_id).strip()
-            
+
             if not final_cod or final_cod == "nan":
                 st.error("Eroare: Specificați un Cod Identificare valid.")
             else:
@@ -150,7 +166,7 @@ def porneste_motorul(supabase):
                 st.session_state["admin_msg"] = ("success" if ok else "error", msg)
                 st.rerun()
 
-    # 7. Logica de Ștergere
+    # 9. Ștergere
     if btn_delete:
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_id}!")
         if st.checkbox("Confirm eliminarea din toate tabelele"):
