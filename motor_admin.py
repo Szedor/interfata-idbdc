@@ -97,7 +97,7 @@ def porneste_motorul(supabase):
 
             elif tab_name == "Date financiare":
                 ui.render_financial_info_box(data_dict[base_table])
-                t_fin = "det_date_financiare"
+                t_fin = "com_date_financiare"
                 col_cfg = rules.get_column_config(data_dict[t_fin])
                 data_dict[t_fin] = st.data_editor(
                     data_dict[t_fin],
@@ -109,8 +109,8 @@ def porneste_motorul(supabase):
                 )
 
             elif tab_name == "Echipă":
-                ui.render_team_info_box(len(data_dict["det_echipa"]))
-                t_ech = "det_echipa"
+                ui.render_team_info_box(len(data_dict["com_echipe_proiect"]))
+                t_ech = "com_echipe_proiect"
                 col_cfg = rules.get_column_config(data_dict[t_ech])
                 data_dict[t_ech] = st.data_editor(
                     data_dict[t_ech],
@@ -122,7 +122,7 @@ def porneste_motorul(supabase):
                 )
 
             elif tab_name == "Aspecte tehnice":
-                t_teh = "det_aspecte_tehnice"
+                t_teh = "com_aspecte_tehnice"
                 col_cfg = rules.get_column_config(data_dict[t_teh])
                 data_dict[t_teh] = st.data_editor(
                     data_dict[t_teh],
