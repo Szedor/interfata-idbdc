@@ -28,9 +28,9 @@ BASE_TABLE_MAP = {
 
 # --- TABELE COMPLEMENTARE ---
 COMPLEMENTARY_TABLES = [
-    ("Date financiare", "det_date_financiare"),
-    ("Echipă", "det_echipa"),
-    ("Aspecte tehnice", "det_aspecte_tehnice"),
+    ("Date financiare", "com_date_financiare"),
+    ("Echipă", "com_echipe_proiect"),
+    ("Aspecte tehnice", "com_aspecte_tehnice"),
 ]
 
 # --- DEFINIRE TAB-URI PER CATEGORIE (Logica stabilă) ---
