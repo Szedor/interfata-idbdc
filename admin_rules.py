@@ -13,16 +13,16 @@ def get_column_config(df):
     config = {}
     
     for col in df.columns:
-        # 1. Forțăm TEXT pentru câmpurile problematice (Bug fix: persoana_contact)
-        if col in ["persoana_contact", "cod_identificare", "telefon", "email"]:
+        # 1. Forțăm TEXT pentru câmpurile problematice
+        if col in ["cod_identificare", "telefon", "email"]:
             config[col] = st.column_config.TextColumn(
                 col.replace("_", " ").title(),
                 help=f"Câmp formatat ca text pentru {col}",
-                disabled=(col == "cod_identificare") # Codul nu se editează manual aici
+                disabled=(col == "cod_identificare")
             )
         
         # 2. Configurare pentru Booleene (Checkboxes)
-        elif col.startswith("is_") or col in ["validat_idbdc", "confirmare"]:
+        elif col.startswith("is_") or col in ["validat_idbdc", "confirmare", "persoana_contact"]:
             config[col] = st.column_config.CheckboxColumn(
                 col.replace("_", " ").title()
             )
