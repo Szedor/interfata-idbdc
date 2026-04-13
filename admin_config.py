@@ -1,46 +1,63 @@
 # =========================================================
 # IDBDC - MODUL ADMIN - CONFIGURARE STRUCTURĂ (admin_config.py)
-# Versiune: 1.0 - Restructurare logică (Fără modificări vizuale)
+# Versiune: 1.1 - Tab-uri specifice per tip
 # =========================================================
 
 import streamlit as st
 
-# --- MAPARE TABELE BAZĂ (Identitate Vizuală păstrată) ---
+# --- MAPARE TABELE BAZĂ ---
 BASE_TABLE_MAP = {
     "Contracte": {
         "TERTI": "base_contracte_terti",
-        "CEP": "base_contracte_cep",
+        "CEP":   "base_contracte_cep",
     },
     "Proiecte": {
-        "FDI": "base_proiecte_fdi",
-        "PNCDI": "base_proiecte_pncdi",
-        "PNRR": "base_proiecte_pnrr",
+        "FDI":            "base_proiecte_fdi",
+        "PNCDI":          "base_proiecte_pncdi",
+        "PNRR":           "base_proiecte_pnrr",
         "INTERNATIONALE": "base_proiecte_internationale",
-        "ALTE": "base_proiecte_alte",
+        "INTERREG":       "base_proiecte_interreg",
+        "NONEU":          "base_proiecte_noneu",
+        "SEE":            "base_proiecte_see",
     },
     "Evenimente stiintifice": {
-        "CONFERINTE": "base_evenimente_conferinte",
+        "CONFERINTE": "base_evenimente_stiintifice",
     },
     "Proprietate industriala": {
-        "BREVETE": "base_proprietate_brevete",
-    }
+        "BREVETE": "base_prop_intelect",
+    },
 }
 
-# --- TABELE COMPLEMENTARE ---
+# --- TABELE COMPLEMENTARE (folosite în ștergere generică) ---
 COMPLEMENTARY_TABLES = [
     ("Date financiare", "com_date_financiare"),
-    ("Echipă", "com_echipe_proiect"),
+    ("Echipă",          "com_echipe_proiect"),
     ("Aspecte tehnice", "com_aspecte_tehnice"),
 ]
 
-# --- DEFINIRE TAB-URI PER CATEGORIE (Logica stabilă) ---
-def get_tabs_for_category(categorie):
-    """Returnează lista de tab-uri care trebuie afișate în funcție de categorie."""
-    if categorie in ["Evenimente stiintifice", "Proprietate industriala"]:
-        return ["Date de bază"]
-    return ["Date de bază", "Date financiare", "Echipă", "Aspecte tehnice"]
+# --- TAB-URI PER CATEGORIE/TIP ---
+# Cheia: (categorie, tip) sau (categorie, None) pentru toate tipurile acelei categorii
+TABS_MAP = {
+    ("Contracte", "CEP"):   ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
+    ("Contracte", "TERTI"): ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
+    # Proiectele și restul vor fi adăugate pe măsură ce sunt configurate
+}
 
-# --- NOMENCLATOARE WHITELIST (Pentru Dropdowns) ---
+def get_tabs_for_category(categorie, tip=None):
+    """Returnează lista de tab-uri pentru combinația categorie + tip."""
+    key = (categorie, tip)
+    if key in TABS_MAP:
+        return TABS_MAP[key]
+    # Fallback generic
+    if categorie in ["Evenimente stiintifice", "Proprietate industriala"]:
+        return ["📋 Date de bază"]
+    return ["📋 Date de bază", "💰 Date financiare", "👥 Echipă", "🧪 Aspecte tehnice"]
+
+def get_base_table(categorie, tip):
+    """Returnează numele tabelului SQL pe baza selecției din UI."""
+    return BASE_TABLE_MAP.get(categorie, {}).get(tip)
+
+# --- NOMENCLATOARE ---
 NOMDET_WHITELIST = [
     "nom_categorie",
     "nom_status_proiect",
@@ -55,22 +72,20 @@ NOMDET_WHITELIST = [
     "nom_stadiu_protectie",
 ]
 
-# --- MAPARE DROPDOWNS ---
 NOMDET_DROPDOWN_MAP = {
-    "tip_contract": "nom_contracte",
-    "tip_proiect": "nom_proiecte",
-    "categorie_fdi": "nom_categorie",
-    "status_proiect": "nom_status_proiect",
-    "departament": "nom_departament",
-    "functie_upt": "nom_functie_upt",
+    "tip_contract":       "nom_contracte",
+    "tip_proiect":        "nom_proiecte",
+    "categorie_fdi":      "nom_categorie",
+    "status_proiect":     "nom_status_proiect",
+    "departament":        "nom_departament",
+    "functie_upt":        "nom_functie_upt",
     "functie_in_proiect": "nom_functie_proiect",
-    "moneda": "nom_moneda",
-    "sursa_finantare": "nom_sursa_finantare",
-    "tip_rezultat": "nom_tip_rezultat",
-    "stadiu_protectie": "nom_stadiu_protectie",
+    "moneda":             "nom_moneda",
+    "sursa_finantare":    "nom_sursa_finantare",
+    "tip_rezultat":       "nom_tip_rezultat",
+    "stadiu_protectie":   "nom_stadiu_protectie",
 }
 
-# --- COLOANE DE CONTROL (ADMIN ONLY) ---
 CONTROL_COLS = [
     "responsabil_idbdc",
     "observatii_idbdc",
@@ -78,10 +93,3 @@ CONTROL_COLS = [
     "data_ultimei_modificari",
     "validat_idbdc",
 ]
-
-# --- CONFIGURARE ETICHETE SPECIALE ---
-TABELE_CONTRACTE = ["base_contracte_terti", "base_contracte_cep"]
-
-def get_base_table(categorie, tip):
-    """Returnează numele tabelului SQL pe baza selecției din UI."""
-    return BASE_TABLE_MAP.get(categorie, {}).get(tip)
