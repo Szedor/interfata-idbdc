@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - MOTOR ADMIN - ORCHESTRATOR PRINCIPAL
-# Versiune: 2.3 - Cod liber + selecție acțiune
+# Versiune: 2.4 - Fișe specifice per categorie/tip
 # Logică unică pentru toate categoriile și tipurile platformei
 # =========================================================
 
@@ -101,117 +101,116 @@ def porneste_motorul(supabase):
         st.info("Selectați acțiunea din meniul lateral.")
         return
 
-    # 6. Încărcare date
     is_new = (actiune == "Fișă nouă")
-    data_dict = {}
 
-    if is_new:
-        # Fișă nouă — codul pre-completat în toate tabelele
-        data_dict[base_table] = pd.DataFrame(
-            [{"cod_identificare": cod_introdus, "validat_idbdc": False}]
-        )
-        for label, t_name in cfg.COMPLEMENTARY_TABLES:
-            data_dict[t_name] = pd.DataFrame([{"cod_identificare": cod_introdus}])
-    else:
-        # Modificare — date existente din baza de date
+    # 6. Încărcare date existente din BD
+    def _fetch(table, cod):
         try:
-            res_b = supabase.table(base_table).select("*").eq("cod_identificare", cod_introdus).execute()
-            data_dict[base_table] = (
-                pd.DataFrame(res_b.data) if res_b.data
-                else pd.DataFrame([{"cod_identificare": cod_introdus}])
-            )
+            res = supabase.table(table).select("*").eq("cod_identificare", cod).execute()
+            return res.data or []
         except Exception:
-            data_dict[base_table] = pd.DataFrame([{"cod_identificare": cod_introdus}])
+            return []
 
-        for label, t_name in cfg.COMPLEMENTARY_TABLES:
-            try:
-                res_t = supabase.table(t_name).select("*").eq("cod_identificare", cod_introdus).execute()
-                data_dict[t_name] = (
-                    pd.DataFrame(res_t.data) if res_t.data
-                    else pd.DataFrame([{"cod_identificare": cod_introdus}])
-                )
-            except Exception:
-                data_dict[t_name] = pd.DataFrame([{"cod_identificare": cod_introdus}])
+    date_baza_ex    = (_fetch(base_table, cod_introdus)[0]
+                       if not is_new and _fetch(base_table, cod_introdus) else {})
+    date_fin_ex     = _fetch("com_date_financiare", cod_introdus) if not is_new else []
+    date_echipa_ex  = _fetch("com_echipe_proiect",  cod_introdus) if not is_new else []
 
-    df_fin = data_dict.get("com_date_financiare", pd.DataFrame())
+    # 7. Randare fișe în funcție de categorie și tip
+    rezultate = {}
 
-    # 7. Randare tab-uri
-    list_tabs = cfg.get_tabs_for_category(cat_sel)
-    st_tabs = st.tabs(list_tabs)
+    # ── CONTRACTE CEP ──────────────────────────────────────
+    if cat_sel == "Contracte" and tip_sel == "CEP":
+        import admin_cep as cep
 
-    for i, tab_name in enumerate(list_tabs):
-        with st_tabs[i]:
+        tab1, tab2, tab3 = st.tabs([
+            "📋 Date de bază",
+            "💰 Date financiare",
+            "👥 Echipă",
+        ])
 
-            if tab_name == "Date de bază":
-                ui.render_base_info_box()
-                col_cfg = rules.get_column_config(data_dict[base_table], is_new=is_new)
-                data_dict[base_table] = st.data_editor(
-                    data_dict[base_table],
-                    column_config=col_cfg,
-                    hide_index=True,
-                    use_container_width=True,
-                    num_rows="fixed",
-                    key=f"editor_{base_table}"
-                )
+        with tab1:
+            rezultate["baza"] = cep.render_date_de_baza(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
+            )
 
-            elif tab_name == "Date financiare":
-                ui.render_financial_info_box(df_fin)
-                t_fin = "com_date_financiare"
-                col_cfg = rules.get_column_config(data_dict[t_fin], is_new=is_new)
-                data_dict[t_fin] = st.data_editor(
-                    data_dict[t_fin],
-                    column_config=col_cfg,
-                    hide_index=True,
-                    use_container_width=True,
-                    num_rows="dynamic",
-                    key=f"editor_{t_fin}"
-                )
+        with tab2:
+            rezultate["financiar"] = cep.render_date_financiare(
+                supabase, cod_introdus, is_new, date_fin_ex
+            )
 
-            elif tab_name == "Echipă":
-                ui.render_team_info_box(len(data_dict["com_echipe_proiect"]))
-                t_ech = "com_echipe_proiect"
-                col_cfg = rules.get_column_config(data_dict[t_ech], is_new=is_new)
-                data_dict[t_ech] = st.data_editor(
-                    data_dict[t_ech],
-                    column_config=col_cfg,
-                    hide_index=True,
-                    use_container_width=True,
-                    num_rows="dynamic",
-                    key=f"editor_{t_ech}"
-                )
+        with tab3:
+            rezultate["echipa"] = cep.render_echipa(
+                supabase, cod_introdus, is_new, date_echipa_ex
+            )
 
-            elif tab_name == "Aspecte tehnice":
-                ui.render_technical_info_box()
-                t_teh = "com_aspecte_tehnice"
-                col_cfg = rules.get_column_config(data_dict[t_teh], is_new=is_new)
-                data_dict[t_teh] = st.data_editor(
-                    data_dict[t_teh],
-                    column_config=col_cfg,
-                    hide_index=True,
-                    use_container_width=True,
-                    num_rows="dynamic",
-                    key=f"editor_{t_teh}"
-                )
+    # ── ALTE CATEGORII/TIPURI — fallback generic (urmează) ─
+    else:
+        st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
+        return
 
     # 8. Salvare
     if btn_save:
         with st.spinner("Se salvează datele..."):
-            df_b = data_dict[base_table]
-            raw_id = df_b.iloc[0].get("cod_identificare", "") if not df_b.empty else ""
-            final_cod = str(raw_id).strip()
+            erori = []
 
-            if not final_cod or final_cod == "nan":
-                st.error("Eroare: Codul de identificare lipsește.")
+            # Tabel bază
+            if "baza" in rezultate and rezultate["baza"]:
+                row = {**rezultate["baza"]}
+                row["cod_identificare"] = cod_introdus
+                ok, msg = ops.direct_upsert_single_row(supabase, base_table, row)
+                if not ok:
+                    erori.append(f"Date de bază: {msg}")
+
+            # Date financiare (listă de rânduri)
+            if "financiar" in rezultate:
+                # Ștergem rândurile vechi și reinserăm
+                try:
+                    supabase.table("com_date_financiare").delete().eq(
+                        "cod_identificare", cod_introdus
+                    ).execute()
+                except Exception:
+                    pass
+                for row in rezultate["financiar"]:
+                    ok, msg = ops.direct_upsert_single_row(
+                        supabase, "com_date_financiare", row, match_col="cod_identificare"
+                    )
+                    if not ok:
+                        erori.append(f"Date financiare: {msg}")
+
+            # Echipă (listă de rânduri)
+            if "echipa" in rezultate:
+                try:
+                    supabase.table("com_echipe_proiect").delete().eq(
+                        "cod_identificare", cod_introdus
+                    ).execute()
+                except Exception:
+                    pass
+                for row in rezultate["echipa"]:
+                    if not row.get("nume_prenume"):
+                        continue
+                    ok, msg = ops.direct_upsert_single_row(
+                        supabase, "com_echipe_proiect", row, match_col="cod_identificare"
+                    )
+                    if not ok:
+                        erori.append(f"Echipă: {msg}")
+
+            if erori:
+                st.session_state["admin_msg"] = ("error", " | ".join(erori))
             else:
-                ok, msg = ops.direct_save_all_tables(supabase, final_cod, data_dict, base_table)
-                st.session_state["admin_msg"] = ("success" if ok else "error", msg)
-                st.rerun()
+                st.session_state["admin_msg"] = ("success", "Toate datele au fost salvate cu succes.")
+            st.rerun()
 
     # 9. Ștergere
     if btn_delete:
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
         if st.checkbox("Confirm eliminarea din toate tabelele"):
-            tabele_curatare = [base_table] + [t[1] for t in cfg.COMPLEMENTARY_TABLES]
+            tabele_curatare = [
+                base_table,
+                "com_date_financiare",
+                "com_echipe_proiect",
+                "com_aspecte_tehnice",
+            ]
             ok, msg = ops.direct_delete_all_tables(supabase, cod_introdus, tabele_curatare)
             if ok:
                 st.session_state["admin_msg"] = ("success", "Înregistrarea a fost eliminată.")
