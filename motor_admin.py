@@ -103,7 +103,7 @@ def porneste_motorul(supabase):
         with st_tabs[i]:
             if tab_name == "Date de bază":
                 ui.render_base_info_box()
-                col_cfg = rules.get_column_config(data_dict[base_table])
+                col_cfg = rules.get_column_config(data_dict[base_table], is_new=(cod_id == "- NOU -"))
                 data_dict[base_table] = st.data_editor(
                     data_dict[base_table],
                     column_config=col_cfg,
