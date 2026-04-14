@@ -210,29 +210,28 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
 
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
 
-    @st.cache_data(show_spinner=False, ttl=600)
-    def get_persoane(_sb):
-        try:
-            res = _sb.table("det_resurse_umane").select(
-                "nume_prenume,email,telefon_mobil,telefon_upt,acronim_departament"
-            ).execute()
-            return res.data or []
-        except Exception:
-            return []
+    # Citire directă fără cache — cache_data nu funcționează corect cu clientul Supabase
+    try:
+        res = supabase.table("det_resurse_umane").select(
+            "nume_prenume,email,telefon_mobil,telefon_upt,acronim_departament"
+        ).order("nume_prenume").execute()
+        persoane_data = res.data or []
+    except Exception as e:
+        st.error(f"❌ Eroare citire det_resurse_umane: {e}")
+        persoane_data = []
 
-    @st.cache_data(show_spinner=False, ttl=600)
-    def get_dep_map(_sb):
-        try:
-            res = _sb.table("nom_departament").select(
-                "acronim_departament,denumire_departament"
-            ).execute()
-            return {r["acronim_departament"]: r["denumire_departament"]
-                    for r in (res.data or []) if r.get("acronim_departament")}
-        except Exception:
-            return {}
+    try:
+        res2 = supabase.table("nom_departament").select(
+            "acronim_departament,denumire_departament"
+        ).execute()
+        dep_map = {r["acronim_departament"]: r["denumire_departament"]
+                   for r in (res2.data or []) if r.get("acronim_departament")}
+    except Exception as e:
+        st.error(f"❌ Eroare citire nom_departament: {e}")
+        dep_map = {}
 
-    persoane_data = get_persoane(supabase)
-    dep_map       = get_dep_map(supabase)
+    if not persoane_data:
+        st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane. Verificați conexiunea la baza de date.")
     persoane_list = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
 
     # Indexuri rapide pentru completare automată
