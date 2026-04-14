@@ -213,7 +213,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     # Citire directă fără cache — cache_data nu funcționează corect cu clientul Supabase
     try:
         res = supabase.table("det_resurse_umane").select(
-            "nume_prenume,email,telefon_mobil,telefon_upt,acronim_departament"
+            "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
         ).order("nume_prenume").execute()
         persoane_data = res.data or []
     except Exception as e:
@@ -246,7 +246,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             "dep":   f"{acronim} - {den}" if acronim and den else acronim,
             "email": p.get("email", ""),
             "mob":   p.get("telefon_mobil", ""),
-            "fix":   p.get("telefon_upt", ""),
+            "fix":   p.get("telefon_fix", ""),
         }
 
     # ── Construim tabelul inițial ─────────────────────────
