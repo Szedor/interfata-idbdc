@@ -25,21 +25,21 @@ def get_column_config(df, is_new: bool = False):
         # 2. Booleene (bifă)
         elif col.startswith("is_") or col in ["validat_idbdc", "confirmare", "persoana_contact"]:
             config[col] = st.column_config.CheckboxColumn(
-                col.replace("_", " ").title()
+                "✅ " + col.replace("_", " ").title()
             )
 
         # 3. Ani (fără virgulă la mii: 2.024 -> 2024)
         elif "an_" in col or col == "an":
             config[col] = st.column_config.NumberColumn(
-                col.replace("_", " ").title(),
+                "📆 " + col.replace("_", " ").title(),
                 format="%d"
             )
 
         # 4. Valori financiare
         elif any(key in col for key in ["valoare", "buget", "suma"]):
             config[col] = st.column_config.NumberColumn(
-                col.replace("_", " ").title(),
-                format="%.2f"
+                "💰 " + col.replace("_", " ").title(),
+                format="%,.2f"
             )
 
     return config
