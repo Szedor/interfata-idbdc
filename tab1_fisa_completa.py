@@ -221,7 +221,13 @@ def _fmt_numeric(val, col_name: str = "") -> str:
     if col_name in no_decimal_fields:
         return str(int(round(f)))
 
+    # Detectam campuri financiare pentru separator de mii
+    financial_keys = ("valoare", "buget", "suma", "cost", "contributie", "cofinantare")
+    is_financial = any(k in col_name for k in financial_keys)
+
     if f.is_integer():
+        if is_financial:
+            return f"{int(f):,}".replace(",", ".")
         return str(int(f))
 
     return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -441,10 +447,22 @@ def _get_contact_info(supabase, nume: str, debug_st=None) -> list:
             return []
         d = res.data[0]
         out = []
-        dept  = str(d.get("acronim_departament") or "").strip()
-        email = str(d.get("email") or "").strip()
-        tel   = str(d.get("telefon_mobil") or "").strip()
-        if dept:  out.append(f"🏛 {dept}")
+        acronim = str(d.get("acronim_departament") or "").strip()
+        email   = str(d.get("email") or "").strip()
+        tel     = str(d.get("telefon_mobil") or "").strip()
+        # [3] Aducem denumirea completa a departamentului
+        if acronim:
+            try:
+                dep_res = supabase.table("nom_departament") \
+                    .select("denumire_departament") \
+                    .eq("acronim_departament", acronim).limit(1).execute()
+                den = ""
+                if dep_res.data:
+                    den = str(dep_res.data[0].get("denumire_departament") or "").strip()
+                dept_label = f"{acronim} - {den}" if den else acronim
+            except Exception:
+                dept_label = acronim
+            out.append(f"🏛 {dept_label}")
         if email: out.append(f"✉ {email}")
         if tel:   out.append(f"📱 {tel}")
         return out
@@ -476,9 +494,8 @@ def _render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
             dept_row = str(r.get("acronim_departament") or "").strip()
             contact  = _get_contact_info(supabase, nume)
             # Daca departamentul vine deja din randul echipei, nu il mai adaugam din contact
-            if dept_row:
-                contact = [c for c in contact if not c.startswith("🏛")]
-                contact = [f"🏛 {dept_row}"] + contact
+            # [3] Departamentul complet vine deja din _get_contact_info
+            pass  # dept_row din randul echipei nu mai suprascrie - _get_contact_info il aduce complet
 
             titlu_contact = " · ".join(p for p in [nume, rol] if p)
             contact_html = ""
@@ -527,7 +544,7 @@ def _render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
 
     def _fmt_membru(r):
         nume = str(r.get("nume_prenume") or "").strip()
-        rol  = str(r.get("functia_specifica") or "").strip()
+        rol  = str(r.get("rol") or r.get("functia_specifica") or "").strip()
         if nume and rol:
             return f"{_html.escape(nume)} ({_html.escape(rol)})"
         return _html.escape(nume or rol)
@@ -651,13 +668,9 @@ def _build_echipa_export_rows(rows_ech: list, supabase: Client) -> pd.DataFrame:
     contact_parts = []
     for r in persoane_cont:
         nume = str(r.get("nume_prenume") or "").strip()
-        rol  = str(r.get("functia_specifica") or "").strip()
+        rol  = str(r.get("rol") or r.get("functia_specifica") or "").strip()
         txt  = ", ".join(p for p in [nume, rol] if p)
-        dept_row = str(r.get("acronim_departament") or "").strip()
         contact = _get_contact_info(supabase, nume)
-        if dept_row:
-            contact = [c for c in contact if not c.startswith("🏛")]
-            contact = [f"🏛 {dept_row}"] + contact
         if contact:
             txt += "  " + "  ".join(contact)
         if txt:
@@ -666,7 +679,7 @@ def _build_echipa_export_rows(rows_ech: list, supabase: Client) -> pd.DataFrame:
 
     def _fmt_m(r):
         nume = str(r.get("nume_prenume") or "").strip()
-        rol  = str(r.get("functia_specifica") or "").strip()
+        rol  = str(r.get("rol") or r.get("functia_specifica") or "").strip()
         if nume and rol:
             return f"{nume} ({rol})"
         return nume or rol
@@ -830,7 +843,7 @@ def render_fisa_completa(supabase: Client):
             export_frames["Echipa"] = df_ech
 
     # Ordine fixă secțiuni — matriță pentru toate tipurile: Generale / Financiar / Echipa / Tehnic
-    _SECTIUNI_ORDINE = ["Generale", "Financiar", "Echipa", "Tehnic"]
+    _SECTIUNI_ORDINE = ["Generale", "Financiar", "Echipa", "Tehnic"]  # [6] ordine identica cu calea2
     export_frames = {
         k: export_frames[k]
         for k in _SECTIUNI_ORDINE
@@ -845,11 +858,31 @@ def render_fisa_completa(supabase: Client):
 
     with ea1:
         try:
+            # [7] Alegere format export Excel
+            mod_xlsx = st.radio(
+                "Format Excel",
+                options=["📋 Sheet per secțiune", "📄 Un singur sheet"],
+                key=f"fisa_xlsx_mod_{cod}",
+                horizontal=True,
+                label_visibility="collapsed",
+            )
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                for section_label, df_sec in export_frames.items():
-                    sheet_name = section_label[:31].replace("/", "-").replace(":", "")
-                    df_sec.to_excel(writer, index=False, sheet_name=sheet_name)
+                if mod_xlsx == "📄 Un singur sheet":
+                    # Concatenam toate sectiunile vertical cu rand separator
+                    frames_list = []
+                    for section_label, df_sec in export_frames.items():
+                        # Rand titlu sectiune
+                        titlu_row = pd.DataFrame([{"Camp": f"=== {section_label.upper()} ===", "Valoare": ""}])
+                        frames_list.append(titlu_row)
+                        frames_list.append(df_sec)
+                        frames_list.append(pd.DataFrame([{"Camp": "", "Valoare": ""}]))  # rand gol separator
+                    df_all = pd.concat(frames_list, ignore_index=True)
+                    df_all.to_excel(writer, index=False, sheet_name="Fisa completa")
+                else:
+                    for section_label, df_sec in export_frames.items():
+                        sheet_name = section_label[:31].replace("/", "-").replace(":", "")
+                        df_sec.to_excel(writer, index=False, sheet_name=sheet_name)
             buf.seek(0)
             st.download_button(
                 "⬇️ Excel (.xlsx)", data=buf,
@@ -927,6 +960,14 @@ def render_fisa_completa(supabase: Client):
                     sec_label = df_sec_name if r_idx == 0 else ""
                     camp_val  = str(row.get("Camp", ""))
                     val_val   = str(row.get("Valoare", "")) if row.get("Valoare") is not None else ""
+                    # [5] Inlocuim emoji cu text ASCII pentru compatibilitate PDF
+                    val_val = (val_val
+                        .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
+                        .replace("✉ ", "Email: ").replace("✉", "Email: ")
+                        .replace("📱 ", "Mobil: ").replace("📱", "Mobil: ")
+                        .replace("⭐ ", "").replace("⭐", "")
+                        .replace("👥 ", "").replace("👥", "")
+                    )
                     tbl_data.append((sec_label, camp_val, val_val, bg))
                 if not tbl_data:
                     continue
