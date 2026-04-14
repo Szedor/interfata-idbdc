@@ -186,14 +186,14 @@ def porneste_motorul(supabase):
                     ).execute()
                 except Exception:
                     pass
-                for row in rezultate["echipa"]:
-                    if not row.get("nume_prenume"):
-                        continue
-                    ok, msg = ops.direct_upsert_single_row(
-                        supabase, "com_echipe_proiect", row, match_col="cod_identificare"
-                    )
-                    if not ok:
-                        erori.append(f"Echipă: {msg}")
+                randuri_echipa = [
+                    row for row in rezultate["echipa"] if row.get("nume_prenume")
+                ]
+                if randuri_echipa:
+                    try:
+                        supabase.table("com_echipe_proiect").insert(randuri_echipa).execute()
+                    except Exception as e:
+                        erori.append(f"Echipa: {e}")
 
             if erori:
                 st.session_state["admin_msg"] = ("error", " | ".join(erori))
