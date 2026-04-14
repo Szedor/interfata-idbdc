@@ -98,14 +98,14 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "CATEGORIE": st.column_config.TextColumn("CATEGORIE", disabled=True),
         "TIPUL DE CONTRACT": st.column_config.TextColumn("TIPUL DE CONTRACT", disabled=True),
         "NR.CONTRACT": st.column_config.TextColumn("NR.CONTRACT", disabled=True),
-        "DATA CONTRACTULUI": st.column_config.DateColumn("DATA CONTRACTULUI", format="YYYY-MM-DD"),
+        "DATA CONTRACTULUI": st.column_config.DateColumn("📅 DATA CONTRACTULUI", format="DD-MM-YYYY"),
         "OBIECTUL CONTRACTULUI": st.column_config.TextColumn("OBIECTUL CONTRACTULUI", width="large"),
         "BENEFICIAR": st.column_config.TextColumn("BENEFICIAR"),
-        "DATA DE INCEPUT": st.column_config.DateColumn("DATA DE INCEPUT", format="YYYY-MM-DD"),
-        "DATA DE SFARSIT": st.column_config.DateColumn("DATA DE SFARSIT", format="YYYY-MM-DD"),
+        "DATA DE INCEPUT": st.column_config.DateColumn("📅 DATA DE INCEPUT", format="DD-MM-YYYY"),
+        "DATA DE SFARSIT": st.column_config.DateColumn("📅 DATA DE SFARSIT", format="DD-MM-YYYY"),
         "DURATA": st.column_config.NumberColumn("DURATA", format="%d", min_value=0),
         "STATUS CONTRACT": st.column_config.SelectboxColumn(
-            "STATUS CONTRACT", options=status_list
+            "🔖 STATUS CONTRACT", options=status_list
         ),
     }
 
@@ -177,9 +177,9 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
     }])
 
     col_cfg = {
-        "VALUTA": st.column_config.SelectboxColumn("VALUTA", options=VALUTE, required=True),
+        "VALUTA": st.column_config.SelectboxColumn("💱 VALUTA", options=VALUTE, required=True),
         "VALOARE CONTRACT": st.column_config.NumberColumn(
-            "VALOARE CONTRACT", format="%.2f", min_value=0.0
+            "💰 VALOARE CONTRACT", format="%,.2f", min_value=0.0
         ),
     }
 
@@ -292,10 +292,10 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
 
     col_cfg = {
         "NUME ȘI PRENUME": st.column_config.SelectboxColumn(
-            "NUME ȘI PRENUME", options=persoane_list, required=False
+            "👤 NUME ȘI PRENUME", options=persoane_list, required=False
         ),
         "ROLUL ÎN CONTRACT":   st.column_config.TextColumn("ROLUL ÎN CONTRACT"),
-        "PERSOANĂ DE CONTACT": st.column_config.CheckboxColumn("PERSOANĂ DE CONTACT"),
+        "PERSOANĂ DE CONTACT": st.column_config.CheckboxColumn("⭐ PERSOANĂ DE CONTACT"),
         "DEPARTAMENT":         st.column_config.TextColumn("DEPARTAMENT", disabled=True),
         "EMAIL":               st.column_config.TextColumn("EMAIL", disabled=True),
         "TELEFON MOBIL":       st.column_config.TextColumn("TELEFON MOBIL", disabled=True),
