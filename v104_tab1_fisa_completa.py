@@ -660,12 +660,39 @@ def _build_section_export_df(rows: list, table: str = None,
                               tabela_baza_ctx: str = None) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame()
-    priority_set = {c: i for i, c in enumerate(CARD_PRIORITY)}
 
     is_contract_ctx = (tabela_baza_ctx or table or "") in _TABELE_CONTRACTE
     extra_hidden = _COLS_EXCLUDE_CONTRACTE if is_contract_ctx else set()
 
-    all_items = []
+    COL_ORDER_GENERALE = [
+        "denumire_categorie", "acronim_tip_contract", "cod_identificare",
+        "data_contract", "obiectul_contractului", "denumire_beneficiar",
+        "data_inceput", "data_sfarsit", "durata",
+        "status_contract_proiect",
+        "titlul_proiect", "acronim_proiect", "programul_de_finantare",
+        "schema_de_finantare", "apel_pentru_propuneri", "rol_upt",
+        "parteneri", "coordonator", "director_proiect",
+        "data_depunere", "data_depozit_cerere", "data_apel",
+        "an_referinta", "an_inceput", "an_sfarsit", "durata_luni",
+        "natura_eveniment", "format_eveniment", "loc_desfasurare",
+        "numar_participanti", "institutii_organizare",
+        "acronim_prop_intelect", "nr_cerere", "nr_brevet",
+        "data_acordare", "data_oficiala_acordare", "numar_oficial_acordare",
+        "inventatori", "cuvinte_cheie", "descriere", "observatii",
+    ]
+
+    COL_ORDER_FINANCIAR = [
+        "cod_identificare", "valuta",
+        "valoare_contract_cep_terti_speciale",
+        "valoare_anuala_contract", "valoare_totala_contract",
+        "cofinantare_anuala_contract", "cofinantare_totala_contract",
+        "suma_solicitata_fdi", "cofinantare_upt_fdi",
+        "cost_total_proiect", "cost_proiect_upt",
+        "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
+    ]
+
+    export_rows = []
+
     for row in rows:
         visible_cols = [
             c for c in row.keys()
@@ -674,24 +701,46 @@ def _build_section_export_df(rows: list, table: str = None,
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
         ]
-        # Sectiunea Tehnic — ordine fixa de matrita
+
         if table == "com_aspecte_tehnice":
             ordered = [c for c in TEHNIC_COL_ORDER if c in visible_cols]
-            rest    = sorted([c for c in visible_cols if c not in TEHNIC_COL_ORDER],
-                             key=lambda c: (priority_set.get(c, 999), c))
+            rest = [c for c in visible_cols if c not in TEHNIC_COL_ORDER]
+            visible_cols = ordered + rest
+        elif table == "com_date_financiare":
+            ordered = [c for c in COL_ORDER_FINANCIAR if c in visible_cols]
+            rest = [c for c in visible_cols if c not in COL_ORDER_FINANCIAR]
             visible_cols = ordered + rest
         else:
-            visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
+            ordered = [c for c in COL_ORDER_GENERALE if c in visible_cols]
+            rest = [c for c in visible_cols if c not in COL_ORDER_GENERALE]
+            visible_cols = ordered + rest
+
+        header_row = {}
+        value_row = {}
+
         for c in visible_cols:
             raw_val = row[c]
+
             try:
                 float(str(raw_val).replace(",", ".").strip())
                 is_num = True
-            except (ValueError, TypeError):
+            except Exception:
                 is_num = False
+
             val_str = _fmt_numeric(raw_val, c) if is_num else str(raw_val)
-            all_items.append({"Camp": _col_label(c, table), "Valoare": val_str})
-    return pd.DataFrame(all_items) if all_items else pd.DataFrame()
+
+            header_row[c] = _col_label(c, table)
+            value_row[c] = val_str
+
+        if header_row:
+            export_rows.append(header_row)
+            export_rows.append(value_row)
+            export_rows.append({})
+
+    if not export_rows:
+        return pd.DataFrame()
+
+    return pd.DataFrame(export_rows)
 
 
 def _build_echipa_export_rows(rows_ech: list, supabase: Client) -> pd.DataFrame:
