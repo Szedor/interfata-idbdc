@@ -1,56 +1,83 @@
+# =========================================================
+# IDBDC - MODUL ADMIN - OPERAȚIUNI DATE (admin_data_ops.py)
+# Versiune: 1.1 - Corecție critică sintaxă Supabase
+# =========================================================
+
+import streamlit as st
 import pandas as pd
-import io
-from fpdf import FPDF
+from datetime import datetime
 
-# [Art. 11] Lista oficiala care dicteaza ordinea campurilor (Punctul 2)
-# Aceasta ordine va fi replicata in SQL, Interfata, PDF si Excel
-ORDINE_CAMPURI_CEP = [
-    "cod_inregistrare", "nr_contract", "data_contract", "beneficiar", 
-    "obiect_contract", "valoare_totala", "valuta", "durata_luni", 
-    "stadiu_actual", "observatii"
-]
+def now_iso():
+    return datetime.now().isoformat()
 
-def genereaza_pdf_cu_diacritice(date_fisa):
-    """Generare PDF cu suport pentru caractere romanesti (Punctul 1)"""
-    pdf = FPDF()
-    pdf.add_page()
-    # Utilizam un font standard care suporta setul de caractere latin-2
-    pdf.set_font("Arial", size=12)
-    
-    pdf.cell(200, 10, txt="FISA COMPLETA CONTRACT CEP", ln=True, align='C')
-    pdf.ln(10)
-    
-    for camp in ORDINE_CAMPURI_CEP:
-        nume_afisat = camp.replace("_", " ").upper()
-        valoare = str(date_fisa.get(camp, ""))
-        # Conversie manuala pentru a asigura scrierea diacriticelor in formatul PDF
-        linie = f"{nume_afisat}: {valoare}"
-        pdf.multi_cell(0, 10, txt=linie.encode('latin-1', 'replace').decode('latin-1'))
-    
-    return pdf.output(dest='S').encode('latin-1')
+def normalize_identifier_column(df, column_name="cod_identificare"):
+    """Asigură că coloana de legătură este tratată ca string curat."""
+    if column_name in df.columns:
+        df[column_name] = df[column_name].astype(str).str.strip().replace("nan", "")
+    return df
 
-def export_excel_special(df_selectat):
-    """Export: R1-Denumiri, R2-Valori, Coloana goala intre fise (Punctul 3)"""
-    output = io.BytesIO()
-    lista_finala = []
+def cleanup_payload(row_dict):
+    """Elimină câmpurile sistem sau nule înainte de trimiterea către bază."""
+    to_exclude = {"id", "creat_la", "creat_de", "modificat_la", "modificat_de"}
+    return {k: v for k, v in row_dict.items() if k not in to_exclude and pd.notnull(v)}
+
+def direct_upsert_single_row(supabase, table_name, row_data, match_col="cod_identificare"):
+    """Efectuează insert/update (upsert) corect în Supabase."""
+    payload = cleanup_payload(row_data)
+    if not payload.get(match_col):
+        return False, "Lipsă cod identificare."
     
-    # Capetele de tabel (Denumirile campurilor)
-    rand_header = []
-    # Datele (Valorile)
-    rand_date = []
-    
-    for i, (_, row) in enumerate(df_selectat.iterrows()):
-        for camp in ORDINE_CAMPURI_CEP:
-            rand_header.append(camp.replace("_", " ").upper())
-            rand_date.append(row[camp])
+    try:
+        # Ordinea corectă: .table().upsert()
+        supabase.table(table_name).upsert(payload, on_conflict=match_col).execute()
+        return True, "Succes"
+    except Exception as e:
+        return False, str(e)
+
+def direct_save_all_tables(supabase, cod_id, data_dict, base_table):
+    """Salvează centralizat toate tabelele (Bază + Detalii)."""
+    # 1. Salvare Tabel Bază
+    if base_table in data_dict:
+        df_base = data_dict[base_table]
+        if not df_base.empty:
+            row = df_base.iloc[0].to_dict()
+            row["cod_identificare"] = cod_id
+            row["data_ultimei_modificari"] = now_iso()
+            ok, msg = direct_upsert_single_row(supabase, base_table, row)
+            if not ok: return False, f"Eroare Bază: {msg}"
+
+    # 2. Salvare Tabele Detaliu
+    for t_name, df_det in data_dict.items():
+        if t_name == base_table: continue
         
-        # Daca sunt mai multe fise, adaugam o coloana goala (Punctul 3)
-        if i < len(df_selectat) - 1:
-            rand_header.append("") # Coloana goala in header
-            rand_date.append("")   # Coloana goala in date
+        df_det = normalize_identifier_column(df_det)
+        
+        for _, r in df_det.iterrows():
+            row_payload = r.to_dict()
+            # Forțăm legătura cu codul principal
+            row_payload["cod_identificare"] = cod_id
+            if str(row_payload.get("cod_identificare")).strip() in ["", "nan"]:
+                continue
+                
+            ok, msg = direct_upsert_single_row(supabase, t_name, row_payload)
+            if not ok: return False, f"Eroare în {t_name}: {msg}"
             
-    df_export = pd.DataFrame([rand_header, rand_date])
-    
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_export.to_excel(writer, index=False, header=False)
-    return output.getvalue()
+    return True, "Toate datele au fost salvate cu succes."
+
+def direct_delete_all_tables(supabase, cod_id, all_tables):
+    """Șterge fișa din toate tabelele. Corecție: .table().delete().eq()"""
+    try:
+        for t_name in all_tables:
+            # Ordinea corectă obligatorie: table -> delete -> filtru
+            supabase.table(t_name).delete().eq("cod_identificare", cod_id).execute()
+        return True, "Înregistrare ștearsă."
+    except Exception as e:
+        return False, str(e)
+
+def append_observatii(old_obs, new_text, user_name):
+    """Adaugă observații noi păstrând istoricul."""
+    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
+    header = f"--- {user_name} ({timestamp}) ---"
+    if not old_obs or str(old_obs) == "nan":
+        return f"{header}\n{new_text}"
+    return f"{old_obs}\n\n{header}\n{new_text}"
