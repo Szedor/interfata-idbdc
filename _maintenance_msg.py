@@ -17,7 +17,7 @@ _MAINTENANCE_STYLE = """
 """
 
 _MAINTENANCE_HTML = """
-    <div style='text-align:center;margin-top:3rem;'>
+    <div style='text-align:center;margin-top:2rem;'>
         <div style='font-size:2.2rem;'>&#9888;&#65039;</div>
         <div style='color:#ffffff;font-size:1.10rem;font-weight:900;
                     letter-spacing:0.06em;margin:0.5rem 0;'>
