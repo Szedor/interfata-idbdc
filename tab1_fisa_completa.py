@@ -560,4 +560,4 @@ def _render_export_auth_tab1(supabase: Client) -> bool:
         return True
     st.markdown(
         "<div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);"
-        "border-radius:12px;padding:
+        "border-radius:12px;padding:"
