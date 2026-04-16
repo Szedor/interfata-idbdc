@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 3.3 - Modificări cerute: redenumiri, mesaj, majuscule, print, PDF diacritice
+# Versiune: 3.4 - Modificări cerute: redenumiri, mesaj, majuscule, print doar culoare albă
 # =========================================================
 
 import streamlit as st
@@ -784,7 +784,6 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
         from reportlab.pdfbase.ttfonts import TTFont
         import os
 
-        # Folosim același font ca în print (Arial/DejaVu)
         font_registered = False
         font_name = "Helvetica"
         
@@ -875,17 +874,15 @@ def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str
     <meta charset="UTF-8">
     <title>Fișa {cod}</title>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #0b2a52; }}
-        h2 {{ color: #ffffff; }}
-        h3 {{ color: #ffffff; margin-top: 20px; }}
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        h2 {{ color: #0B2A52; }}
+        h3 {{ color: #0B2A52; margin-top: 20px; }}
         table {{ border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }}
-        th, td {{ border: 1px solid #ffffff; padding: 6px; text-align: left; vertical-align: top; }}
+        th, td {{ border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }}
         th {{ background-color: #0B2A52; color: white; font-size: 11px; }}
         td {{ color: white; font-size: 10px; }}
         @media print {{
             button {{ display: none; }}
-            body {{ background-color: #0b2a52; }}
-            td {{ color: white; }}
         }}
     </style>
 </head>
@@ -895,7 +892,7 @@ def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str
 """
     for section in export_data["sections"]:
         html += f"<h3>{section['name'].upper()}</h3>"
-        html += " <tr> <tr><th>Camp</th><th>Valoare</th></tr>"
+        html += " </table> <tr><th>Camp</th><th>Valoare</th></tr>"
         for f, v in zip(section["fields"], section["values"]):
             html += f" hilabbert<td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
         html += "</table>"
