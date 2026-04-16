@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 3.0 - Export final: Excel/CSV orizontal, PDF/Print vertical
+# Versiune: 3.1 - Export corectat: PDF diacritice, majuscule
 # =========================================================
 
 import streamlit as st
@@ -737,7 +737,7 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
 
 
 # =========================================================
-# FUNCȚII PENTRU EXPORT (vertical - PDF/Print)
+# FUNCȚII PENTRU EXPORT (vertical - PDF/Print) - CORECTATE
 # =========================================================
 
 def _build_vertical_export_data(supabase: Client, cod: str, tabela_gasita: str) -> dict:
@@ -754,7 +754,7 @@ def _build_vertical_export_data(supabase: Client, cod: str, tabela_gasita: str) 
             if rows:
                 headers, values = _get_echipa_export_data(rows, supabase)
                 for h, v in zip(headers, values):
-                    section_data["fields"].append(h)
+                    section_data["fields"].append(h.upper())
                     section_data["values"].append(v)
                 export_data["sections"].append(section_data)
         else:
@@ -763,7 +763,7 @@ def _build_vertical_export_data(supabase: Client, cod: str, tabela_gasita: str) 
                 field_order = _get_section_fields_ordered(section_name, rows, table_name, tabela_gasita)
                 if field_order:
                     values = _get_section_values_ordered(section_name, rows, field_order, table_name)
-                    headers = [_col_label(f, table_name) for f in field_order]
+                    headers = [_col_label(f, table_name).upper() for f in field_order]
                     for h, v in zip(headers, values):
                         section_data["fields"].append(h)
                         section_data["values"].append(v)
@@ -783,25 +783,55 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
         from reportlab.pdfbase.ttfonts import TTFont
         import os
 
+        # Font cu suport diacritice - căutare în mai multe locații
         font_registered = False
+        font_name = "Helvetica"  # fallback
+        
+        # Listă extinsă de fonturi cu suport diacritice
         font_paths = [
+            # Linux (Deploymente uzuale)
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+            "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            # macOS
             "/System/Library/Fonts/Helvetica.ttc",
+            "/System/Library/Fonts/Arial.ttf",
+            "/Library/Fonts/Arial.ttf",
+            # Windows
             "C:\\Windows\\Fonts\\arial.ttf",
+            "C:\\Windows\\Fonts\\segoeui.ttf",
+            "C:\\Windows\\Fonts\\times.ttf",
+            # Streamlit Cloud / PythonAnywhere
+            "/usr/local/lib/python3.11/site-packages/reportlab/fonts/Vera.ttf",
         ]
+        
         for path in font_paths:
             if os.path.exists(path):
                 try:
                     pdfmetrics.registerFont(TTFont("CustomFont", path))
+                    font_name = "CustomFont"
                     font_registered = True
                     break
                 except:
                     continue
+        
+        # Dacă niciun font nu a fost găsit, încercăm să folosim un font standard
+        # care suportă diacritice (Helvetica nu suportă corect)
         if not font_registered:
-            font_name = "Helvetica"
-        else:
-            font_name = "CustomFont"
+            # Ultimă încercare: folosim un font din pachetul reportlab dacă există
+            try:
+                from reportlab.pdfbase import pdfmetrics
+                from reportlab.pdfbase.ttfonts import TTFont
+                import pkg_resources
+                vera_path = pkg_resources.resource_filename('reportlab', 'fonts/Vera.ttf')
+                if os.path.exists(vera_path):
+                    pdfmetrics.registerFont(TTFont("Vera", vera_path))
+                    font_name = "Vera"
+                    font_registered = True
+            except:
+                pass
 
         pdf_buf = io.BytesIO()
         doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
@@ -833,7 +863,10 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
             story.append(Spacer(1, 0.2*cm))
             table_data = []
             for f, v in zip(section["fields"], section["values"]):
-                table_data.append([Paragraph(str(f), cell_style), Paragraph(str(v), cell_style)])
+                # Escapăm caracterele speciale pentru PDF
+                f_safe = str(f).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                v_safe = str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                table_data.append([Paragraph(f_safe, cell_style), Paragraph(v_safe, cell_style)])
             if table_data:
                 t = Table(table_data, colWidths=[4.5*cm, 11*cm])
                 t.setStyle(TableStyle([
@@ -879,7 +912,7 @@ def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str
 """
     for section in export_data["sections"]:
         html += f"<h3>{section['name'].upper()}</h3>"
-        html += "<table><tr><th>Camp</th><th>Valoare</th></tr>"
+        html += " <table> <tr><th>Camp</th><th>Valoare</th></tr>"
         for f, v in zip(section["fields"], section["values"]):
             html += f"<tr><td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
         html += "</table>"
