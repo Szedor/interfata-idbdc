@@ -785,7 +785,24 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
 
         # Font cu suport diacritice - căutare în mai multe locații
         font_registered = False
-        font_name = "Helvetica"  # fallback
+        font_name = "Helvetica"
+    
+    # Încercăm să folosim un font din sistem care suportă diacritice
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "C:\\Windows\\Fonts\\arial.ttf",
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont("CustomFont", path))
+                font_name = "CustomFont"
+                font_registered = True
+                break
+            except:
+                continue
         
         # Listă extinsă de fonturi cu suport diacritice
         font_paths = [
