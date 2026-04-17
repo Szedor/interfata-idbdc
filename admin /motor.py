@@ -1,19 +1,12 @@
-# =========================================================
-# IDBDC - MOTOR ADMIN - ORCHESTRATOR PRINCIPAL
-# Versiune: 2.4 - Fișe specifice per categorie/tip
-# Logică unică pentru toate categoriile și tipurile platformei
-# =========================================================
-
 import streamlit as st
 import pandas as pd
-import admin_config as cfg
-import admin_rules as rules
-import admin_data_ops as ops
-import admin_ui as ui
+import admin.config as cfg
+import admin.rules as rules
+import admin.data_ops as ops
+import admin.ui as ui
 
 
 def porneste_motorul(supabase):
-    # 1. Stil și mesaje
     ui.apply_admin_styles()
     ui.display_admin_message()
 
@@ -21,7 +14,6 @@ def porneste_motorul(supabase):
     filtru_cat = st.session_state.get("operator_filtru_categorie", [])
     filtru_tip = st.session_state.get("operator_filtru_tipuri", [])
 
-    # 2. Sidebar - Categorie
     with st.sidebar:
         st.header("📂 Selecție Date")
         lista_categorii = (
@@ -34,7 +26,6 @@ def porneste_motorul(supabase):
         st.info("Selectați categoria din meniul lateral.")
         return
 
-    # 3. Sidebar - Tip
     with st.sidebar:
         optiuni_tip = list(cfg.BASE_TABLE_MAP[cat_sel].keys())
         if not is_admin:
@@ -47,7 +38,6 @@ def porneste_motorul(supabase):
 
     base_table = cfg.get_base_table(cat_sel, tip_sel)
 
-    # 4. Sidebar - Cod identificare (câmp text liber)
     with st.sidebar:
         try:
             res_coduri = supabase.table(base_table).select("cod_identificare").execute()
@@ -67,10 +57,8 @@ def porneste_motorul(supabase):
         st.info("Introduceți codul în meniul lateral.")
         return
 
-    # 5. Detectare: cod nou sau existent
     este_existent = cod_introdus in list_coduri
 
-    # 5a. Sidebar - feedback + selecție acțiune
     with st.sidebar:
         if este_existent:
             st.success(f"✅ Cod recunoscut: {cod_introdus}")
@@ -103,7 +91,6 @@ def porneste_motorul(supabase):
 
     is_new = (actiune == "Fișă nouă")
 
-    # 6. Încărcare date existente din BD
     def _fetch(table, cod):
         try:
             res = supabase.table(table).select("*").eq("cod_identificare", cod).execute()
@@ -116,12 +103,10 @@ def porneste_motorul(supabase):
     date_fin_ex     = _fetch("com_date_financiare", cod_introdus) if not is_new else []
     date_echipa_ex  = _fetch("com_echipe_proiect",  cod_introdus) if not is_new else []
 
-    # 7. Randare fișe în funcție de categorie și tip
     rezultate = {}
 
-    # ── CONTRACTE CEP ──────────────────────────────────────
     if cat_sel == "Contracte" and tip_sel == "CEP":
-        import admin_cep as cep
+        import admin.fise.contracte_cep as cep
 
         tab1, tab2, tab3 = st.tabs([
             "📋 Date de bază",
@@ -144,17 +129,14 @@ def porneste_motorul(supabase):
                 supabase, cod_introdus, is_new, date_echipa_ex
             )
 
-    # ── ALTE CATEGORII/TIPURI — fallback generic (urmează) ─
     else:
         st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
         return
 
-    # 8. Salvare
     if btn_save:
         with st.spinner("Se salvează datele..."):
             erori = []
 
-            # Tabel bază
             if "baza" in rezultate and rezultate["baza"]:
                 row = {**rezultate["baza"]}
                 row["cod_identificare"] = cod_introdus
@@ -162,9 +144,7 @@ def porneste_motorul(supabase):
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
 
-            # Date financiare (listă de rânduri)
             if "financiar" in rezultate:
-                # Ștergem rândurile vechi și reinserăm
                 try:
                     supabase.table("com_date_financiare").delete().eq(
                         "cod_identificare", cod_introdus
@@ -178,7 +158,6 @@ def porneste_motorul(supabase):
                     if not ok:
                         erori.append(f"Date financiare: {msg}")
 
-            # Echipă (listă de rânduri)
             if "echipa" in rezultate:
                 try:
                     supabase.table("com_echipe_proiect").delete().eq(
@@ -201,7 +180,6 @@ def porneste_motorul(supabase):
                 st.session_state["admin_msg"] = ("success", "Toate datele au fost salvate cu succes.")
             st.rerun()
 
-    # 9. Ștergere
     if btn_delete:
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
         if st.checkbox("Confirm eliminarea din toate tabelele"):
