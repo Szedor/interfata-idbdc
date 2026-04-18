@@ -892,9 +892,9 @@ def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str
 """
     for section in export_data["sections"]:
         html += f"<h3>{section['name'].upper()}</h3>"
-        html += " </table> <tr><th>Camp</th><th>Valoare</th></tr>"
+        html += " <table> <tr><th>Camp</th><th>Valoare</th></tr>"
         for f, v in zip(section["fields"], section["values"]):
-            html += f" hilabbert<td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
+            html += f"<tr><td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
         html += "</table>"
     html += """
 </body>
