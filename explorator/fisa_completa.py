@@ -888,21 +888,21 @@ def render_fisa_completa(supabase: Client):
         st.info("Nu există date de exportat pentru acest cod.")
         return
 
+    # ── Sectiunea export: Excel / PDF / Print ─────────────
+    # Rand 1: radio pentru optiunea xlsx (lat intreaga)
+    OPT_MULTI  = "Fiecare sectiune = un sheet separat"
+    OPT_SINGLE = "Toate sectiunile intr-un singur sheet"
+    mod_xlsx = st.radio(
+        "Format Excel:",
+        options=[OPT_MULTI, OPT_SINGLE],
+        key=f"fisa_xlsx_mod_{cod}",
+        horizontal=True,
+    )
+    # Rand 2: cele 3 butoane pe coloane egale
     ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
 
     with ea1:
         try:
-            # [2][3] Radio alegere format — denumiri descriptive
-            OPT_MULTI  = "Fiecare secțiune = un sheet separat"
-            OPT_SINGLE = "Toate secțiunile într-un singur sheet"
-            mod_xlsx = st.radio(
-                "Format Excel",
-                options=[OPT_MULTI, OPT_SINGLE],
-                key=f"fisa_xlsx_mod_{cod}",
-                horizontal=False,
-                label_visibility="collapsed",
-            )
-            # Bufferul se construieste DUPA citirea optiunii alese
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
                 if mod_xlsx == OPT_SINGLE:
@@ -939,9 +939,21 @@ def render_fisa_completa(supabase: Client):
 
             from reportlab.pdfbase import pdfmetrics
             from reportlab.pdfbase.ttfonts import TTFont
-            _FONT_DIR = "/usr/share/fonts/truetype/dejavu"
-            pdfmetrics.registerFont(TTFont("DV",     f"{_FONT_DIR}/DejaVuSans.ttf"))
-            pdfmetrics.registerFont(TTFont("DV-Bold",f"{_FONT_DIR}/DejaVuSans-Bold.ttf"))
+            import os as _os
+            _FONT_CANDIDATES = [
+                "/usr/share/fonts/truetype/dejavu",
+                "/usr/local/lib/python3.12/dist-packages/matplotlib/mpl-data/fonts/ttf",
+            ]
+            _FONT_DIR = next(
+                (d for d in _FONT_CANDIDATES if _os.path.isfile(f"{d}/DejaVuSans.ttf")),
+                None
+            )
+            if _FONT_DIR:
+                pdfmetrics.registerFont(TTFont("DV",      f"{_FONT_DIR}/DejaVuSans.ttf"))
+                pdfmetrics.registerFont(TTFont("DV-Bold",  f"{_FONT_DIR}/DejaVuSans-Bold.ttf"))
+                _fn_reg, _fn_bold = "DV", "DV-Bold"
+            else:
+                _fn_reg, _fn_bold = "Helvetica", "Helvetica-Bold"
 
             pdf_buf   = io.BytesIO()
             doc       = SimpleDocTemplate(pdf_buf, pagesize=A4,
@@ -952,17 +964,17 @@ def render_fisa_completa(supabase: Client):
             BLUE_MED  = HexColor("#1A4A7A")
             BLUE_ROW  = HexColor("#EEF4FB")
             s_title   = ParagraphStyle("T", parent=styles["Title"],
-                            fontName="DV-Bold", fontSize=13, textColor=colors.white, leading=18)
+                            fontName=_fn_bold, fontSize=13, textColor=colors.white, leading=18)
             s_sub     = ParagraphStyle("S", parent=styles["Normal"],
-                            fontName="DV-Bold", fontSize=9, textColor=colors.white)
+                            fontName=_fn_bold, fontSize=9, textColor=colors.white)
             s_sec     = ParagraphStyle("SC", parent=styles["Normal"],
-                            fontName="DV-Bold", fontSize=7.5, textColor=HexColor("#5A7FA8"))
+                            fontName=_fn_bold, fontSize=7.5, textColor=HexColor("#5A7FA8"))
             s_lbl     = ParagraphStyle("L", parent=styles["Normal"],
-                            fontName="DV-Bold", fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
+                            fontName=_fn_bold, fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
             s_val     = ParagraphStyle("V", parent=styles["Normal"],
-                            fontName="DV", fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
+                            fontName=_fn_reg, fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
             s_head    = ParagraphStyle("H", parent=styles["Normal"],
-                            fontName="DV-Bold", fontSize=8, textColor=colors.white)
+                            fontName=_fn_bold, fontSize=8, textColor=colors.white)
             col_w = [2.5*cm, 5.5*cm, 9.44*cm]
             story = []
 
@@ -1033,7 +1045,7 @@ def render_fisa_completa(supabase: Client):
             story.append(Spacer(1, 0.5*cm))
             story.append(Paragraph(
                 "Document generat automat — IDBDC UPT  |  Uz intern",
-                ParagraphStyle("F", parent=styles["Normal"], fontName="Helvetica",
+                ParagraphStyle("F", parent=styles["Normal"], fontName=_fn_reg,
                     fontSize=7, textColor=HexColor("#8AADCC"), alignment=1)
             ))
             doc.build(story)
