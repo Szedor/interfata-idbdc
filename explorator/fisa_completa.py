@@ -221,15 +221,13 @@ def _fmt_numeric(val, col_name: str = "") -> str:
     if col_name in no_decimal_fields:
         return str(int(round(f)))
 
-    # Detectam campuri financiare pentru separator de mii si zecimale
+    # Detectam campuri financiare pentru separator de mii
     financial_keys = ("valoare", "buget", "suma", "cost", "contributie", "cofinantare")
     is_financial = any(k in col_name for k in financial_keys)
 
-    if is_financial:
-        # [4] Intotdeauna 2 zecimale si separator de mii pentru valori financiare
-        return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
     if f.is_integer():
+        if is_financial:
+            return f"{int(f):,}".replace(",", ".")
         return str(int(f))
 
     return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -383,46 +381,14 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
         ]
-        # [5] Ordine campuri identica cu calea2 — matrite per tabela
-        COL_ORDER_GENERALE = [
-            "denumire_categorie", "acronim_tip_contract", "cod_identificare",
-            "data_contract", "obiectul_contractului", "denumire_beneficiar",
-            "data_inceput", "data_sfarsit", "durata",
-            "status_contract_proiect",
-            # proiecte
-            "titlul_proiect", "acronim_proiect", "programul_de_finantare",
-            "schema_de_finantare", "apel_pentru_propuneri", "rol_upt",
-            "parteneri", "coordonator", "director_proiect",
-            "data_depunere", "data_depozit_cerere", "data_apel",
-            "an_referinta", "an_inceput", "an_sfarsit", "durata_luni",
-            "natura_eveniment", "format_eveniment", "loc_desfasurare",
-            "numar_participanti", "institutii_organizare",
-            "acronim_prop_intelect", "nr_cerere", "nr_brevet",
-            "data_acordare", "data_oficiala_acordare", "numar_oficial_acordare",
-            "inventatori", "cuvinte_cheie", "descriere", "observatii",
-        ]
-        COL_ORDER_FINANCIAR = [
-            "cod_identificare", "valuta",
-            "valoare_contract_cep_terti_speciale",
-            "valoare_anuala_contract", "valoare_totala_contract",
-            "cofinantare_anuala_contract", "cofinantare_totala_contract",
-            "suma_solicitata_fdi", "cofinantare_upt_fdi",
-            "cost_total_proiect", "cost_proiect_upt",
-            "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
-        ]
+        # Sectiunea Tehnic — ordine fixă de matriță
         if table == "com_aspecte_tehnice":
             ordered = [c for c in TEHNIC_COL_ORDER if c in visible_cols]
-            rest    = [c for c in visible_cols if c not in TEHNIC_COL_ORDER]
-            visible_cols = ordered + rest
-        elif table == "com_date_financiare":
-            ordered = [c for c in COL_ORDER_FINANCIAR if c in visible_cols]
-            rest    = [c for c in visible_cols if c not in COL_ORDER_FINANCIAR]
+            rest    = sorted([c for c in visible_cols if c not in TEHNIC_COL_ORDER],
+                             key=lambda c: (priority_set.get(c, 999), c))
             visible_cols = ordered + rest
         else:
-            # Generale si celelalte tabele baza
-            ordered = [c for c in COL_ORDER_GENERALE if c in visible_cols]
-            rest    = [c for c in visible_cols if c not in COL_ORDER_GENERALE]
-            visible_cols = ordered + rest
+            visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
         for c in visible_cols:
             # Format numeric pentru câmpuri de valori
             raw_val = row[c]
@@ -674,43 +640,14 @@ def _build_section_export_df(rows: list, table: str = None,
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
         ]
-        # [2] Ordine campuri identica cu calea2 si cu _render_sectiune_tabel
-        _EXP_COL_GEN = [
-            "denumire_categorie", "acronim_tip_contract", "cod_identificare",
-            "data_contract", "obiectul_contractului", "denumire_beneficiar",
-            "data_inceput", "data_sfarsit", "durata", "status_contract_proiect",
-            "titlul_proiect", "acronim_proiect", "programul_de_finantare",
-            "schema_de_finantare", "apel_pentru_propuneri", "rol_upt",
-            "parteneri", "coordonator", "director_proiect",
-            "data_depunere", "data_depozit_cerere", "data_apel",
-            "an_referinta", "an_inceput", "an_sfarsit", "durata_luni",
-            "natura_eveniment", "format_eveniment", "loc_desfasurare",
-            "numar_participanti", "institutii_organizare",
-            "acronim_prop_intelect", "nr_cerere", "nr_brevet",
-            "data_acordare", "data_oficiala_acordare", "numar_oficial_acordare",
-            "inventatori", "cuvinte_cheie", "descriere", "observatii",
-        ]
-        _EXP_COL_FIN = [
-            "cod_identificare", "valuta",
-            "valoare_contract_cep_terti_speciale",
-            "valoare_anuala_contract", "valoare_totala_contract",
-            "cofinantare_anuala_contract", "cofinantare_totala_contract",
-            "suma_solicitata_fdi", "cofinantare_upt_fdi",
-            "cost_total_proiect", "cost_proiect_upt",
-            "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
-        ]
+        # Sectiunea Tehnic — ordine fixa de matrita
         if table == "com_aspecte_tehnice":
             ordered = [c for c in TEHNIC_COL_ORDER if c in visible_cols]
-            rest    = [c for c in visible_cols if c not in TEHNIC_COL_ORDER]
-            visible_cols = ordered + rest
-        elif table == "com_date_financiare":
-            ordered = [c for c in _EXP_COL_FIN if c in visible_cols]
-            rest    = [c for c in visible_cols if c not in _EXP_COL_FIN]
+            rest    = sorted([c for c in visible_cols if c not in TEHNIC_COL_ORDER],
+                             key=lambda c: (priority_set.get(c, 999), c))
             visible_cols = ordered + rest
         else:
-            ordered = [c for c in _EXP_COL_GEN if c in visible_cols]
-            rest    = [c for c in visible_cols if c not in _EXP_COL_GEN]
-            visible_cols = ordered + rest
+            visible_cols.sort(key=lambda c: (priority_set.get(c, 999), c))
         for c in visible_cols:
             raw_val = row[c]
             try:
@@ -917,35 +854,30 @@ def render_fisa_completa(supabase: Client):
         st.info("Nu există date de exportat pentru acest cod.")
         return
 
-    # ── Sectiunea export: Excel / PDF / Print ─────────────
-    # Rand 1: radio pentru optiunea xlsx (lat intreaga)
-    OPT_MULTI  = "Fiecare sectiune = un sheet separat"
-    OPT_SINGLE = "Toate sectiunile intr-un singur sheet"
-    mod_xlsx = st.radio(
-        "Format Excel:",
-        options=[OPT_MULTI, OPT_SINGLE],
-        key=f"fisa_xlsx_mod_{cod}",
-        horizontal=True,
-    )
-    # Rand 2: cele 3 butoane pe coloane egale
     ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
 
     with ea1:
         try:
+            # [7] Alegere format export Excel
+            mod_xlsx = st.radio(
+                "Format Excel",
+                options=["📋 Sheet per secțiune", "📄 Un singur sheet"],
+                key=f"fisa_xlsx_mod_{cod}",
+                horizontal=True,
+                label_visibility="collapsed",
+            )
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                if mod_xlsx == OPT_SINGLE:
-                    # [3] 3 coloane: Sectiune | Camp | Valoare, rand gol intre sectiuni
-                    rows3 = []
+                if mod_xlsx == "📄 Un singur sheet":
+                    # Concatenam toate sectiunile vertical cu rand separator
+                    frames_list = []
                     for section_label, df_sec in export_frames.items():
-                        for r_idx, (_, row) in enumerate(df_sec.iterrows()):
-                            rows3.append({
-                                "Sectiune": section_label if r_idx == 0 else "",
-                                "Camp":     str(row.get("Camp", "")),
-                                "Valoare":  str(row.get("Valoare", "")),
-                            })
-                        rows3.append({"Sectiune": "", "Camp": "", "Valoare": ""})
-                    df_all = pd.DataFrame(rows3, columns=["Sectiune", "Camp", "Valoare"])
+                        # Rand titlu sectiune
+                        titlu_row = pd.DataFrame([{"Camp": f"=== {section_label.upper()} ===", "Valoare": ""}])
+                        frames_list.append(titlu_row)
+                        frames_list.append(df_sec)
+                        frames_list.append(pd.DataFrame([{"Camp": "", "Valoare": ""}]))  # rand gol separator
+                    df_all = pd.concat(frames_list, ignore_index=True)
                     df_all.to_excel(writer, index=False, sheet_name="Fisa completa")
                 else:
                     for section_label, df_sec in export_frames.items():
@@ -970,27 +902,6 @@ def render_fisa_completa(supabase: Client):
             from reportlab.lib.units import cm
             from reportlab.lib.colors import HexColor
 
-            from reportlab.pdfbase import pdfmetrics
-            from reportlab.pdfbase.ttfonts import TTFont
-            import os as _os
-            _FONT_CANDIDATES = [
-                "/usr/share/fonts/truetype/dejavu",
-                "/usr/local/lib/python3.12/dist-packages/matplotlib/mpl-data/fonts/ttf",
-            ]
-            _FONT_DIR = next(
-                (d for d in _FONT_CANDIDATES if _os.path.isfile(f"{d}/DejaVuSans.ttf")),
-                None
-            )
-            if _FONT_DIR:
-                # registerFont sigur: nu inregistram de doua ori in aceeasi sesiune
-                if "DV" not in pdfmetrics._fonts:
-                    pdfmetrics.registerFont(TTFont("DV",     f"{_FONT_DIR}/DejaVuSans.ttf"))
-                if "DV-Bold" not in pdfmetrics._fonts:
-                    pdfmetrics.registerFont(TTFont("DV-Bold", f"{_FONT_DIR}/DejaVuSans-Bold.ttf"))
-                _fn_reg, _fn_bold = "DV", "DV-Bold"
-            else:
-                _fn_reg, _fn_bold = "Helvetica", "Helvetica-Bold"
-
             pdf_buf   = io.BytesIO()
             doc       = SimpleDocTemplate(pdf_buf, pagesize=A4,
                             leftMargin=1.8*cm, rightMargin=1.8*cm,
@@ -1000,17 +911,17 @@ def render_fisa_completa(supabase: Client):
             BLUE_MED  = HexColor("#1A4A7A")
             BLUE_ROW  = HexColor("#EEF4FB")
             s_title   = ParagraphStyle("T", parent=styles["Title"],
-                            fontName=_fn_bold, fontSize=13, textColor=colors.white, leading=18)
+                            fontName="Helvetica-Bold", fontSize=13, textColor=colors.white, leading=18)
             s_sub     = ParagraphStyle("S", parent=styles["Normal"],
-                            fontName=_fn_bold, fontSize=9, textColor=colors.white)
+                            fontName="Helvetica-Bold", fontSize=9, textColor=colors.white)
             s_sec     = ParagraphStyle("SC", parent=styles["Normal"],
-                            fontName=_fn_bold, fontSize=7.5, textColor=HexColor("#5A7FA8"))
+                            fontName="Helvetica-Bold", fontSize=7.5, textColor=HexColor("#5A7FA8"))
             s_lbl     = ParagraphStyle("L", parent=styles["Normal"],
-                            fontName=_fn_bold, fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
+                            fontName="Helvetica-Bold", fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
             s_val     = ParagraphStyle("V", parent=styles["Normal"],
-                            fontName=_fn_reg, fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
+                            fontName="Helvetica", fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
             s_head    = ParagraphStyle("H", parent=styles["Normal"],
-                            fontName=_fn_bold, fontSize=8, textColor=colors.white)
+                            fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)
             col_w = [2.5*cm, 5.5*cm, 9.44*cm]
             story = []
 
@@ -1063,7 +974,7 @@ def render_fisa_completa(supabase: Client):
                 tbl_rows = [[
                     Paragraph(r[0], s_sec),
                     Paragraph(r[1], s_lbl),
-                    Paragraph(r[2].replace("\n","<br/>"), s_val),
+                    Paragraph(r[2].replace("\n","<br/>").encode("ascii","replace").decode("ascii"), s_val),
                 ] for r in tbl_data]
                 tbl = Table(tbl_rows, colWidths=col_w)
                 cmds = [
@@ -1081,7 +992,7 @@ def render_fisa_completa(supabase: Client):
             story.append(Spacer(1, 0.5*cm))
             story.append(Paragraph(
                 "Document generat automat — IDBDC UPT  |  Uz intern",
-                ParagraphStyle("F", parent=styles["Normal"], fontName=_fn_reg,
+                ParagraphStyle("F", parent=styles["Normal"], fontName="Helvetica",
                     fontSize=7, textColor=HexColor("#8AADCC"), alignment=1)
             ))
             doc.build(story)
