@@ -1,7 +1,7 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
 # !! FIȘIER BETONAT — NU SE MODIFICĂ !!
-# Ultima versiune validată: 19.03.2026
+# Ultima versiune validată: 14.04.2026
 # =========================================================
 
 import streamlit as st
