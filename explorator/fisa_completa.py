@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 3.4 - Modificări cerute: redenumiri, mesaj, majuscule, print doar culoare albă
+# Versiune: 3.0 - Export final: Excel/CSV orizontal, PDF/Print vertical
 # =========================================================
 
 import streamlit as st
@@ -67,7 +67,7 @@ COL_LABELS = {
     "domenii_studii": "DOMENIILE DE STUDII SUPERIOARE",
     "domeniu_aplicare": "DOMENIUL DE APLICARE",
     "domeniu_cercetare": "DOMENIUL DE CERCETARE",
-    "durata": "DURATA (în nr. luni)",
+    "durata": "DURATA",
     "durata_luni": "DURATA",
     "email": "EMAIL",
     "email_upt": "EMAIL",
@@ -130,7 +130,6 @@ COL_LABELS = {
     "total_proiecte": "TOTAL PROIECTE DEPUSE",
     "username_sistem": "USERNAME",
     "valoare_anuala_contract": "VALOAREA ANUALA A CONTRACTULUI",
-    "valoare_contract_cep_terti_speciale": "VALOARE CONTRACT CEP",
     "valoare_totala_contract": "VALOAREA TOTALA A CONTRACTULUI",
     "valuta": "VALUTA",
     "website": "WEBSITE",
@@ -755,7 +754,7 @@ def _build_vertical_export_data(supabase: Client, cod: str, tabela_gasita: str) 
             if rows:
                 headers, values = _get_echipa_export_data(rows, supabase)
                 for h, v in zip(headers, values):
-                    section_data["fields"].append(h.upper())
+                    section_data["fields"].append(h)
                     section_data["values"].append(v)
                 export_data["sections"].append(section_data)
         else:
@@ -764,7 +763,7 @@ def _build_vertical_export_data(supabase: Client, cod: str, tabela_gasita: str) 
                 field_order = _get_section_fields_ordered(section_name, rows, table_name, tabela_gasita)
                 if field_order:
                     values = _get_section_values_ordered(section_name, rows, field_order, table_name)
-                    headers = [_col_label(f, table_name).upper() for f in field_order]
+                    headers = [_col_label(f, table_name) for f in field_order]
                     for h, v in zip(headers, values):
                         section_data["fields"].append(h)
                         section_data["values"].append(v)
@@ -785,8 +784,6 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
         import os
 
         font_registered = False
-        font_name = "Helvetica"
-        
         font_paths = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
@@ -797,22 +794,14 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
             if os.path.exists(path):
                 try:
                     pdfmetrics.registerFont(TTFont("CustomFont", path))
-                    font_name = "CustomFont"
                     font_registered = True
                     break
                 except:
                     continue
-        
         if not font_registered:
-            try:
-                import urllib.request
-                font_url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
-                font_local = "/tmp/DejaVuSans.ttf"
-                urllib.request.urlretrieve(font_url, font_local)
-                pdfmetrics.registerFont(TTFont("CustomFont", font_local))
-                font_name = "CustomFont"
-            except:
-                pass
+            font_name = "Helvetica"
+        else:
+            font_name = "CustomFont"
 
         pdf_buf = io.BytesIO()
         doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
@@ -844,9 +833,7 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
             story.append(Spacer(1, 0.2*cm))
             table_data = []
             for f, v in zip(section["fields"], section["values"]):
-                f_safe = str(f).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                v_safe = str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                table_data.append([Paragraph(f_safe, cell_style), Paragraph(v_safe, cell_style)])
+                table_data.append([Paragraph(str(f), cell_style), Paragraph(str(v), cell_style)])
             if table_data:
                 t = Table(table_data, colWidths=[4.5*cm, 11*cm])
                 t.setStyle(TableStyle([
@@ -880,7 +867,7 @@ def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str
         table {{ border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }}
         th, td {{ border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }}
         th {{ background-color: #0B2A52; color: white; font-size: 11px; }}
-        td {{ color: white; font-size: 10px; }}
+        td {{ font-size: 10px; }}
         @media print {{
             button {{ display: none; }}
         }}
@@ -892,9 +879,9 @@ def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str
 """
     for section in export_data["sections"]:
         html += f"<h3>{section['name'].upper()}</h3>"
-        html += " </table> <tr><th>Camp</th><th>Valoare</th></tr>"
+        html += "<table><tr><th>Camp</th><th>Valoare</th></tr>"
         for f, v in zip(section["fields"], section["values"]):
-            html += f" hilabbert<td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
+            html += f"<tr><td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
         html += "</table>"
     html += """
 </body>
@@ -946,14 +933,7 @@ def render_fisa_completa(supabase: Client):
             unsafe_allow_html=True,
         )
     if not cod_found:
-        st.markdown(
-            "<div style='background:rgba(255,100,100,0.15);border:1px solid rgba(255,100,100,0.60);"
-            "border-radius:10px;padding:7px 14px;margin-bottom:4px;display:inline-block;'>"
-            "<span style='color:#ff8888;font-weight:700;font-size:0.92rem;'>"
-            "❌ Codul introdus nu a fost găsit în baza de date."
-            "</span></div>",
-            unsafe_allow_html=True,
-        )
+        st.warning("Codul introdus nu a fost găsit în nicio tabelă de bază.")
         return
     st.divider()
     titlu_fisa = TABLE_LABELS.get(tabela_gasita, "Fișă")
@@ -1031,27 +1011,30 @@ def render_fisa_completa(supabase: Client):
     if not _render_export_auth_tab1(supabase):
         return
 
+    # =========================================================
+    # EXPORT
+    # =========================================================
     export_data_horizontal = _build_horizontal_export_data(supabase, cod, tabela_gasita)
 
     if not export_data_horizontal["headers"]:
         st.info("Nu există date de exportat pentru acest cod.")
         return
 
-    # CSV (orizontal)
+    # ----- CSV (orizontal) -----
     csv_df = pd.DataFrame([export_data_horizontal["values"]], columns=export_data_horizontal["headers"])
     csv_bytes = csv_df.to_csv(index=False).encode("utf-8-sig")
 
-    # Excel (orizontal)
+    # ----- Excel (orizontal) -----
     excel_buf = io.BytesIO()
     with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
         df_export = pd.DataFrame([export_data_horizontal["values"]], columns=export_data_horizontal["headers"])
         df_export.to_excel(writer, index=False, sheet_name="Fisa completa")
     excel_buf.seek(0)
 
-    # PDF (vertical)
+    # ----- PDF (vertical) -----
     pdf_buf = _generate_pdf_vertical(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
-    # Print HTML (vertical)
+    # ----- Print HTML (vertical) -----
     print_html = _generate_print_html_vertical(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
     col1, col2, col3, col4 = st.columns(4)
