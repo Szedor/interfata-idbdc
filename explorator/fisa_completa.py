@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 4.4 - Diacritice în PDF folosind fonturile sistemului
+# Versiune: 4.5 - PDF cu diacritice folosind LiberationSans
 # =========================================================
 
 import streamlit as st
@@ -756,14 +756,14 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
 # ------------------------------------------------------------
 
 def _get_font_path():
-    """Returnează calea către un font TrueType care suportă diacritice."""
-    # Căi comune în Streamlit Cloud / Linux
+    """Returnează calea către un font care suportă diacritice românești."""
+    # Prioritizează LiberationSans (instalat implicit în Ubuntu)
     candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",  # macOS (nu are diacritice, dar există)
-        "C:\\Windows\\Fonts\\arial.ttf",       # Windows
+        "/System/Library/Fonts/Helvetica.ttc",  # fallback
     ]
     for path in candidates:
         if os.path.isfile(path):
@@ -785,9 +785,8 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         if font_path:
             try:
                 pdfmetrics.registerFont(TTFont("CustomFont", font_path))
-                # Pentru bold, folosim același font (reportlab va face synthetic bold)
                 _fn_reg = "CustomFont"
-                _fn_bold = "CustomFont"
+                _fn_bold = "CustomFont"  # reportlab va face synthetic bold
             except Exception:
                 _fn_reg = "Helvetica"
                 _fn_bold = "Helvetica-Bold"
