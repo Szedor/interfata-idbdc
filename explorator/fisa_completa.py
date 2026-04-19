@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 3.1 - Export corectat: PDF diacritice, majuscule
+# Versiune: 3.2 - Export PDF cu diacritice corectate
 # =========================================================
 
 import streamlit as st
@@ -737,7 +737,7 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
 
 
 # =========================================================
-# FUNCȚII PENTRU EXPORT (vertical - PDF/Print) - CORECTATE
+# FUNCȚII PENTRU EXPORT (vertical - PDF/Print)
 # =========================================================
 
 def _build_vertical_export_data(supabase: Client, cod: str, tabela_gasita: str) -> dict:
@@ -782,46 +782,19 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         import os
+        import urllib.request
 
-        # Font cu suport diacritice - căutare în mai multe locații
         font_registered = False
         font_name = "Helvetica"
-    
-    # Încercăm să folosim un font din sistem care suportă diacritice
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "C:\\Windows\\Fonts\\arial.ttf",
-    ]
-    for path in font_paths:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont("CustomFont", path))
-                font_name = "CustomFont"
-                font_registered = True
-                break
-            except:
-                continue
-        
-        # Listă extinsă de fonturi cu suport diacritice
+
+        # Lista de fonturi care suportă diacritice
         font_paths = [
-            # Linux (Deploymente uzuale)
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
             "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-            "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-            # macOS
             "/System/Library/Fonts/Helvetica.ttc",
-            "/System/Library/Fonts/Arial.ttf",
-            "/Library/Fonts/Arial.ttf",
-            # Windows
             "C:\\Windows\\Fonts\\arial.ttf",
-            "C:\\Windows\\Fonts\\segoeui.ttf",
-            "C:\\Windows\\Fonts\\times.ttf",
-            # Streamlit Cloud / PythonAnywhere
-            "/usr/local/lib/python3.11/site-packages/reportlab/fonts/Vera.ttf",
+            "/tmp/DejaVuSans.ttf",
         ]
         
         for path in font_paths:
@@ -834,19 +807,15 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
                 except:
                     continue
         
-        # Dacă niciun font nu a fost găsit, încercăm să folosim un font standard
-        # care suportă diacritice (Helvetica nu suportă corect)
+        # Dacă nu există font, îl descărcăm
         if not font_registered:
-            # Ultimă încercare: folosim un font din pachetul reportlab dacă există
             try:
-                from reportlab.pdfbase import pdfmetrics
-                from reportlab.pdfbase.ttfonts import TTFont
-                import pkg_resources
-                vera_path = pkg_resources.resource_filename('reportlab', 'fonts/Vera.ttf')
-                if os.path.exists(vera_path):
-                    pdfmetrics.registerFont(TTFont("Vera", vera_path))
-                    font_name = "Vera"
-                    font_registered = True
+                font_url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
+                font_local = "/tmp/DejaVuSans.ttf"
+                urllib.request.urlretrieve(font_url, font_local)
+                pdfmetrics.registerFont(TTFont("CustomFont", font_local))
+                font_name = "CustomFont"
+                font_registered = True
             except:
                 pass
 
@@ -880,7 +849,6 @@ def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu
             story.append(Spacer(1, 0.2*cm))
             table_data = []
             for f, v in zip(section["fields"], section["values"]):
-                # Escapăm caracterele speciale pentru PDF
                 f_safe = str(f).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 v_safe = str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 table_data.append([Paragraph(f_safe, cell_style), Paragraph(v_safe, cell_style)])
@@ -929,7 +897,7 @@ def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str
 """
     for section in export_data["sections"]:
         html += f"<h3>{section['name'].upper()}</h3>"
-        html += " <table> <tr><th>Camp</th><th>Valoare</th></tr>"
+        html += " <tr> <tr><th>Camp</th><th>Valoare</th></tr>"
         for f, v in zip(section["fields"], section["values"]):
             html += f"<tr><td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
         html += "</table>"
@@ -1061,30 +1029,27 @@ def render_fisa_completa(supabase: Client):
     if not _render_export_auth_tab1(supabase):
         return
 
-    # =========================================================
-    # EXPORT
-    # =========================================================
     export_data_horizontal = _build_horizontal_export_data(supabase, cod, tabela_gasita)
 
     if not export_data_horizontal["headers"]:
         st.info("Nu există date de exportat pentru acest cod.")
         return
 
-    # ----- CSV (orizontal) -----
+    # CSV (orizontal)
     csv_df = pd.DataFrame([export_data_horizontal["values"]], columns=export_data_horizontal["headers"])
     csv_bytes = csv_df.to_csv(index=False).encode("utf-8-sig")
 
-    # ----- Excel (orizontal) -----
+    # Excel (orizontal)
     excel_buf = io.BytesIO()
     with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
         df_export = pd.DataFrame([export_data_horizontal["values"]], columns=export_data_horizontal["headers"])
         df_export.to_excel(writer, index=False, sheet_name="Fisa completa")
     excel_buf.seek(0)
 
-    # ----- PDF (vertical) -----
+    # PDF (vertical)
     pdf_buf = _generate_pdf_vertical(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
-    # ----- Print HTML (vertical) -----
+    # Print HTML (vertical)
     print_html = _generate_print_html_vertical(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
     col1, col2, col3, col4 = st.columns(4)
