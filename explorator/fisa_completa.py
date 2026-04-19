@@ -889,35 +889,23 @@ def render_fisa_completa(supabase: Client):
         return
 
     # ── Sectiunea export: Excel / PDF / Print ─────────────
-    # Rand 1: radio pentru optiunea xlsx (lat intreaga)
-    OPT_MULTI  = "Fiecare sectiune = un sheet separat"
-    OPT_SINGLE = "Toate sectiunile intr-un singur sheet"
-    mod_xlsx = st.radio(
-        "Format Excel:",
-        options=[OPT_MULTI, OPT_SINGLE],
-        key=f"fisa_xlsx_mod_{cod}",
-        horizontal=True,
-    )
-    # Rand 2: cele 3 butoane pe coloane egale
+    # Exportul XLSX este definitiv intr-un singur fisier cu un singur sheet.
     ea1, ea2, ea3 = st.columns([1.0, 1.0, 1.0])
 
     with ea1:
         try:
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                if mod_xlsx == OPT_SINGLE:
-                    frames_list = []
-                    for section_label, df_sec in export_frames.items():
-                        titlu_row = pd.DataFrame([{"Camp": f"=== {section_label.upper()} ===", "Valoare": ""}])
-                        frames_list.append(titlu_row)
-                        frames_list.append(df_sec)
-                        frames_list.append(pd.DataFrame([{"Camp": "", "Valoare": ""}]))
-                    df_all = pd.concat(frames_list, ignore_index=True)
-                    df_all.to_excel(writer, index=False, sheet_name="Fisa completa")
-                else:
-                    for section_label, df_sec in export_frames.items():
-                        sheet_name = section_label[:31].replace("/", "-").replace(":", "")
-                        df_sec.to_excel(writer, index=False, sheet_name=sheet_name)
+                frames_list = []
+                for section_label, df_sec in export_frames.items():
+                    titlu_row = pd.DataFrame([{"Camp": f"=== {section_label.upper()} ===", "Valoare": ""}])
+                    frames_list.append(titlu_row)
+                    frames_list.append(df_sec)
+                    frames_list.append(pd.DataFrame([{"Camp": "", "Valoare": ""}]))
+
+                df_all = pd.concat(frames_list, ignore_index=True)
+                df_all.to_excel(writer, index=False, sheet_name="Fisa completa")
+
             buf.seek(0)
             st.download_button(
                 "⬇️ Excel (.xlsx)", data=buf,
