@@ -1,6 +1,7 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 3.0 - Export final: Excel/CSV orizontal, PDF/Print vertical
+# !! FIȘIER ACTUALIZAT - Export corectat !!
+# Versiune: 2.0 - Export pe orizontală, diacritice PDF, ordine câmpuri
 # =========================================================
 
 import streamlit as st
@@ -174,6 +175,35 @@ _TABELE_CONTRACTE = {
 
 _COLS_EXCLUDE_CONTRACTE = {"an_referinta"}
 
+
+def _fmt_numeric(val, col_name: str = "") -> str:
+    if val is None:
+        return ""
+    raw = str(val).strip()
+    if raw == "":
+        return ""
+    try:
+        f = float(raw.replace(",", "."))
+    except (ValueError, TypeError):
+        return raw
+    col_name = (col_name or "").lower().strip()
+    no_decimal_fields = {
+        "cod_identificare", "numar_contract", "nr_contract", "nr_contract_achizitie",
+        "nr_contract_subsecvent", "numar_oficial_acordare", "numar_publicare_cerere",
+        "numar_data_notificare_intern", "telefon_mobil", "telefon_upt",
+        "cod_depunere", "cod_temporar",
+    }
+    if col_name in no_decimal_fields:
+        return str(int(round(f)))
+    financial_keys = ("valoare", "buget", "suma", "cost", "contributie", "cofinantare")
+    is_financial = any(k in col_name for k in financial_keys)
+    if is_financial:
+        return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if f.is_integer():
+        return str(int(f))
+    return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 TABLE_LABELS = {
     "base_contracte_cep":           "📄 Contract CEP",
     "base_contracte_terti":         "📄 Contract TERȚI",
@@ -284,34 +314,6 @@ ALL_BASE_TABLES = [
 ]
 
 SECTIUNI_ORDINE = ["Generale", "Financiar", "Echipa", "Tehnic"]
-
-
-def _fmt_numeric(val, col_name: str = "") -> str:
-    if val is None:
-        return ""
-    raw = str(val).strip()
-    if raw == "":
-        return ""
-    try:
-        f = float(raw.replace(",", "."))
-    except (ValueError, TypeError):
-        return raw
-    col_name = (col_name or "").lower().strip()
-    no_decimal_fields = {
-        "cod_identificare", "numar_contract", "nr_contract", "nr_contract_achizitie",
-        "nr_contract_subsecvent", "numar_oficial_acordare", "numar_publicare_cerere",
-        "numar_data_notificare_intern", "telefon_mobil", "telefon_upt",
-        "cod_depunere", "cod_temporar",
-    }
-    if col_name in no_decimal_fields:
-        return str(int(round(f)))
-    financial_keys = ("valoare", "buget", "suma", "cost", "contributie", "cofinantare")
-    is_financial = any(k in col_name for k in financial_keys)
-    if is_financial:
-        return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    if f.is_integer():
-        return str(int(f))
-    return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _col_label(col: str, table: str = None) -> str:
@@ -594,11 +596,12 @@ def _render_export_auth_tab1(supabase: Client) -> bool:
 
 
 # =========================================================
-# FUNCȚII PENTRU EXPORT (orizontal - Excel/CSV)
+# NOI FUNCȚII PENTRU EXPORT PE ORIZONTALĂ
 # =========================================================
 
 def _get_section_fields_ordered(section_name: str, rows: list, table: str = None,
                                  tabela_baza_ctx: str = None) -> list:
+    """Returnează lista ordonată a câmpurilor pentru o secțiune."""
     if not rows:
         return []
     is_contract_ctx = (tabela_baza_ctx or table or "") in _TABELE_CONTRACTE
@@ -655,6 +658,7 @@ def _get_section_fields_ordered(section_name: str, rows: list, table: str = None
 
 def _get_section_values_ordered(section_name: str, rows: list, field_order: list,
                                  table: str = None) -> list:
+    """Returnează lista valorilor în aceeași ordine ca field_order."""
     if not rows or not field_order:
         return []
     values = []
@@ -677,6 +681,7 @@ def _get_section_values_ordered(section_name: str, rows: list, field_order: list
 
 
 def _get_echipa_export_data(rows_ech: list, supabase: Client) -> tuple:
+    """Returnează (nume_campuri, valori) pentru secțiunea Echipa."""
     if not rows_ech:
         return [], []
     persoane_cont = [r for r in rows_ech if _is_persoana_contact(r)]
@@ -704,20 +709,27 @@ def _get_echipa_export_data(rows_ech: list, supabase: Client) -> tuple:
 
 
 def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str) -> dict:
-    export_data = {"headers": [], "values": []}
+    """Construiește datele pentru export pe orizontală."""
+    export_data = {
+        "headers": [],
+        "values": [],
+        "sections_order": []
+    }
     sections = [
         ("Generale", tabela_gasita),
         ("Financiar", "com_date_financiare"),
         ("Echipa", "com_echipe_proiect"),
+        ("Tehnic", "com_aspecte_tehnice"),
     ]
     for section_name, table_name in sections:
         if table_name == "com_echipe_proiect":
             rows = _safe_select_eq(supabase, table_name, "cod_identificare", cod, limit=2000)
             if rows:
                 headers, values = _get_echipa_export_data(rows, supabase)
-                export_data["headers"].extend([h.upper() for h in headers])
+                export_data["headers"].extend(headers)
                 export_data["values"].extend(values)
-                export_data["headers"].append("")
+                export_data["sections_order"].append(section_name)
+                export_data["headers"].append("")  # coloană goală separator
                 export_data["values"].append("")
         else:
             rows = _safe_select_eq(supabase, table_name, "cod_identificare", cod, limit=50)
@@ -725,173 +737,18 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
                 field_order = _get_section_fields_ordered(section_name, rows, table_name, tabela_gasita)
                 if field_order:
                     values = _get_section_values_ordered(section_name, rows, field_order, table_name)
-                    headers = [_col_label(f, table_name).upper() for f in field_order]
+                    headers = [_col_label(f, table_name) for f in field_order]
                     export_data["headers"].extend(headers)
                     export_data["values"].extend(values)
-                    export_data["headers"].append("")
+                    export_data["sections_order"].append(section_name)
+                    export_data["headers"].append("")  # coloană goală separator
                     export_data["values"].append("")
+    # Elimină ultimul separator gol
     if export_data["headers"] and export_data["headers"][-1] == "":
         export_data["headers"] = export_data["headers"][:-1]
         export_data["values"] = export_data["values"][:-1]
     return export_data
 
-
-# =========================================================
-# FUNCȚII PENTRU EXPORT (vertical - PDF/Print)
-# =========================================================
-
-def _build_vertical_export_data(supabase: Client, cod: str, tabela_gasita: str) -> dict:
-    export_data = {"sections": []}
-    sections = [
-        ("Generale", tabela_gasita),
-        ("Financiar", "com_date_financiare"),
-        ("Echipa", "com_echipe_proiect"),
-    ]
-    for section_name, table_name in sections:
-        section_data = {"name": section_name, "fields": [], "values": []}
-        if table_name == "com_echipe_proiect":
-            rows = _safe_select_eq(supabase, table_name, "cod_identificare", cod, limit=2000)
-            if rows:
-                headers, values = _get_echipa_export_data(rows, supabase)
-                for h, v in zip(headers, values):
-                    section_data["fields"].append(h)
-                    section_data["values"].append(v)
-                export_data["sections"].append(section_data)
-        else:
-            rows = _safe_select_eq(supabase, table_name, "cod_identificare", cod, limit=50)
-            if rows:
-                field_order = _get_section_fields_ordered(section_name, rows, table_name, tabela_gasita)
-                if field_order:
-                    values = _get_section_values_ordered(section_name, rows, field_order, table_name)
-                    headers = [_col_label(f, table_name) for f in field_order]
-                    for h, v in zip(headers, values):
-                        section_data["fields"].append(h)
-                        section_data["values"].append(v)
-                    export_data["sections"].append(section_data)
-    return export_data
-
-
-def _generate_pdf_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu_fisa: str) -> bytes:
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        from reportlab.lib.colors import HexColor
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-        import os
-
-        font_registered = False
-        font_paths = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/System/Library/Fonts/Helvetica.ttc",
-            "C:\\Windows\\Fonts\\arial.ttf",
-        ]
-        for path in font_paths:
-            if os.path.exists(path):
-                try:
-                    pdfmetrics.registerFont(TTFont("CustomFont", path))
-                    font_registered = True
-                    break
-                except:
-                    continue
-        if not font_registered:
-            font_name = "Helvetica"
-        else:
-            font_name = "CustomFont"
-
-        pdf_buf = io.BytesIO()
-        doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
-                                leftMargin=1.5*cm, rightMargin=1.5*cm,
-                                topMargin=1.5*cm, bottomMargin=1.5*cm)
-
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            "TitleStyle", parent=styles["Title"],
-            fontName=font_name, fontSize=12, textColor=HexColor("#0B2A52"), alignment=1
-        )
-        section_style = ParagraphStyle(
-            "SectionStyle", parent=styles["Normal"],
-            fontName=font_name, fontSize=10, textColor=HexColor("#0B2A52"), alignment=0
-        )
-        cell_style = ParagraphStyle(
-            "CellStyle", parent=styles["Normal"],
-            fontName=font_name, fontSize=8, leading=9
-        )
-
-        story = []
-        story.append(Paragraph(f"IDBDC UPT - Fișa {titlu_fisa} - Cod: {cod}", title_style))
-        story.append(Spacer(1, 0.5*cm))
-
-        export_data = _build_vertical_export_data(supabase, cod, tabela_gasita)
-
-        for section in export_data["sections"]:
-            story.append(Paragraph(section["name"].upper(), section_style))
-            story.append(Spacer(1, 0.2*cm))
-            table_data = []
-            for f, v in zip(section["fields"], section["values"]):
-                table_data.append([Paragraph(str(f), cell_style), Paragraph(str(v), cell_style)])
-            if table_data:
-                t = Table(table_data, colWidths=[4.5*cm, 11*cm])
-                t.setStyle(TableStyle([
-                    ("FONTNAME", (0, 0), (-1, -1), font_name),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ]))
-                story.append(t)
-                story.append(Spacer(1, 0.3*cm))
-
-        doc.build(story)
-        pdf_buf.seek(0)
-        return pdf_buf.getvalue()
-    except Exception as e:
-        return None
-
-
-def _generate_print_html_vertical(supabase: Client, cod: str, tabela_gasita: str, titlu_fisa: str) -> str:
-    export_data = _build_vertical_export_data(supabase, cod, tabela_gasita)
-
-    html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Fișa {cod}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; }}
-        h2 {{ color: #0B2A52; }}
-        h3 {{ color: #0B2A52; margin-top: 20px; }}
-        table {{ border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }}
-        th, td {{ border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }}
-        th {{ background-color: #0B2A52; color: white; font-size: 11px; }}
-        td {{ font-size: 10px; }}
-        @media print {{
-            button {{ display: none; }}
-        }}
-    </style>
-</head>
-<body>
-    <button onclick="window.print()">Print</button>
-    <h2>IDBDC UPT - Fișa {titlu_fisa} - Cod: {cod}</h2>
-"""
-    for section in export_data["sections"]:
-        html += f"<h3>{section['name'].upper()}</h3>"
-        html += "<table><tr><th>Camp</th><th>Valoare</th></tr>"
-        for f, v in zip(section["fields"], section["values"]):
-            html += f"<tr><td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
-        html += "</table>"
-    html += """
-</body>
-</html>"""
-    return html
-
-
-# =========================================================
-# FUNCȚIA PRINCIPALĂ DE RENDER
-# =========================================================
 
 def render_fisa_completa(supabase: Client):
     st.markdown("## 📄 Fișă completă")
@@ -1012,30 +869,30 @@ def render_fisa_completa(supabase: Client):
         return
 
     # =========================================================
-    # EXPORT
+    # EXPORT PE ORIZONTALĂ - NOUA STRUCTURĂ
     # =========================================================
-    export_data_horizontal = _build_horizontal_export_data(supabase, cod, tabela_gasita)
+    export_data = _build_horizontal_export_data(supabase, cod, tabela_gasita)
 
-    if not export_data_horizontal["headers"]:
+    if not export_data["headers"]:
         st.info("Nu există date de exportat pentru acest cod.")
         return
 
-    # ----- CSV (orizontal) -----
-    csv_df = pd.DataFrame([export_data_horizontal["values"]], columns=export_data_horizontal["headers"])
+    # ----- CSV -----
+    csv_df = pd.DataFrame([export_data["values"]], columns=export_data["headers"])
     csv_bytes = csv_df.to_csv(index=False).encode("utf-8-sig")
 
-    # ----- Excel (orizontal) -----
+    # ----- Excel -----
     excel_buf = io.BytesIO()
     with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
-        df_export = pd.DataFrame([export_data_horizontal["values"]], columns=export_data_horizontal["headers"])
+        df_export = pd.DataFrame([export_data["values"]], columns=export_data["headers"])
         df_export.to_excel(writer, index=False, sheet_name="Fisa completa")
     excel_buf.seek(0)
 
-    # ----- PDF (vertical) -----
-    pdf_buf = _generate_pdf_vertical(supabase, cod, tabela_gasita, titlu_fisa_curat)
+    # ----- PDF cu diacritice -----
+    pdf_buf = _generate_pdf_horizontal(export_data, cod, titlu_fisa_curat)
 
-    # ----- Print HTML (vertical) -----
-    print_html = _generate_print_html_vertical(supabase, cod, tabela_gasita, titlu_fisa_curat)
+    # ----- Print HTML -----
+    print_html = _generate_print_html_horizontal(export_data, cod, titlu_fisa_curat)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -1051,3 +908,139 @@ def render_fisa_completa(supabase: Client):
     with col4:
         if st.button("🖨️ Print", key="fisa_print"):
             components.html(print_html, height=700, scrolling=True)
+
+
+def _generate_pdf_horizontal(export_data: dict, cod: str, titlu_fisa: str) -> bytes:
+    """Generează PDF cu diacritice corecte."""
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib.colors import HexColor
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
+
+        # Înregistrare font cu suport diacritice
+        font_registered = False
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "C:\\Windows\\Fonts\\arial.ttf",
+        ]
+        for path in font_paths:
+            if os.path.exists(path):
+                try:
+                    pdfmetrics.registerFont(TTFont("CustomFont", path))
+                    font_registered = True
+                    break
+                except:
+                    continue
+        if not font_registered:
+            font_name = "Helvetica"
+        else:
+            font_name = "CustomFont"
+
+        pdf_buf = io.BytesIO()
+        doc = SimpleDocTemplate(pdf_buf, pagesize=landscape(A4),
+                                leftMargin=1.5*cm, rightMargin=1.5*cm,
+                                topMargin=1.5*cm, bottomMargin=1.5*cm)
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "TitleStyle", parent=styles["Title"],
+            fontName=font_name, fontSize=12, textColor=HexColor("#0B2A52"), alignment=1
+        )
+        header_style = ParagraphStyle(
+            "HeaderStyle", parent=styles["Normal"],
+            fontName=font_name, fontSize=8, textColor=colors.white, alignment=1
+        )
+        cell_style = ParagraphStyle(
+            "CellStyle", parent=styles["Normal"],
+            fontName=font_name, fontSize=7.5, leading=9
+        )
+
+        story = []
+        story.append(Paragraph(f"IDBDC UPT - Fișa {titlu_fisa} - Cod: {cod}", title_style))
+        story.append(Spacer(1, 0.5*cm))
+
+        # Construire tabel: un rând de header + un rând de valori
+        headers = export_data["headers"]
+        values = export_data["values"]
+
+        # Lățimi coloane dinamice
+        col_widths = []
+        for h in headers:
+            width = max(len(str(h)) * 5, 40)
+            col_widths.append(min(width, 120))
+
+        # Rând header
+        header_cells = [Paragraph(_html.escape(str(h)), header_style) for h in headers]
+        # Rând valori
+        value_cells = [Paragraph(_html.escape(str(v)), cell_style) for v in values]
+
+        table_data = [header_cells, value_cells]
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0B2A52")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTNAME", (0, 0), (-1, 0), font_name),
+            ("FONTSIZE", (0, 0), (-1, 0), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+            ("TOPPADDING", (0, 0), (-1, 0), 6),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("FONTNAME", (0, 1), (-1, 1), font_name),
+            ("FONTSIZE", (0, 1), (-1, 1), 7.5),
+        ]))
+        story.append(table)
+
+        doc.build(story)
+        pdf_buf.seek(0)
+        return pdf_buf.getvalue()
+    except Exception as e:
+        return None
+
+
+def _generate_print_html_horizontal(export_data: dict, cod: str, titlu_fisa: str) -> str:
+    """Generează HTML pentru print cu structură pe orizontală."""
+    headers = export_data["headers"]
+    values = export_data["values"]
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Fișa {cod}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        h2 {{ color: #0B2A52; }}
+        table {{ border-collapse: collapse; width: 100%; margin-top: 20px; }}
+        th, td {{ border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }}
+        th {{ background-color: #0B2A52; color: white; font-size: 11px; }}
+        td {{ font-size: 10px; }}
+        @media print {{
+            button {{ display: none; }}
+        }}
+    </style>
+</head>
+<body>
+    <button onclick="window.print()">Print</button>
+    <h2>IDBDC UPT - Fișa {titlu_fisa} - Cod: {cod}</h2>
+    <table>
+        <tr>
+"""
+    for h in headers:
+        html += f"<th>{_html.escape(str(h))}</th>"
+    html += "</tr><tr>"
+    for v in values:
+        html += f"<td>{_html.escape(str(v))}</td>"
+    html += """</tr>
+    </table>
+</body>
+</html>"""
+    return html
