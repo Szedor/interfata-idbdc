@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 4.1 - Export CSV/Excel din platformă, PDF/Print din inspirație
+# Versiune: 4.2 - Print cu titlu vizibil (fundal alb, text negru)
 # =========================================================
 
 import streamlit as st
@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 from supabase import Client
 
 # ------------------------------------------------------------
-# DICTIONARE ȘI CONFIGURĂRI (identice cu IN_PLATFORMA)
+# DICTIONARE ȘI CONFIGURĂRI (identice cu etapa 1)
 # ------------------------------------------------------------
 
 COL_LABELS = {
@@ -821,7 +821,6 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         from reportlab.pdfbase.ttfonts import TTFont
         import os as _os
 
-        # Încercăm să încărcăm un font cu diacritice (DejaVu)
         _FONT_CANDIDATES = [
             "/usr/share/fonts/truetype/dejavu",
             "/usr/local/lib/python3.12/dist-packages/matplotlib/mpl-data/fonts/ttf",
@@ -860,7 +859,6 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         col_w = [2.5*cm, 5.5*cm, 9.44*cm]
         story = []
 
-        # Antet principal
         hdr = Table([[Paragraph("IDBDC — UPT", s_title),
                       Paragraph("Departamentul Cercetare Dezvoltare Inovare", s_sub)]],
                     colWidths=[5*cm, 12.44*cm])
@@ -872,7 +870,6 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         story.append(hdr)
         story.append(Spacer(1, 0.2*cm))
 
-        # Subtitlu cu codul
         sub = Table([[Paragraph(f"Fisa completa  |  Cod: {cod}", s_sub)]], colWidths=[17.44*cm])
         sub.setStyle(TableStyle([
             ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
@@ -882,7 +879,6 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         story.append(sub)
         story.append(Spacer(1, 0.3*cm))
 
-        # Antet tabel
         antet = Table([[Paragraph("SECTIUNEA",s_head), Paragraph("CAMP",s_head), Paragraph("VALOARE",s_head)]],
                       colWidths=col_w)
         antet.setStyle(TableStyle([
@@ -893,7 +889,6 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         ]))
         story.append(antet)
 
-        # Parcurgem secțiunile
         for sec_name, df_sec in export_frames.items():
             tbl_data = []
             for r_idx, (_, row) in enumerate(df_sec.iterrows()):
@@ -901,7 +896,6 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
                 sec_label = sec_name if r_idx == 0 else ""
                 camp_val = str(row.get("Camp", ""))
                 val_val = str(row.get("Valoare", "")) if row.get("Valoare") is not None else ""
-                # Înlocuim emoji-urile pentru compatibilitate
                 val_val = (val_val
                     .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
                     .replace("✉ ", "Email: ").replace("✉", "Email: ")
@@ -943,6 +937,9 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         return None
 
 def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
+    """
+    Generează HTML pentru print, cu titlul într-o casetă cu fundal alb și text negru.
+    """
     html_sections = []
     for section_label, df_sec in export_frames.items():
         if df_sec.empty:
@@ -958,7 +955,7 @@ def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
             rows_html += (
                 f"<tr style='background:{bg};'>"
                 f"<td style='width:{col1_px}px;font-weight:600;color:#2c4a6e;white-space:nowrap;'>{camp_val}</td>"
-                f"<td>{val_val}</td>"
+                f"<td style='color:#000000;'>{val_val}</td>"
                 f"</tr>"
             )
         tbl_html = (
@@ -971,17 +968,24 @@ def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
         )
         html_sections.append(f"<h3>{_html.escape(section_label)}</h3>{tbl_html}")
 
+    # Titlu într-o casetă albă cu text negru
+    titlu_html = f"""
+    <div style="background-color: #ffffff; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cccccc; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #000000; margin: 0; font-weight: 700;">Fișă — {_html.escape(cod)}</h2>
+    </div>
+    """
+
     full_html = f"""<html><head><meta charset="utf-8"/>
     <style>
-    body{{font-family:Arial;padding:20px;font-size:11px;}}
-    h2{{color:#003366;}} h3{{color:#0b2a52;margin-top:20px;font-size:13px;}}
+    body{{font-family:Arial;padding:20px;font-size:11px; background-color: #ffffff;}}
+    h3{{color:#0b2a52;margin-top:20px;font-size:13px;}}
     table{{border-collapse:collapse;width:100%;margin-bottom:16px;}}
     th,td{{border:1px solid #ccc;padding:5px;font-size:11px;vertical-align:top;}}
     th{{background:#e8f0f8;font-weight:700;}}
     @media print{{button{{display:none;}}}}
     </style></head><body>
     <button onclick="window.print()">Print</button>
-    <h2>Fisa — {_html.escape(cod)}</h2>
+    {titlu_html}
     {"".join(html_sections)}</body></html>"""
     return full_html
 
@@ -1114,7 +1118,7 @@ def render_fisa_completa(supabase: Client):
     if not _render_export_auth_tab1(supabase):
         return
 
-    # --- Export CSV și Excel (orizontal, din platformă) ---
+    # Export CSV și Excel (orizontal, din platformă)
     export_data_horizontal = _build_horizontal_export_data(supabase, cod, tabela_gasita)
     if not export_data_horizontal["headers"]:
         st.info("Nu există date de exportat pentru acest cod.")
@@ -1129,7 +1133,7 @@ def render_fisa_completa(supabase: Client):
         df_export.to_excel(writer, index=False, sheet_name="Fisa completa")
     excel_buf.seek(0)
 
-    # --- Construim frame-urile pentru PDF și Print (vertical, din inspirație) ---
+    # Construim frame-urile pentru PDF și Print (vertical)
     export_frames = {}
     rows_gen = _safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=50)
     if rows_gen:
@@ -1153,7 +1157,7 @@ def render_fisa_completa(supabase: Client):
     _SECTIUNI_ORDINE = ["Generale", "Financiar", "Echipa", "Tehnic"]
     export_frames = {k: export_frames[k] for k in _SECTIUNI_ORDINE if k in export_frames}
 
-    # --- Butoane de export ---
+    # Butoane de export
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.download_button("⬇️ CSV", data=csv_bytes, file_name=f"fisa_{cod}.csv", mime="text/csv", key="fisa_csv")
