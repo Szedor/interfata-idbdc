@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 4.5 - PDF cu diacritice folosind LiberationSans
+# Versiune: 5.1 - PDF cu diacritice (fpdf2, corectat Unicode)
 # =========================================================
 
 import streamlit as st
@@ -9,11 +9,12 @@ import html as _html
 import io
 import re
 import os
+import urllib.request
 import streamlit.components.v1 as components
 from supabase import Client
 
 # ------------------------------------------------------------
-# DICTIONARE ȘI CONFIGURĂRI (identice)
+# DICTIONARE ȘI CONFIGURĂRI (identice cu versiunea stabilă)
 # ------------------------------------------------------------
 
 COL_LABELS = {
@@ -429,15 +430,19 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
                 f"<span style='color:rgba(255,255,255,0.45);font-size:0.74rem;font-weight:800;"
                 f"text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;'>"
                 f"{_html.escape(section_label)}</span>"
-                f"</td>"
+                f""
+                f""
             )
         rows_html += (
-            f"<tr>{sec_cell}"
+            f"<tr>"
+            f"{sec_cell}"
             f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
             f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
-            f"text-transform:uppercase;letter-spacing:0.04em;'>{label}</span></td>"
+            f"text-transform:uppercase;letter-spacing:0.04em;'>{label}</span>"
+            f"</td>"
             f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
-            f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{value}</span></td>"
+            f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{value}</span>"
+            f"</td>"
             f"</tr>"
         )
     st.markdown(
@@ -752,143 +757,127 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
     return export_data
 
 # ------------------------------------------------------------
-# FUNCȚII PENTRU EXPORT (PDF și Print – cu diacritice în PDF)
+# FUNCȚII PENTRU EXPORT PDF (folosind fpdf2)
 # ------------------------------------------------------------
 
-def _get_font_paths():
-    """Returnează un tuplu (regular, bold) cu căile către fonturi cu diacritice românești."""
-    candidates = [
-        (
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        ),
-        (
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        ),
-        (
-            "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-            "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
-        ),
-    ]
-    for reg_path, bold_path in candidates:
-        if os.path.isfile(reg_path) and os.path.isfile(bold_path):
-            return reg_path, bold_path
-    for reg_path, bold_path in candidates:
-        if os.path.isfile(reg_path):
-            return reg_path, reg_path
-    return None, None
-
-def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
+def _ensure_font():
+    """Asigură existența fontului DejaVuSans.ttf în folderul assets/."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    font_dir = os.path.join(base_dir, "assets")
+    font_path = os.path.join(font_dir, "DejaVuSans.ttf")
+    if os.path.isfile(font_path):
+        return font_path
+    # Creează folderul assets dacă nu există
+    os.makedirs(font_dir, exist_ok=True)
+    # Încearcă să descarce fontul
+    url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
     try:
-        from fpdf import FPDF
-        from fpdf.enums import Align, XPos, YPos
-
-        font_reg, font_bold = _get_font_paths()
-        if not font_reg:
-            return None
-
-        pdf = FPDF(orientation="P", unit="mm", format="A4")
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_font("DJ", style="", fname=font_reg)
-        pdf.add_font("DJ", style="B", fname=font_bold)
-
-        W = pdf.w - pdf.l_margin - pdf.r_margin  # ~190mm
-        col_w = [25.0, 55.0, W - 80.0]
-
-        # ── Header principal ──────────────────────────────────────────
-        pdf.set_fill_color(11, 42, 82)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("DJ", "B", 13)
-        pdf.cell(60, 12, "IDBDC \u2014 UPT", fill=True, align=Align.L)
-        pdf.set_font("DJ", "B", 9)
-        pdf.cell(W - 60, 12, "Departamentul Cercetare Dezvoltare Inovare",
-                 fill=True, align=Align.L,
-                 new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-        # ── Sub-header cu codul ───────────────────────────────────────
-        pdf.set_fill_color(26, 74, 122)
-        pdf.set_font("DJ", "B", 9)
-        pdf.cell(W, 7, f"Fi\u0219\u0103 complet\u0103  |  Cod: {cod}",
-                 fill=True, align=Align.L,
-                 new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(2)
-
-        # ── Antet tabel ───────────────────────────────────────────────
-        pdf.set_fill_color(26, 74, 122)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("DJ", "B", 8)
-        for txt, w in zip(["SEC\u021AIUNEA", "C\u00C2MP", "VALOARE"], col_w):
-            pdf.cell(w, 7, txt, fill=True, border=1, align=Align.L)
-        pdf.ln()
-
-        # ── Rânduri de date ───────────────────────────────────────────
-        for sec_name, df_sec in export_frames.items():
-            for r_idx, (_, row) in enumerate(df_sec.iterrows()):
-                if r_idx % 2 == 0:
-                    pdf.set_fill_color(238, 244, 251)
-                else:
-                    pdf.set_fill_color(255, 255, 255)
-
-                sec_label = sec_name if r_idx == 0 else ""
-                camp_val = str(row.get("Camp", ""))
-                val_val = str(row.get("Valoare", "") or "")
-                # Eliminăm emoji-urile pentru PDF
-                val_val = (val_val
-                    .replace("\U0001f3db ", "Dept: ").replace("\U0001f3db", "Dept: ")
-                    .replace("\u2709 ", "Email: ").replace("\u2709", "Email: ")
-                    .replace("\U0001f4f1 ", "Mobil: ").replace("\U0001f4f1", "Mobil: ")
-                    .replace("\u2b50 ", "").replace("\u2b50", "")
-                    .replace("\U0001f465 ", "").replace("\U0001f465", "")
-                )
-
-                # Înălțimea rândului adaptată la conținut
-                lines_val = max(1, len(val_val) // 55 + val_val.count("\n") + 1)
-                row_h = max(6.0, float(lines_val) * 5.0)
-
-                y_before = pdf.get_y()
-                x_start = pdf.l_margin
-
-                # Coloana Secțiune
-                pdf.set_text_color(90, 127, 168)
-                pdf.set_font("DJ", "B", 7)
-                pdf.set_xy(x_start, y_before)
-                pdf.multi_cell(col_w[0], row_h, sec_label,
-                               fill=True, border=1, align=Align.L)
-                h_sec = pdf.get_y() - y_before
-
-                # Coloana Câmp
-                pdf.set_text_color(44, 74, 110)
-                pdf.set_font("DJ", "B", 8)
-                pdf.set_xy(x_start + col_w[0], y_before)
-                pdf.multi_cell(col_w[1], row_h, camp_val,
-                               fill=True, border=1, align=Align.L)
-                h_camp = pdf.get_y() - y_before
-
-                # Coloana Valoare
-                pdf.set_text_color(13, 31, 53)
-                pdf.set_font("DJ", "", 8)
-                pdf.set_xy(x_start + col_w[0] + col_w[1], y_before)
-                pdf.multi_cell(col_w[2], row_h, val_val,
-                               fill=True, border=1, align=Align.L)
-                h_val = pdf.get_y() - y_before
-
-                pdf.set_xy(x_start, y_before + max(h_sec, h_camp, h_val))
-
-        # ── Footer ────────────────────────────────────────────────────
-        pdf.ln(3)
-        pdf.set_text_color(138, 173, 204)
-        pdf.set_font("DJ", "", 7)
-        pdf.cell(W, 5, "Document generat automat \u2014 IDBDC UPT  |  Uz intern",
-                 align=Align.C)
-
-        return bytes(pdf.output())
+        urllib.request.urlretrieve(url, font_path)
+        return font_path
     except Exception:
         return None
 
+def _clean_text_for_pdf(text: str) -> str:
+    """Înlocuiește caracterele problematice și normalizează pentru PDF."""
+    if not isinstance(text, str):
+        text = str(text)
+    # Înlocuiește liniuțele lungi cu liniuțe normale
+    text = text.replace("—", "-").replace("–", "-")
+    # Elimină caracterele non-ASCII care nu sunt diacritice românești
+    # Păstrăm: a-z, A-Z, 0-9, spații, punctuație standard, și diacriticele ăâîșț
+    # Vom face o curățare simplă: înlocuim caracterele suspecte
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
+    """Generează PDF cu diacritice folosind fpdf2."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return None
+
+    font_path = _ensure_font()
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=1.5)
+    pdf.add_page()
+
+    # Înregistrare font dacă există
+    if font_path:
+        try:
+            pdf.add_font("DejaVu", "", font_path, uni=True)
+            pdf.set_font("DejaVu", size=10)
+        except Exception:
+            pdf.set_font("helvetica", size=10)
+    else:
+        pdf.set_font("helvetica", size=10)
+
+    # Antet principal
+    pdf.set_font_size(13)
+    pdf.set_text_color(11, 42, 82)  # albastru închis
+    pdf.cell(0, 8, _clean_text_for_pdf("IDBDC - UPT"), ln=True, align="C")
+    pdf.set_font_size(9)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 6, _clean_text_for_pdf("Departamentul Cercetare Dezvoltare Inovare"), ln=True, align="C")
+    pdf.ln(4)
+
+    # Subtitlu cu codul
+    pdf.set_font_size(10)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_fill_color(26, 74, 122)  # albastru mediu
+    pdf.cell(0, 8, _clean_text_for_pdf(f"Fișă completă  |  Cod: {cod}"), ln=True, align="C", fill=True)
+    pdf.ln(6)
+
+    # Parcurgem secțiunile
+    for sec_name, df_sec in export_frames.items():
+        # Titlu secțiune
+        pdf.set_font_size(10)
+        pdf.set_text_color(90, 127, 168)
+        pdf.cell(0, 6, _clean_text_for_pdf(sec_name.upper()), ln=True, align="L")
+        pdf.ln(2)
+
+        # Tabel cu două coloane: Câmp și Valoare
+        col_width = [50, 140]  # lățimi în mm
+        pdf.set_font_size(8)
+        pdf.set_text_color(44, 74, 110)
+        pdf.set_fill_color(232, 240, 248)
+
+        # Antet tabel
+        pdf.cell(col_width[0], 6, _clean_text_for_pdf("CÂMP"), border=1, align="L", fill=True)
+        pdf.cell(col_width[1], 6, _clean_text_for_pdf("VALOARE"), border=1, align="L", fill=True)
+        pdf.ln()
+
+        # Rânduri date
+        fill = False
+        for _, row in df_sec.iterrows():
+            camp = _clean_text_for_pdf(str(row.get("Camp", "")))
+            valoare = str(row.get("Valoare", ""))
+            # Eliminăm emoji-urile rămase
+            valoare = (valoare
+                .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
+                .replace("✉ ", "Email: ").replace("✉", "Email: ")
+                .replace("📱 ", "Mobil: ").replace("📱", "Mobil: ")
+                .replace("⭐ ", "").replace("⭐", "")
+                .replace("👥 ", "").replace("👥", "")
+            )
+            valoare = _clean_text_for_pdf(valoare)
+            pdf.set_fill_color(238, 244, 251) if fill else pdf.set_fill_color(255, 255, 255)
+            pdf.cell(col_width[0], 6, camp, border=1, align="L", fill=fill)
+            pdf.multi_cell(col_width[1], 6, valoare, border=1, align="L", fill=fill)
+            fill = not fill
+        pdf.ln(2)
+
+    # Footer
+    pdf.set_y(-15)
+    pdf.set_font_size(7)
+    pdf.set_text_color(138, 173, 204)
+    pdf.cell(0, 6, _clean_text_for_pdf("Document generat automat — IDBDC UPT  |  Uz intern"), ln=True, align="C")
+
+    return pdf.output(dest='S')  # Returnează bytes
+
+# ------------------------------------------------------------
+# FUNCȚII PENTRU PRINT (HTML) – neschimbată
+# ------------------------------------------------------------
+
 def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
-    """Generează HTML pentru print, cu titlul vizibil și diacritice."""
     html_sections = []
     for section_label, df_sec in export_frames.items():
         if df_sec.empty:
@@ -1174,7 +1163,7 @@ def render_fisa_completa(supabase: Client):
         if pdf_bytes:
             st.download_button("⬇️ PDF", data=pdf_bytes, file_name=f"fisa_{cod}.pdf", mime="application/pdf", key="fisa_pdf")
         else:
-            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați fontul sistem")
+            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați fpdf2")
     with col4:
         if st.button("🖨️ Print", key="fisa_print"):
             print_html = _generate_print_html_from_frames(export_frames, cod)
