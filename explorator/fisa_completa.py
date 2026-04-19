@@ -755,7 +755,7 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
 # FUNCȚII PENTRU EXPORT (PDF și Print – cu diacritice în PDF)
 # ------------------------------------------------------------
 
-def _get_font_path():
+def _get_font_paths():
     """Returnează un tuplu (regular, bold) cu căile către fonturi cu diacritice românești."""
     candidates = [
         (
@@ -774,7 +774,6 @@ def _get_font_path():
     for reg_path, bold_path in candidates:
         if os.path.isfile(reg_path) and os.path.isfile(bold_path):
             return reg_path, bold_path
-    # Dacă găsim doar regular fără bold, returnăm același pentru ambele
     for reg_path, bold_path in candidates:
         if os.path.isfile(reg_path):
             return reg_path, reg_path
@@ -782,130 +781,110 @@ def _get_font_path():
 
 def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
     try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        from reportlab.lib.colors import HexColor
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
+        from fpdf import FPDF
+        from fpdf.enums import Align, XPos, YPos
 
-        font_path_reg, font_path_bold = _get_font_path()
-        if font_path_reg:
-            try:
-                pdfmetrics.registerFont(TTFont("CustomFont", font_path_reg))
-                pdfmetrics.registerFont(TTFont("CustomFont-Bold", font_path_bold))
-                from reportlab.pdfbase.pdfmetrics import registerFontFamily
-                registerFontFamily("CustomFont", normal="CustomFont", bold="CustomFont-Bold")
-                _fn_reg = "CustomFont"
-                _fn_bold = "CustomFont-Bold"
-            except Exception:
-                _fn_reg = "Helvetica"
-                _fn_bold = "Helvetica-Bold"
-        else:
-            _fn_reg = "Helvetica"
-            _fn_bold = "Helvetica-Bold"
+        font_reg, font_bold = _get_font_paths()
+        if not font_reg:
+            return None
 
-        pdf_buf = io.BytesIO()
-        doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
-                                leftMargin=1.8*cm, rightMargin=1.8*cm,
-                                topMargin=1.8*cm, bottomMargin=1.8*cm)
-        styles = getSampleStyleSheet()
-        BLUE_DARK = HexColor("#0B2A52")
-        BLUE_MED = HexColor("#1A4A7A")
-        BLUE_ROW = HexColor("#EEF4FB")
-        s_title = ParagraphStyle("T", parent=styles["Title"],
-                                 fontName=_fn_bold, fontSize=13, textColor=colors.white, leading=18)
-        s_sub = ParagraphStyle("S", parent=styles["Normal"],
-                               fontName=_fn_bold, fontSize=9, textColor=colors.white)
-        s_sec = ParagraphStyle("SC", parent=styles["Normal"],
-                               fontName=_fn_bold, fontSize=7.5, textColor=HexColor("#5A7FA8"))
-        s_lbl = ParagraphStyle("L", parent=styles["Normal"],
-                               fontName=_fn_bold, fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
-        s_val = ParagraphStyle("V", parent=styles["Normal"],
-                               fontName=_fn_reg, fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
-        s_head = ParagraphStyle("H", parent=styles["Normal"],
-                                fontName=_fn_bold, fontSize=8, textColor=colors.white)
-        col_w = [2.5*cm, 5.5*cm, 9.44*cm]
-        story = []
+        pdf = FPDF(orientation="P", unit="mm", format="A4")
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_font("DJ", style="", fname=font_reg)
+        pdf.add_font("DJ", style="B", fname=font_bold)
 
-        hdr = Table([[Paragraph("IDBDC — UPT", s_title),
-                      Paragraph("Departamentul Cercetare Dezvoltare Inovare", s_sub)]],
-                    colWidths=[5*cm, 12.44*cm])
-        hdr.setStyle(TableStyle([
-            ("BACKGROUND", (0,0),(-1,-1), BLUE_DARK), ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("TOPPADDING",(0,0),(-1,-1),10), ("BOTTOMPADDING",(0,0),(-1,-1),10),
-            ("LEFTPADDING",(0,0),(0,0),14), ("LEFTPADDING",(1,0),(1,0),8),
-        ]))
-        story.append(hdr)
-        story.append(Spacer(1, 0.2*cm))
+        W = pdf.w - pdf.l_margin - pdf.r_margin  # ~190mm
+        col_w = [25.0, 55.0, W - 80.0]
 
-        sub = Table([[Paragraph(f"Fișă completă  |  Cod: {cod}", s_sub)]], colWidths=[17.44*cm])
-        sub.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
-            ("TOPPADDING",(0,0),(-1,-1),5), ("BOTTOMPADDING",(0,0),(-1,-1),5),
-            ("LEFTPADDING",(0,0),(-1,-1),14),
-        ]))
-        story.append(sub)
-        story.append(Spacer(1, 0.3*cm))
+        # ── Header principal ──────────────────────────────────────────
+        pdf.set_fill_color(11, 42, 82)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("DJ", "B", 13)
+        pdf.cell(60, 12, "IDBDC \u2014 UPT", fill=True, align=Align.L)
+        pdf.set_font("DJ", "B", 9)
+        pdf.cell(W - 60, 12, "Departamentul Cercetare Dezvoltare Inovare",
+                 fill=True, align=Align.L,
+                 new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        antet = Table([[Paragraph("SECȚIUNEA", s_head), Paragraph("CÂMP", s_head), Paragraph("VALOARE", s_head)]],
-                      colWidths=col_w)
-        antet.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
-            ("TOPPADDING",(0,0),(-1,-1),4), ("BOTTOMPADDING",(0,0),(-1,-1),4),
-            ("LEFTPADDING",(0,0),(-1,-1),5),
-            ("GRID",(0,0),(-1,-1),0.3,HexColor("#6A9CC8")),
-        ]))
-        story.append(antet)
+        # ── Sub-header cu codul ───────────────────────────────────────
+        pdf.set_fill_color(26, 74, 122)
+        pdf.set_font("DJ", "B", 9)
+        pdf.cell(W, 7, f"Fi\u0219\u0103 complet\u0103  |  Cod: {cod}",
+                 fill=True, align=Align.L,
+                 new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(2)
 
+        # ── Antet tabel ───────────────────────────────────────────────
+        pdf.set_fill_color(26, 74, 122)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("DJ", "B", 8)
+        for txt, w in zip(["SEC\u021AIUNEA", "C\u00C2MP", "VALOARE"], col_w):
+            pdf.cell(w, 7, txt, fill=True, border=1, align=Align.L)
+        pdf.ln()
+
+        # ── Rânduri de date ───────────────────────────────────────────
         for sec_name, df_sec in export_frames.items():
-            tbl_data = []
             for r_idx, (_, row) in enumerate(df_sec.iterrows()):
-                bg = BLUE_ROW if r_idx % 2 == 0 else colors.white
+                if r_idx % 2 == 0:
+                    pdf.set_fill_color(238, 244, 251)
+                else:
+                    pdf.set_fill_color(255, 255, 255)
+
                 sec_label = sec_name if r_idx == 0 else ""
                 camp_val = str(row.get("Camp", ""))
-                val_val = str(row.get("Valoare", "")) if row.get("Valoare") is not None else ""
+                val_val = str(row.get("Valoare", "") or "")
                 # Eliminăm emoji-urile pentru PDF
                 val_val = (val_val
-                    .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
-                    .replace("✉ ", "Email: ").replace("✉", "Email: ")
-                    .replace("📱 ", "Mobil: ").replace("📱", "Mobil: ")
-                    .replace("⭐ ", "").replace("⭐", "")
-                    .replace("👥 ", "").replace("👥", "")
+                    .replace("\U0001f3db ", "Dept: ").replace("\U0001f3db", "Dept: ")
+                    .replace("\u2709 ", "Email: ").replace("\u2709", "Email: ")
+                    .replace("\U0001f4f1 ", "Mobil: ").replace("\U0001f4f1", "Mobil: ")
+                    .replace("\u2b50 ", "").replace("\u2b50", "")
+                    .replace("\U0001f465 ", "").replace("\U0001f465", "")
                 )
-                tbl_data.append((sec_label, camp_val, val_val, bg))
-            if not tbl_data:
-                continue
-            tbl_rows = [[
-                Paragraph(r[0], s_sec),
-                Paragraph(r[1], s_lbl),
-                Paragraph(r[2].replace("\n", "<br/>"), s_val),
-            ] for r in tbl_data]
-            tbl = Table(tbl_rows, colWidths=col_w)
-            cmds = [
-                ("VALIGN",(0,0),(-1,-1),"TOP"),
-                ("TOPPADDING",(0,0),(-1,-1),3), ("BOTTOMPADDING",(0,0),(-1,-1),3),
-                ("LEFTPADDING",(0,0),(-1,-1),5),
-                ("GRID",(0,0),(-1,-1),0.3,HexColor("#C5D8EC")),
-                ("LINEABOVE",(0,0),(-1,0),1.2,BLUE_MED),
-            ]
-            for i, r in enumerate(tbl_data):
-                cmds.append(("BACKGROUND",(0,i),(-1,i),r[3]))
-            tbl.setStyle(TableStyle(cmds))
-            story.append(tbl)
 
-        story.append(Spacer(1, 0.5*cm))
-        story.append(Paragraph(
-            "Document generat automat — IDBDC UPT  |  Uz intern",
-            ParagraphStyle("F", parent=styles["Normal"], fontName=_fn_reg,
-                fontSize=7, textColor=HexColor("#8AADCC"), alignment=1)
-        ))
-        doc.build(story)
-        pdf_buf.seek(0)
-        return pdf_buf.getvalue()
-    except Exception as e:
+                # Înălțimea rândului adaptată la conținut
+                lines_val = max(1, len(val_val) // 55 + val_val.count("\n") + 1)
+                row_h = max(6.0, float(lines_val) * 5.0)
+
+                y_before = pdf.get_y()
+                x_start = pdf.l_margin
+
+                # Coloana Secțiune
+                pdf.set_text_color(90, 127, 168)
+                pdf.set_font("DJ", "B", 7)
+                pdf.set_xy(x_start, y_before)
+                pdf.multi_cell(col_w[0], row_h, sec_label,
+                               fill=True, border=1, align=Align.L)
+                h_sec = pdf.get_y() - y_before
+
+                # Coloana Câmp
+                pdf.set_text_color(44, 74, 110)
+                pdf.set_font("DJ", "B", 8)
+                pdf.set_xy(x_start + col_w[0], y_before)
+                pdf.multi_cell(col_w[1], row_h, camp_val,
+                               fill=True, border=1, align=Align.L)
+                h_camp = pdf.get_y() - y_before
+
+                # Coloana Valoare
+                pdf.set_text_color(13, 31, 53)
+                pdf.set_font("DJ", "", 8)
+                pdf.set_xy(x_start + col_w[0] + col_w[1], y_before)
+                pdf.multi_cell(col_w[2], row_h, val_val,
+                               fill=True, border=1, align=Align.L)
+                h_val = pdf.get_y() - y_before
+
+                pdf.set_xy(x_start, y_before + max(h_sec, h_camp, h_val))
+
+        # ── Footer ────────────────────────────────────────────────────
+        pdf.ln(3)
+        pdf.set_text_color(138, 173, 204)
+        pdf.set_font("DJ", "", 7)
+        pdf.cell(W, 5, "Document generat automat \u2014 IDBDC UPT  |  Uz intern",
+                 align=Align.C)
+
+        return bytes(pdf.output())
+    except Exception:
         return None
 
 def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
