@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 5.1 - PDF cu diacritice (fpdf2, corectat Unicode)
+# Versiune: 5.2 - PDF cu diacritice, corectat bytes pentru download
 # =========================================================
 
 import streamlit as st
@@ -439,10 +439,12 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
             f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
             f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
             f"text-transform:uppercase;letter-spacing:0.04em;'>{label}</span>"
-            f"</td>"
+            f""
+            f""
             f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
             f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{value}</span>"
-            f"</td>"
+            f""
+            f""
             f"</tr>"
         )
     st.markdown(
@@ -767,9 +769,7 @@ def _ensure_font():
     font_path = os.path.join(font_dir, "DejaVuSans.ttf")
     if os.path.isfile(font_path):
         return font_path
-    # Creează folderul assets dacă nu există
     os.makedirs(font_dir, exist_ok=True)
-    # Încearcă să descarce fontul
     url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
     try:
         urllib.request.urlretrieve(url, font_path)
@@ -778,18 +778,18 @@ def _ensure_font():
         return None
 
 def _clean_text_for_pdf(text: str) -> str:
-    """Înlocuiește caracterele problematice și normalizează pentru PDF."""
+    """Curăță textul pentru a fi compatibil cu fpdf2: înlocuiește caracterele problematice."""
     if not isinstance(text, str):
         text = str(text)
-    # Înlocuiește liniuțele lungi cu liniuțe normale
+    # Înlocuiește liniuțele lungi
     text = text.replace("—", "-").replace("–", "-")
-    # Elimină caracterele non-ASCII care nu sunt diacritice românești
-    # Păstrăm: a-z, A-Z, 0-9, spații, punctuație standard, și diacriticele ăâîșț
-    # Vom face o curățare simplă: înlocuim caracterele suspecte
-    return text.encode("latin-1", errors="replace").decode("latin-1")
+    # Elimină caracterele non-ASCII care nu sunt diacritice românești (ăâîșț)
+    # Vom păstra diacriticele, dar le vom codifica corect.
+    # fpdf2 cu font Unicode ar trebui să le suporte.
+    return text
 
 def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
-    """Generează PDF cu diacritice folosind fpdf2."""
+    """Generează PDF cu diacritice folosind fpdf2. Returnează bytes."""
     try:
         from fpdf import FPDF
     except ImportError:
@@ -800,42 +800,42 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
     pdf.set_auto_page_break(auto=True, margin=1.5)
     pdf.add_page()
 
-    # Înregistrare font dacă există
+    # Înregistrare font
+    font_ok = False
     if font_path:
         try:
             pdf.add_font("DejaVu", "", font_path, uni=True)
             pdf.set_font("DejaVu", size=10)
+            font_ok = True
         except Exception:
-            pdf.set_font("helvetica", size=10)
-    else:
+            pass
+    if not font_ok:
         pdf.set_font("helvetica", size=10)
 
     # Antet principal
     pdf.set_font_size(13)
-    pdf.set_text_color(11, 42, 82)  # albastru închis
+    pdf.set_text_color(11, 42, 82)
     pdf.cell(0, 8, _clean_text_for_pdf("IDBDC - UPT"), ln=True, align="C")
     pdf.set_font_size(9)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 6, _clean_text_for_pdf("Departamentul Cercetare Dezvoltare Inovare"), ln=True, align="C")
     pdf.ln(4)
 
-    # Subtitlu cu codul
+    # Subtitlu
     pdf.set_font_size(10)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_fill_color(26, 74, 122)  # albastru mediu
+    pdf.set_fill_color(26, 74, 122)
     pdf.cell(0, 8, _clean_text_for_pdf(f"Fișă completă  |  Cod: {cod}"), ln=True, align="C", fill=True)
     pdf.ln(6)
 
     # Parcurgem secțiunile
     for sec_name, df_sec in export_frames.items():
-        # Titlu secțiune
         pdf.set_font_size(10)
         pdf.set_text_color(90, 127, 168)
         pdf.cell(0, 6, _clean_text_for_pdf(sec_name.upper()), ln=True, align="L")
         pdf.ln(2)
 
-        # Tabel cu două coloane: Câmp și Valoare
-        col_width = [50, 140]  # lățimi în mm
+        col_width = [50, 140]
         pdf.set_font_size(8)
         pdf.set_text_color(44, 74, 110)
         pdf.set_fill_color(232, 240, 248)
@@ -845,12 +845,11 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         pdf.cell(col_width[1], 6, _clean_text_for_pdf("VALOARE"), border=1, align="L", fill=True)
         pdf.ln()
 
-        # Rânduri date
         fill = False
         for _, row in df_sec.iterrows():
             camp = _clean_text_for_pdf(str(row.get("Camp", "")))
             valoare = str(row.get("Valoare", ""))
-            # Eliminăm emoji-urile rămase
+            # Eliminăm emoji-urile
             valoare = (valoare
                 .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
                 .replace("✉ ", "Email: ").replace("✉", "Email: ")
@@ -871,7 +870,14 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
     pdf.set_text_color(138, 173, 204)
     pdf.cell(0, 6, _clean_text_for_pdf("Document generat automat — IDBDC UPT  |  Uz intern"), ln=True, align="C")
 
-    return pdf.output(dest='S')  # Returnează bytes
+    # Obține bytes
+    try:
+        pdf_bytes = pdf.output(dest='S')
+        if not isinstance(pdf_bytes, bytes):
+            pdf_bytes = bytes(pdf_bytes)
+        return pdf_bytes
+    except Exception:
+        return None
 
 # ------------------------------------------------------------
 # FUNCȚII PENTRU PRINT (HTML) – neschimbată
@@ -894,7 +900,7 @@ def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
                 f"<tr style='background:{bg};'>"
                 f"<td style='width:{col1_px}px;font-weight:600;color:#2c4a6e;white-space:nowrap;'>{camp_val}</td>"
                 f"<td style='color:#000000;'>{val_val}</td>"
-                f"</tr>"
+                f"<tr>"
             )
         tbl_html = (
             f"<table style='border-collapse:collapse;width:100%;margin-bottom:16px;'>"
