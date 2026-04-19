@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 4.5 - PDF cu diacritice folosind LiberationSans
+# Versiune: 5.0 - PDF cu diacritice folosind fpdf2
 # =========================================================
 
 import streamlit as st
@@ -9,11 +9,12 @@ import html as _html
 import io
 import re
 import os
+import urllib.request
 import streamlit.components.v1 as components
 from supabase import Client
 
 # ------------------------------------------------------------
-# DICTIONARE ȘI CONFIGURĂRI (identice)
+# DICTIONARE ȘI CONFIGURĂRI (identice cu versiunea stabilă)
 # ------------------------------------------------------------
 
 COL_LABELS = {
@@ -752,151 +753,119 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
     return export_data
 
 # ------------------------------------------------------------
-# FUNCȚII PENTRU EXPORT (PDF și Print – cu diacritice în PDF)
+# FUNCȚII PENTRU EXPORT PDF (folosind fpdf2)
 # ------------------------------------------------------------
 
-def _get_font_path():
-    """Returnează calea către un font care suportă diacritice românești."""
-    # Prioritizează LiberationSans (instalat implicit în Ubuntu)
-    candidates = [
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",  # fallback
-    ]
-    for path in candidates:
-        if os.path.isfile(path):
-            return path
-    return None
-
-def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
+def _ensure_font():
+    """Asigură existența fontului DejaVuSans.ttf în folderul assets/."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    font_dir = os.path.join(base_dir, "assets")
+    font_path = os.path.join(font_dir, "DejaVuSans.ttf")
+    if os.path.isfile(font_path):
+        return font_path
+    # Creează folderul assets dacă nu există
+    os.makedirs(font_dir, exist_ok=True)
+    # Încearcă să descarce fontul
+    url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
     try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import cm
-        from reportlab.lib.colors import HexColor
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-
-        font_path = _get_font_path()
-        if font_path:
-            try:
-                pdfmetrics.registerFont(TTFont("CustomFont", font_path))
-                _fn_reg = "CustomFont"
-                _fn_bold = "CustomFont"  # reportlab va face synthetic bold
-            except Exception:
-                _fn_reg = "Helvetica"
-                _fn_bold = "Helvetica-Bold"
-        else:
-            _fn_reg = "Helvetica"
-            _fn_bold = "Helvetica-Bold"
-
-        pdf_buf = io.BytesIO()
-        doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
-                                leftMargin=1.8*cm, rightMargin=1.8*cm,
-                                topMargin=1.8*cm, bottomMargin=1.8*cm)
-        styles = getSampleStyleSheet()
-        BLUE_DARK = HexColor("#0B2A52")
-        BLUE_MED = HexColor("#1A4A7A")
-        BLUE_ROW = HexColor("#EEF4FB")
-        s_title = ParagraphStyle("T", parent=styles["Title"],
-                                 fontName=_fn_bold, fontSize=13, textColor=colors.white, leading=18)
-        s_sub = ParagraphStyle("S", parent=styles["Normal"],
-                               fontName=_fn_bold, fontSize=9, textColor=colors.white)
-        s_sec = ParagraphStyle("SC", parent=styles["Normal"],
-                               fontName=_fn_bold, fontSize=7.5, textColor=HexColor("#5A7FA8"))
-        s_lbl = ParagraphStyle("L", parent=styles["Normal"],
-                               fontName=_fn_bold, fontSize=8, textColor=HexColor("#2C4A6E"), leading=10)
-        s_val = ParagraphStyle("V", parent=styles["Normal"],
-                               fontName=_fn_reg, fontSize=8.5, textColor=HexColor("#0D1F35"), leading=11)
-        s_head = ParagraphStyle("H", parent=styles["Normal"],
-                                fontName=_fn_bold, fontSize=8, textColor=colors.white)
-        col_w = [2.5*cm, 5.5*cm, 9.44*cm]
-        story = []
-
-        hdr = Table([[Paragraph("IDBDC — UPT", s_title),
-                      Paragraph("Departamentul Cercetare Dezvoltare Inovare", s_sub)]],
-                    colWidths=[5*cm, 12.44*cm])
-        hdr.setStyle(TableStyle([
-            ("BACKGROUND", (0,0),(-1,-1), BLUE_DARK), ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("TOPPADDING",(0,0),(-1,-1),10), ("BOTTOMPADDING",(0,0),(-1,-1),10),
-            ("LEFTPADDING",(0,0),(0,0),14), ("LEFTPADDING",(1,0),(1,0),8),
-        ]))
-        story.append(hdr)
-        story.append(Spacer(1, 0.2*cm))
-
-        sub = Table([[Paragraph(f"Fișă completă  |  Cod: {cod}", s_sub)]], colWidths=[17.44*cm])
-        sub.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
-            ("TOPPADDING",(0,0),(-1,-1),5), ("BOTTOMPADDING",(0,0),(-1,-1),5),
-            ("LEFTPADDING",(0,0),(-1,-1),14),
-        ]))
-        story.append(sub)
-        story.append(Spacer(1, 0.3*cm))
-
-        antet = Table([[Paragraph("SECȚIUNEA", s_head), Paragraph("CÂMP", s_head), Paragraph("VALOARE", s_head)]],
-                      colWidths=col_w)
-        antet.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,-1),BLUE_MED),
-            ("TOPPADDING",(0,0),(-1,-1),4), ("BOTTOMPADDING",(0,0),(-1,-1),4),
-            ("LEFTPADDING",(0,0),(-1,-1),5),
-            ("GRID",(0,0),(-1,-1),0.3,HexColor("#6A9CC8")),
-        ]))
-        story.append(antet)
-
-        for sec_name, df_sec in export_frames.items():
-            tbl_data = []
-            for r_idx, (_, row) in enumerate(df_sec.iterrows()):
-                bg = BLUE_ROW if r_idx % 2 == 0 else colors.white
-                sec_label = sec_name if r_idx == 0 else ""
-                camp_val = str(row.get("Camp", ""))
-                val_val = str(row.get("Valoare", "")) if row.get("Valoare") is not None else ""
-                # Eliminăm emoji-urile pentru PDF
-                val_val = (val_val
-                    .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
-                    .replace("✉ ", "Email: ").replace("✉", "Email: ")
-                    .replace("📱 ", "Mobil: ").replace("📱", "Mobil: ")
-                    .replace("⭐ ", "").replace("⭐", "")
-                    .replace("👥 ", "").replace("👥", "")
-                )
-                tbl_data.append((sec_label, camp_val, val_val, bg))
-            if not tbl_data:
-                continue
-            tbl_rows = [[
-                Paragraph(r[0], s_sec),
-                Paragraph(r[1], s_lbl),
-                Paragraph(r[2].replace("\n", "<br/>"), s_val),
-            ] for r in tbl_data]
-            tbl = Table(tbl_rows, colWidths=col_w)
-            cmds = [
-                ("VALIGN",(0,0),(-1,-1),"TOP"),
-                ("TOPPADDING",(0,0),(-1,-1),3), ("BOTTOMPADDING",(0,0),(-1,-1),3),
-                ("LEFTPADDING",(0,0),(-1,-1),5),
-                ("GRID",(0,0),(-1,-1),0.3,HexColor("#C5D8EC")),
-                ("LINEABOVE",(0,0),(-1,0),1.2,BLUE_MED),
-            ]
-            for i, r in enumerate(tbl_data):
-                cmds.append(("BACKGROUND",(0,i),(-1,i),r[3]))
-            tbl.setStyle(TableStyle(cmds))
-            story.append(tbl)
-
-        story.append(Spacer(1, 0.5*cm))
-        story.append(Paragraph(
-            "Document generat automat — IDBDC UPT  |  Uz intern",
-            ParagraphStyle("F", parent=styles["Normal"], fontName=_fn_reg,
-                fontSize=7, textColor=HexColor("#8AADCC"), alignment=1)
-        ))
-        doc.build(story)
-        pdf_buf.seek(0)
-        return pdf_buf.getvalue()
-    except Exception as e:
+        urllib.request.urlretrieve(url, font_path)
+        return font_path
+    except Exception:
         return None
 
+def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
+    """Generează PDF cu diacritice folosind fpdf2."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return None
+
+    font_path = _ensure_font()
+    if not font_path:
+        # Dacă nu avem font, încercăm să generăm fără diacritice (fallback)
+        pass
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=1.5)
+    pdf.add_page()
+
+    # Înregistrare font dacă există
+    if font_path:
+        try:
+            pdf.add_font("DejaVu", "", font_path, uni=True)
+            pdf.set_font("DejaVu", size=10)
+        except Exception:
+            pdf.set_font("helvetica", size=10)
+    else:
+        pdf.set_font("helvetica", size=10)
+
+    # Antet principal
+    pdf.set_font_size(13)
+    pdf.set_text_color(11, 42, 82)  # albastru închis
+    pdf.cell(0, 8, "IDBDC — UPT", ln=True, align="C")
+    pdf.set_font_size(9)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 6, "Departamentul Cercetare Dezvoltare Inovare", ln=True, align="C")
+    pdf.ln(4)
+
+    # Subtitlu cu codul
+    pdf.set_font_size(10)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_fill_color(26, 74, 122)  # albastru mediu
+    pdf.cell(0, 8, f"Fișă completă  |  Cod: {cod}", ln=True, align="C", fill=True)
+    pdf.ln(6)
+
+    # Parcurgem secțiunile
+    for sec_name, df_sec in export_frames.items():
+        # Titlu secțiune
+        pdf.set_font_size(10)
+        pdf.set_text_color(90, 127, 168)
+        pdf.cell(0, 6, sec_name.upper(), ln=True, align="L")
+        pdf.ln(2)
+
+        # Tabel cu două coloane: Câmp și Valoare
+        col_width = [50, 140]  # lățimi în mm
+        pdf.set_font_size(8)
+        pdf.set_text_color(44, 74, 110)
+        pdf.set_fill_color(232, 240, 248)
+
+        # Antet tabel
+        pdf.cell(col_width[0], 6, "CÂMP", border=1, align="L", fill=True)
+        pdf.cell(col_width[1], 6, "VALOARE", border=1, align="L", fill=True)
+        pdf.ln()
+
+        # Rânduri date
+        fill = False
+        for _, row in df_sec.iterrows():
+            camp = str(row.get("Camp", ""))
+            valoare = str(row.get("Valoare", ""))
+            # Eliminăm emoji-urile rămase
+            valoare = (valoare
+                .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
+                .replace("✉ ", "Email: ").replace("✉", "Email: ")
+                .replace("📱 ", "Mobil: ").replace("📱", "Mobil: ")
+                .replace("⭐ ", "").replace("⭐", "")
+                .replace("👥 ", "").replace("👥", "")
+            )
+            pdf.set_fill_color(238, 244, 251) if fill else pdf.set_fill_color(255, 255, 255)
+            pdf.cell(col_width[0], 6, camp, border=1, align="L", fill=fill)
+            pdf.multi_cell(col_width[1], 6, valoare, border=1, align="L", fill=fill)
+            fill = not fill
+        pdf.ln(2)
+
+    # Footer
+    pdf.set_y(-15)
+    pdf.set_font_size(7)
+    pdf.set_text_color(138, 173, 204)
+    pdf.cell(0, 6, "Document generat automat — IDBDC UPT  |  Uz intern", ln=True, align="C")
+
+    return pdf.output(dest='S').encode('latin-1')  # fpdf2 returnează bytes
+
+# ------------------------------------------------------------
+# FUNCȚII PENTRU PRINT (HTML) – neschimbată
+# ------------------------------------------------------------
+
 def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
-    """Generează HTML pentru print, cu titlul vizibil și diacritice."""
     html_sections = []
     for section_label, df_sec in export_frames.items():
         if df_sec.empty:
@@ -921,7 +890,7 @@ def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
             f"<th style='width:{col1_px}px;background:#e8f0f8;text-align:left;'>{_html.escape(camp_col)}</th>"
             f"<th style='background:#e8f0f8;text-align:left;'>{_html.escape(df_sec.columns[1] if len(df_sec.columns) > 1 else '')}</th>"
             f"</thead><tbody>{rows_html}</tbody>"
-            f"</table>"
+            f"</tr>"
         )
         html_sections.append(f"<h3>{_html.escape(section_label)}</h3>{tbl_html}")
 
@@ -1182,7 +1151,7 @@ def render_fisa_completa(supabase: Client):
         if pdf_bytes:
             st.download_button("⬇️ PDF", data=pdf_bytes, file_name=f"fisa_{cod}.pdf", mime="application/pdf", key="fisa_pdf")
         else:
-            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați fontul sistem")
+            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați fpdf2")
     with col4:
         if st.button("🖨️ Print", key="fisa_print"):
             print_html = _generate_print_html_from_frames(export_frames, cod)
