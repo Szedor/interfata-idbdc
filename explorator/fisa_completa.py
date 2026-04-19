@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 4.3 - Diacritice corecte în PDF (font DejaVuSans)
+# Versiune: 4.4 - Diacritice în PDF folosind fonturile sistemului
 # =========================================================
 
 import streamlit as st
@@ -9,12 +9,11 @@ import html as _html
 import io
 import re
 import os
-import urllib.request
 import streamlit.components.v1 as components
 from supabase import Client
 
 # ------------------------------------------------------------
-# DICTIONARE ȘI CONFIGURĂRI (identice cu etapele anterioare)
+# DICTIONARE ȘI CONFIGURĂRI (identice)
 # ------------------------------------------------------------
 
 COL_LABELS = {
@@ -429,7 +428,8 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
                 f"<td rowspan='{len(all_items)}' style='vertical-align:top;padding:6px 10px 6px 0;width:10%;'>"
                 f"<span style='color:rgba(255,255,255,0.45);font-size:0.74rem;font-weight:800;"
                 f"text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;'>"
-                f"{_html.escape(section_label)}</span></td>"
+                f"{_html.escape(section_label)}</span>"
+                f"</td>"
             )
         rows_html += (
             f"<tr>{sec_cell}"
@@ -438,6 +438,7 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
             f"text-transform:uppercase;letter-spacing:0.04em;'>{label}</span></td>"
             f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
             f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{value}</span></td>"
+            f"</tr>"
         )
     st.markdown(
         f"<table style='width:100%;border-collapse:collapse;margin-bottom:0;'>{rows_html}</table>",
@@ -755,23 +756,19 @@ def _build_horizontal_export_data(supabase: Client, cod: str, tabela_gasita: str
 # ------------------------------------------------------------
 
 def _get_font_path():
-    """Returnează calea către un font TrueType care suportă diacritice (DejaVuSans)."""
-    # 1. Verifică în folderul assets/ din proiect
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # rădăcina proiectului
-    font_local = os.path.join(base_dir, "assets", "DejaVuSans.ttf")
-    if os.path.isfile(font_local):
-        return font_local
-    # 2. Verifică în directorul temporar (dacă a fost descărcat anterior)
-    tmp_font = "/tmp/DejaVuSans.ttf"
-    if os.path.isfile(tmp_font):
-        return tmp_font
-    # 3. Încearcă să descarce de pe GitHub
-    try:
-        url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
-        urllib.request.urlretrieve(url, tmp_font)
-        return tmp_font
-    except Exception:
-        return None
+    """Returnează calea către un font TrueType care suportă diacritice."""
+    # Căi comune în Streamlit Cloud / Linux
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",  # macOS (nu are diacritice, dar există)
+        "C:\\Windows\\Fonts\\arial.ttf",       # Windows
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return None
 
 def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
     try:
@@ -784,15 +781,17 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
 
-        # Înregistrare font cu suport pentru diacritice
         font_path = _get_font_path()
-        if font_path and os.path.isfile(font_path):
-            pdfmetrics.registerFont(TTFont("DejaVu", font_path))
-            pdfmetrics.registerFont(TTFont("DejaVu-Bold", font_path))  # bold, același fișier (fallback)
-            _fn_reg = "DejaVu"
-            _fn_bold = "DejaVu-Bold"
+        if font_path:
+            try:
+                pdfmetrics.registerFont(TTFont("CustomFont", font_path))
+                # Pentru bold, folosim același font (reportlab va face synthetic bold)
+                _fn_reg = "CustomFont"
+                _fn_bold = "CustomFont"
+            except Exception:
+                _fn_reg = "Helvetica"
+                _fn_bold = "Helvetica-Bold"
         else:
-            # Fallback la Helvetica (fără diacritice, dar nu crapă)
             _fn_reg = "Helvetica"
             _fn_bold = "Helvetica-Bold"
 
@@ -856,7 +855,7 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
                 sec_label = sec_name if r_idx == 0 else ""
                 camp_val = str(row.get("Camp", ""))
                 val_val = str(row.get("Valoare", "")) if row.get("Valoare") is not None else ""
-                # Eliminăm emoji-urile pentru PDF (opțional)
+                # Eliminăm emoji-urile pentru PDF
                 val_val = (val_val
                     .replace("🏛 ", "Dept: ").replace("🏛", "Dept: ")
                     .replace("✉ ", "Email: ").replace("✉", "Email: ")
@@ -895,11 +894,10 @@ def _generate_pdf_from_frames(export_frames: dict, cod: str) -> bytes:
         pdf_buf.seek(0)
         return pdf_buf.getvalue()
     except Exception as e:
-        # În caz de eroare, returnăm None (butonul PDF va fi dezactivat)
         return None
 
 def _generate_print_html_from_frames(export_frames: dict, cod: str) -> str:
-    """Generează HTML pentru print, cu titlul vizibil și diacritice (HTML suportă UTF-8)."""
+    """Generează HTML pentru print, cu titlul vizibil și diacritice."""
     html_sections = []
     for section_label, df_sec in export_frames.items():
         if df_sec.empty:
@@ -1185,7 +1183,7 @@ def render_fisa_completa(supabase: Client):
         if pdf_bytes:
             st.download_button("⬇️ PDF", data=pdf_bytes, file_name=f"fisa_{cod}.pdf", mime="application/pdf", key="fisa_pdf")
         else:
-            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați fontul sau reportlab")
+            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați fontul sistem")
     with col4:
         if st.button("🖨️ Print", key="fisa_print"):
             print_html = _generate_print_html_from_frames(export_frames, cod)
