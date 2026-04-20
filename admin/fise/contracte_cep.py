@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - FIȘA CEP - Logică specifică contracte CEP
-# Versiune: 1.3 - Adăugat câmp OBSERVATII în Date de bază
+# Versiune: 1.4 - Corectat AttributeError pentru None la isoformat
 # =========================================================
 
 import streamlit as st
@@ -90,7 +90,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "DATA DE SFARSIT":     ds,
         "DURATA":              int(dur_ex) if dur_ex else 0,
         "STATUS CONTRACT":     ex.get("status_contract_proiect", ""),
-        "OBSERVATII":          ex.get("observatii", ""),   # <--- COLOANĂ NOUĂ
+        "OBSERVATII":          ex.get("observatii", ""),
     }
 
     df = pd.DataFrame([row_init])
@@ -108,7 +108,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "STATUS CONTRACT": st.column_config.SelectboxColumn(
             "🔖 STATUS CONTRACT", options=status_list
         ),
-        "OBSERVATII": st.column_config.TextColumn("📝 OBSERVATII", width="large"),   # <--- COLOANĂ NOUĂ
+        "OBSERVATII": st.column_config.TextColumn("📝 OBSERVATII", width="large"),
     }
 
     df_edit = st.data_editor(
@@ -137,18 +137,22 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         di_e = _sub_months(ds_e, dur_e)
         st.caption(f"📅 Data de inceput calculată automat: {di_e}")
 
+    # Funcție helper pentru a converti data la string ISO, tratând None
+    def _iso_or_none(d):
+        return d.isoformat() if d is not None else None
+
     return {
         "cod_identificare":        cod_introdus,
         "denumire_categorie":      cat_sel,
         "acronim_tip_contract":    tip_sel,
-        "data_contract":           row["DATA CONTRACTULUI"].isoformat() if row["DATA CONTRACTULUI"] else None,
+        "data_contract":           _iso_or_none(row["DATA CONTRACTULUI"]),
         "obiectul_contractului":   row["OBIECTUL CONTRACTULUI"],
         "denumire_beneficiar":     row["BENEFICIAR"],
-        "data_inceput":            di_e.isoformat() if di_e else None,
-        "data_sfarsit":            ds_e.isoformat() if ds_e else None,
+        "data_inceput":            _iso_or_none(di_e),
+        "data_sfarsit":            _iso_or_none(ds_e),
         "durata":                  dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
-        "observatii":              row["OBSERVATII"],   # <--- COLOANĂ NOUĂ
+        "observatii":              row["OBSERVATII"],
     }
 
 
