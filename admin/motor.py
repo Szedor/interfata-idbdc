@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - MOTOR ADMIN - ORCHESTRATOR PRINCIPAL
-# Versiune: 2.5 - Adaptat pentru noua structură (admin/fise/)
+# Versiune: 5.2 - Adăugat suport pentru TERTI
 # =========================================================
 
 import streamlit as st
@@ -12,7 +12,6 @@ import admin.ui as ui
 
 
 def porneste_motorul(supabase):
-    # 1. Stil și mesaje
     ui.apply_admin_styles()
     ui.display_admin_message()
 
@@ -20,7 +19,6 @@ def porneste_motorul(supabase):
     filtru_cat = st.session_state.get("operator_filtru_categorie", [])
     filtru_tip = st.session_state.get("operator_filtru_tipuri", [])
 
-    # 2. Sidebar - Categorie
     with st.sidebar:
         st.header("📂 Selecție Date")
         lista_categorii = (
@@ -33,7 +31,6 @@ def porneste_motorul(supabase):
         st.info("Selectați categoria din meniul lateral.")
         return
 
-    # 3. Sidebar - Tip
     with st.sidebar:
         optiuni_tip = list(cfg.BASE_TABLE_MAP[cat_sel].keys())
         if not is_admin:
@@ -46,7 +43,6 @@ def porneste_motorul(supabase):
 
     base_table = cfg.get_base_table(cat_sel, tip_sel)
 
-    # 4. Sidebar - Cod identificare (câmp text liber)
     with st.sidebar:
         try:
             res_coduri = supabase.table(base_table).select("cod_identificare").execute()
@@ -66,10 +62,8 @@ def porneste_motorul(supabase):
         st.info("Introduceți codul în meniul lateral.")
         return
 
-    # 5. Detectare: cod nou sau existent
     este_existent = cod_introdus in list_coduri
 
-    # 5a. Sidebar - feedback + selecție acțiune
     with st.sidebar:
         if este_existent:
             st.success(f"✅ Cod recunoscut: {cod_introdus}")
@@ -102,7 +96,6 @@ def porneste_motorul(supabase):
 
     is_new = (actiune == "Fișă nouă")
 
-    # 6. Încărcare date existente din BD
     def _fetch(table, cod):
         try:
             res = supabase.table(table).select("*").eq("cod_identificare", cod).execute()
@@ -115,7 +108,6 @@ def porneste_motorul(supabase):
     date_fin_ex     = _fetch("com_date_financiare", cod_introdus) if not is_new else []
     date_echipa_ex  = _fetch("com_echipe_proiect",  cod_introdus) if not is_new else []
 
-    # 7. Randare fișe în funcție de categorie și tip
     rezultate = {}
 
     # ── CONTRACTE CEP ──────────────────────────────────────
@@ -143,6 +135,31 @@ def porneste_motorul(supabase):
                 supabase, cod_introdus, is_new, date_echipa_ex
             )
 
+    # ── CONTRACTE TERTI ────────────────────────────────────
+    elif cat_sel == "Contracte" and tip_sel == "TERTI":
+        import admin.fise.contracte_terti as terti
+
+        tab1, tab2, tab3 = st.tabs([
+            "📋 Date de bază",
+            "💰 Date financiare",
+            "👥 Echipă",
+        ])
+
+        with tab1:
+            rezultate["baza"] = terti.render_date_de_baza(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
+            )
+
+        with tab2:
+            rezultate["financiar"] = terti.render_date_financiare(
+                supabase, cod_introdus, is_new, date_fin_ex
+            )
+
+        with tab3:
+            rezultate["echipa"] = terti.render_echipa(
+                supabase, cod_introdus, is_new, date_echipa_ex
+            )
+
     # ── ALTE CATEGORII/TIPURI — fallback generic (urmează) ─
     else:
         st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
@@ -163,7 +180,6 @@ def porneste_motorul(supabase):
 
             # Date financiare (listă de rânduri)
             if "financiar" in rezultate:
-                # Ștergem rândurile vechi și reinserăm
                 try:
                     supabase.table("com_date_financiare").delete().eq(
                         "cod_identificare", cod_introdus
