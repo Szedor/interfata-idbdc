@@ -181,7 +181,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
 
 def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
 
-    VALUTE = ["LEI", "EURO", "USD"]
+    VALUTE = ["LEI", "EUR", "USD"]   # <--- schimbat din EURO în EUR
 
     if is_new or not date_existente:
         row_ex = {"valuta": "LEI", "valoare_contract_cep_terti_speciale": 0.0}
