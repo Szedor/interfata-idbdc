@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - FIȘA CEP - Logică specifică contracte CEP
-# Versiune: 1.2 - Tabel data_editor + toate regulile aplicate
+# Versiune: 1.3 - Adăugat câmp OBSERVATII în Date de bază
 # =========================================================
 
 import streamlit as st
@@ -48,7 +48,7 @@ def _sub_months(d, luni) -> date:
 
 
 # =========================================================
-# FIȘA 1 — DATE DE BAZĂ  (1 rând, tabel data_editor)
+# FIȘA 1 — DATE DE BAZĂ (1 rând, tabel data_editor)
 # =========================================================
 
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
@@ -90,6 +90,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "DATA DE SFARSIT":     ds,
         "DURATA":              int(dur_ex) if dur_ex else 0,
         "STATUS CONTRACT":     ex.get("status_contract_proiect", ""),
+        "OBSERVATII":          ex.get("observatii", ""),   # <--- COLOANĂ NOUĂ
     }
 
     df = pd.DataFrame([row_init])
@@ -107,6 +108,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "STATUS CONTRACT": st.column_config.SelectboxColumn(
             "🔖 STATUS CONTRACT", options=status_list
         ),
+        "OBSERVATII": st.column_config.TextColumn("📝 OBSERVATII", width="large"),   # <--- COLOANĂ NOUĂ
     }
 
     df_edit = st.data_editor(
@@ -146,11 +148,12 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "data_sfarsit":            ds_e.isoformat() if ds_e else None,
         "durata":                  dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
+        "observatii":              row["OBSERVATII"],   # <--- COLOANĂ NOUĂ
     }
 
 
 # =========================================================
-# FIȘA 2 — DATE FINANCIARE  (1 rând, tabel data_editor)
+# FIȘA 2 — DATE FINANCIARE (1 rând, tabel data_editor)
 # =========================================================
 
 def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
@@ -201,16 +204,11 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
 
 
 # =========================================================
-# FIȘA 3 — ECHIPĂ  (5 rânduri implicite + buton '+')
-# Coloane salvate: cod_identificare, nume_prenume, rol,
-#                  persoana_contact, functie_upt
-# Afișate (auto, nesalvate): DEPARTAMENT, EMAIL,
-#                             TELEFON MOBIL, TELEFON FIX
+# FIȘA 3 — ECHIPĂ (5 rânduri implicite + buton '+')
 # =========================================================
 
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
 
-    # Citire directă fără cache — cache_data nu funcționează corect cu clientul Supabase
     try:
         res = supabase.table("det_resurse_umane").select(
             "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
@@ -234,7 +232,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane. Verificați conexiunea la baza de date.")
     persoane_list = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
 
-    # Indexuri rapide pentru completare automată
     info_map = {}
     for p in persoane_data:
         n = p.get("nume_prenume", "")
@@ -249,7 +246,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             "fix":   p.get("telefon_fix", ""),
         }
 
-    # ── Construim tabelul inițial ─────────────────────────
     NR_RANDURI_INIT = 5
 
     if is_new or not date_existente:
@@ -274,7 +270,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
                 "TELEFON MOBIL":       info["mob"],
                 "TELEFON FIX":         info["fix"],
             })
-        # Completăm până la 5 rânduri dacă sunt mai puțini
         while len(rows_init) < NR_RANDURI_INIT:
             rows_init.append({
                 "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
@@ -283,7 +278,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
                 "TELEFON MOBIL": "", "TELEFON FIX": ""
             })
 
-    # Păstrăm tabelul în session_state pentru butonul '+'
     key_rows = f"cep_echipa_rows_{cod_introdus}"
     if key_rows not in st.session_state:
         st.session_state[key_rows] = rows_init
@@ -311,7 +305,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key="cep_echipa_editor",
     )
 
-    # Completare automată departament/email/telefon după alegerea numelui
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
@@ -321,12 +314,10 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
         df_updated.at[i, "TELEFON FIX"]   = info["fix"]
 
-    # Dacă s-au schimbat datele automate, reafișăm
     if not df_updated.equals(df_edit):
         st.session_state[key_rows] = df_updated.to_dict("records")
         st.rerun()
 
-    # Buton adăugare rând nou
     if st.button("➕ Adaugă membru", key="cep_add_membru"):
         st.session_state[key_rows].append({
             "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
@@ -336,7 +327,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         })
         st.rerun()
 
-    # ── Construim lista pentru salvare ────────────────────
     rezultat = []
     for _, row in df_updated.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "")).strip()
