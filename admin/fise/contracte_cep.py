@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - FIȘA CEP - Logică specifică contracte CEP
-# Versiune: 1.4 - Corectat AttributeError pentru None la isoformat
+# Versiune: 1.5 - Corectat complet AttributeError pentru date
 # =========================================================
 
 import streamlit as st
@@ -17,7 +17,11 @@ def _to_date(val):
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return None
     try:
-        return pd.to_datetime(val).date()
+        # Convertim la datetime și apoi la date
+        dt = pd.to_datetime(val)
+        if pd.isna(dt):
+            return None
+        return dt.date()
     except Exception:
         return None
 
@@ -45,6 +49,21 @@ def _add_months(d, luni) -> date:
 
 def _sub_months(d, luni) -> date:
     return _add_months(d, -int(luni))
+
+
+def _iso_or_none(d):
+    """Convertește un obiect dată în string ISO, tratând None și Timestamp."""
+    if d is None:
+        return None
+    try:
+        # Dacă este pandas Timestamp, îl convertim la date
+        if hasattr(d, 'date'):
+            d = d.date()
+        elif hasattr(d, 'isoformat'):
+            return d.isoformat()
+        return d.isoformat()
+    except Exception:
+        return None
 
 
 # =========================================================
@@ -127,19 +146,19 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
     ds_e = row["DATA DE SFARSIT"]
     dur_e = int(row["DURATA"]) if row["DURATA"] else 0
 
-    if di_e and ds_e:
-        dur_e = _calc_durata(di_e, ds_e)
-        st.caption(f"📅 Durată calculată automat: {dur_e} luni")
-    elif di_e and dur_e and not ds_e:
-        ds_e = _add_months(di_e, dur_e)
-        st.caption(f"📅 Data de sfarsit calculată automat: {ds_e}")
-    elif ds_e and dur_e and not di_e:
-        di_e = _sub_months(ds_e, dur_e)
-        st.caption(f"📅 Data de inceput calculată automat: {di_e}")
+    # Convertim la date obiecte Python pentru calcule
+    di_e_date = _to_date(di_e)
+    ds_e_date = _to_date(ds_e)
 
-    # Funcție helper pentru a converti data la string ISO, tratând None
-    def _iso_or_none(d):
-        return d.isoformat() if d is not None else None
+    if di_e_date and ds_e_date:
+        dur_e = _calc_durata(di_e_date, ds_e_date)
+        st.caption(f"📅 Durată calculată automat: {dur_e} luni")
+    elif di_e_date and dur_e and not ds_e_date:
+        ds_e_date = _add_months(di_e_date, dur_e)
+        st.caption(f"📅 Data de sfarsit calculată automat: {ds_e_date}")
+    elif ds_e_date and dur_e and not di_e_date:
+        di_e_date = _sub_months(ds_e_date, dur_e)
+        st.caption(f"📅 Data de inceput calculată automat: {di_e_date}")
 
     return {
         "cod_identificare":        cod_introdus,
@@ -148,8 +167,8 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "data_contract":           _iso_or_none(row["DATA CONTRACTULUI"]),
         "obiectul_contractului":   row["OBIECTUL CONTRACTULUI"],
         "denumire_beneficiar":     row["BENEFICIAR"],
-        "data_inceput":            _iso_or_none(di_e),
-        "data_sfarsit":            _iso_or_none(ds_e),
+        "data_inceput":            _iso_or_none(di_e_date),
+        "data_sfarsit":            _iso_or_none(ds_e_date),
         "durata":                  dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
         "observatii":              row["OBSERVATII"],
