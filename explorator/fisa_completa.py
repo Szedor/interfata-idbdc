@@ -1,6 +1,6 @@
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 4.5 - PDF cu diacritice folosind LiberationSans
+# Versiune: 4.5 - valida cu CEP dar fara diacritice la export pdf.
 # =========================================================
 
 import streamlit as st
