@@ -1,6 +1,6 @@
 # =========================================================
-# IDBDC - MODUL ADMIN - CONFIGURARE STRUCTURĂ (admin_config.py)
-# Versiune: 1.1 - Tab-uri specifice per tip
+# IDBDC - MODUL ADMIN - CONFIGURARE STRUCTURĂ (admin/config.py)
+# Versiune: 5.2 - Adăugat TERTI
 # =========================================================
 
 import streamlit as st
@@ -36,25 +36,20 @@ COMPLEMENTARY_TABLES = [
 ]
 
 # --- TAB-URI PER CATEGORIE/TIP ---
-# Cheia: (categorie, tip) sau (categorie, None) pentru toate tipurile acelei categorii
 TABS_MAP = {
     ("Contracte", "CEP"):   ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
     ("Contracte", "TERTI"): ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
-    # Proiectele și restul vor fi adăugate pe măsură ce sunt configurate
 }
 
 def get_tabs_for_category(categorie, tip=None):
-    """Returnează lista de tab-uri pentru combinația categorie + tip."""
     key = (categorie, tip)
     if key in TABS_MAP:
         return TABS_MAP[key]
-    # Fallback generic
     if categorie in ["Evenimente stiintifice", "Proprietate industriala"]:
         return ["📋 Date de bază"]
     return ["📋 Date de bază", "💰 Date financiare", "👥 Echipă", "🧪 Aspecte tehnice"]
 
 def get_base_table(categorie, tip):
-    """Returnează numele tabelului SQL pe baza selecției din UI."""
     return BASE_TABLE_MAP.get(categorie, {}).get(tip)
 
 # --- NOMENCLATOARE ---
