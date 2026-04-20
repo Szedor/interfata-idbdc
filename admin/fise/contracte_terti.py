@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC - FIȘA TERTI - Logică specifică contracte TERTI
-# Versiune: 1.0 - Copiat din CEP (aceeași structură)
+# Versiune: 5.1 - Corectat AttributeError pentru None la isoformat
 # =========================================================
 
 import streamlit as st
@@ -45,6 +45,21 @@ def _add_months(d, luni) -> date:
 
 def _sub_months(d, luni) -> date:
     return _add_months(d, -int(luni))
+
+
+def _iso_or_none(d):
+    """Convertește un obiect dată în string ISO, tratând None și Timestamp."""
+    if d is None:
+        return None
+    try:
+        # Dacă este pandas Timestamp, îl convertim la date
+        if hasattr(d, 'date'):
+            d = d.date()
+        elif hasattr(d, 'isoformat'):
+            return d.isoformat()
+        return d.isoformat()
+    except Exception:
+        return None
 
 
 # =========================================================
@@ -141,11 +156,11 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, ex):
         "cod_identificare":        cod_introdus,
         "denumire_categorie":      cat_sel,
         "acronim_tip_contract":    tip_sel,
-        "data_contract":           row["DATA CONTRACTULUI"].isoformat() if row["DATA CONTRACTULUI"] else None,
+        "data_contract":           _iso_or_none(row["DATA CONTRACTULUI"]),
         "obiectul_contractului":   row["OBIECTUL CONTRACTULUI"],
         "denumire_beneficiar":     row["BENEFICIAR"],
-        "data_inceput":            di_e.isoformat() if di_e else None,
-        "data_sfarsit":            ds_e.isoformat() if ds_e else None,
+        "data_inceput":            _iso_or_none(di_e),
+        "data_sfarsit":            _iso_or_none(ds_e),
         "durata":                  dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
         "observatii":              row["OBSERVATII"],
