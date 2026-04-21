@@ -1,6 +1,6 @@
 # =========================================================
 # utils/date_helpers.py
-# v.modul.1.0 - Funcții ajutătoare pentru date (extrase din codul validat)
+# v.modul.1.1 - Funcții ajutătoare pentru date (extrase din codul validat)
 # =========================================================
 
 import pandas as pd
