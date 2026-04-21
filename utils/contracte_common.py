@@ -1,14 +1,10 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.0 - Funcții comune pentru administrare contracte (CEP, TERTI, SPECIALE)
-# =========================================================
-# Acest fișier conține logica comună pentru toate tipurile de contracte.
-# Nu modifică nimic din ce există deja validat, ci doar mută codul duplicat.
+# v.modul.1.1 - Funcții comune pentru administrare contracte (CEP, TERTI, SPECIALE)
 # =========================================================
 
 import streamlit as st
 import pandas as pd
-from datetime import date
 from utils.date_helpers import to_date, calc_durata, add_months, sub_months
 from utils.supabase_helpers import safe_select_eq
 
@@ -26,26 +22,15 @@ def _get_status_list(supabase):
     return _fetch()
 
 # =========================================================
-# FIȘA 1 — DATE DE BAZĂ (comună pentru CEP, TERTI, SPECIALE)
+# FIȘA 1 — DATE DE BAZĂ (comună)
 # =========================================================
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
-    """
-    Parametri:
-        supabase: clientul Supabase
-        cod_introdus: codul identificator
-        cat_sel: categoria (ex: "Contracte")
-        tip_label: eticheta vizuală a tipului (ex: "CEP", "TERȚI", "SPECIALE")
-        tabela_nume: numele tabelei SQL (ex: "base_contracte_cep")
-        is_new: boolean - dacă este înregistrare nouă
-        date_existente: dict cu datele existente (pentru editare)
-    """
     status_list = _get_status_list(supabase)
 
     di = to_date(date_existente.get("data_inceput"))
     ds = to_date(date_existente.get("data_sfarsit"))
     dur_ex = date_existente.get("durata")
 
-    # Calcule automate
     if di and ds and not dur_ex:
         dur_ex = calc_durata(di, ds)
     elif di and dur_ex and not ds:
@@ -163,14 +148,149 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
     }]
 
 # =========================================================
-# FIȘA 3 — ECHIPĂ (comună)
+# FIȘA 3 — ECHIPĂ (comună) – copiată din admin_cep.py original
 # =========================================================
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
-    # Pentru echipă avem nevoie de listele de persoane și departamente
-    # Vom păstra aceeași logică ca în admin_cep.py original, dar mutată aici.
-    # Din motive de spațiu, voi include doar structura; în realitate se copiază codul funcțional existent.
-    # (Se poate extrage complet din admin_cep.py, funcția render_echipa, fără a schimba nimic.)
-    # Vom presupune că această funcție este deja implementată și funcțională.
-    # Pentru a nu întrerupe fluxul, voi lăsa un placeholder, dar în realitate codul trebuie copiat.
-    # TODO: copiați aici conținutul funcției render_echipa din admin_cep.py (identic pentru toate contractele).
-    pass
+    # =========================================================
+    # Acest cod este identic cu funcția render_echipa din admin_cep.py
+    # Singura modificare: am înlocuit referințele la _safe_select_eq cu safe_select_eq din helper
+    # =========================================================
+    
+    # Citire persoane din det_resurse_umane
+    try:
+        res = supabase.table("det_resurse_umane").select(
+            "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
+        ).order("nume_prenume").execute()
+        persoane_data = res.data or []
+    except Exception as e:
+        st.error(f"❌ Eroare citire det_resurse_umane: {e}")
+        persoane_data = []
+
+    # Citire departamente
+    try:
+        res2 = supabase.table("nom_departament").select(
+            "acronim_departament,denumire_departament"
+        ).execute()
+        dep_map = {r["acronim_departament"]: r["denumire_departament"]
+                   for r in (res2.data or []) if r.get("acronim_departament")}
+    except Exception as e:
+        st.error(f"❌ Eroare citire nom_departament: {e}")
+        dep_map = {}
+
+    if not persoane_data:
+        st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane. Verificați conexiunea la baza de date.")
+    persoane_list = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
+
+    # Indexuri rapide pentru completare automată
+    info_map = {}
+    for p in persoane_data:
+        n = p.get("nume_prenume", "")
+        if not n:
+            continue
+        acronim = p.get("acronim_departament", "")
+        den = dep_map.get(acronim, "")
+        info_map[n] = {
+            "dep":   f"{acronim} - {den}" if acronim and den else acronim,
+            "email": p.get("email", ""),
+            "mob":   p.get("telefon_mobil", ""),
+            "fix":   p.get("telefon_fix", ""),
+        }
+
+    # Construire tabel inițial
+    NR_RANDURI_INIT = 5
+
+    if is_new or not date_existente:
+        rows_init = [
+            {"NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
+             "PERSOANĂ DE CONTACT": False,
+             "DEPARTAMENT": "", "EMAIL": "",
+             "TELEFON MOBIL": "", "TELEFON FIX": ""}
+            for _ in range(NR_RANDURI_INIT)
+        ]
+    else:
+        rows_init = []
+        for r in date_existente:
+            n = r.get("nume_prenume", "")
+            info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
+            rows_init.append({
+                "NUME ȘI PRENUME":     n,
+                "ROLUL ÎN CONTRACT":   r.get("rol", ""),
+                "PERSOANĂ DE CONTACT": bool(r.get("persoana_contact", False)),
+                "DEPARTAMENT":         info["dep"],
+                "EMAIL":               info["email"],
+                "TELEFON MOBIL":       info["mob"],
+                "TELEFON FIX":         info["fix"],
+            })
+        while len(rows_init) < NR_RANDURI_INIT:
+            rows_init.append({
+                "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
+                "PERSOANĂ DE CONTACT": False,
+                "DEPARTAMENT": "", "EMAIL": "",
+                "TELEFON MOBIL": "", "TELEFON FIX": ""
+            })
+
+    key_rows = f"echipa_rows_{cod_introdus}"
+    if key_rows not in st.session_state:
+        st.session_state[key_rows] = rows_init
+
+    df = pd.DataFrame(st.session_state[key_rows])
+
+    col_cfg = {
+        "NUME ȘI PRENUME": st.column_config.SelectboxColumn(
+            "👤 NUME ȘI PRENUME", options=persoane_list, required=False
+        ),
+        "ROLUL ÎN CONTRACT":   st.column_config.TextColumn("ROLUL ÎN CONTRACT"),
+        "PERSOANĂ DE CONTACT": st.column_config.CheckboxColumn("⭐ PERSOANĂ DE CONTACT"),
+        "DEPARTAMENT":         st.column_config.TextColumn("DEPARTAMENT", disabled=True),
+        "EMAIL":               st.column_config.TextColumn("EMAIL", disabled=True),
+        "TELEFON MOBIL":       st.column_config.TextColumn("TELEFON MOBIL", disabled=True),
+        "TELEFON FIX":         st.column_config.TextColumn("TELEFON FIX", disabled=True),
+    }
+
+    df_edit = st.data_editor(
+        df,
+        column_config=col_cfg,
+        hide_index=True,
+        use_container_width=True,
+        num_rows="fixed",
+        key="echipa_editor",
+    )
+
+    # Completare automată
+    df_updated = df_edit.copy()
+    for i, row in df_edit.iterrows():
+        n = row.get("NUME ȘI PRENUME", "")
+        info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
+        df_updated.at[i, "DEPARTAMENT"]   = info["dep"]
+        df_updated.at[i, "EMAIL"]         = info["email"]
+        df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
+        df_updated.at[i, "TELEFON FIX"]   = info["fix"]
+
+    if not df_updated.equals(df_edit):
+        st.session_state[key_rows] = df_updated.to_dict("records")
+        st.rerun()
+
+    # Buton adăugare rând
+    if st.button("➕ Adaugă membru", key="add_membru"):
+        st.session_state[key_rows].append({
+            "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
+            "PERSOANĂ DE CONTACT": False,
+            "DEPARTAMENT": "", "EMAIL": "",
+            "TELEFON MOBIL": "", "TELEFON FIX": ""
+        })
+        st.rerun()
+
+    # Construire listă pentru salvare
+    rezultat = []
+    for _, row in df_updated.iterrows():
+        n = str(row.get("NUME ȘI PRENUME", "")).strip()
+        if not n:
+            continue
+        rezultat.append({
+            "cod_identificare": cod_introdus,
+            "nume_prenume":     n,
+            "rol":              str(row.get("ROLUL ÎN CONTRACT", "")).strip(),
+            "persoana_contact": bool(row.get("PERSOANĂ DE CONTACT", False)),
+            "functie_upt":      "",
+        })
+    return rezultat
