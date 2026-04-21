@@ -1,15 +1,15 @@
 # =========================================================
-# IDBDC - MOTOR ADMIN - ORCHESTRATOR PRINCIPAL
-# Versiune: 5.2 - Adăugat suport pentru TERTI
+# admin/motor.py
+# v.modul.1.0 - Motor principal administrativ (modularizat)
 # =========================================================
 
 import streamlit as st
-import pandas as pd
 import admin.config as cfg
 import admin.rules as rules
 import admin.data_ops as ops
 import admin.ui as ui
 
+from admin.fise import contracte_cep, contracte_terti, contracte_speciale
 
 def porneste_motorul(supabase):
     ui.apply_admin_styles()
@@ -110,67 +110,64 @@ def porneste_motorul(supabase):
 
     rezultate = {}
 
-    # ── CONTRACTE CEP ──────────────────────────────────────
     if cat_sel == "Contracte" and tip_sel == "CEP":
-        import admin.fise.contracte_cep as cep
-
-        tab1, tab2, tab3 = st.tabs([
-            "📋 Date de bază",
-            "💰 Date financiare",
-            "👥 Echipă",
-        ])
-
+        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
         with tab1:
-            rezultate["baza"] = cep.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-
+            rezultate["baza"] = contracte_cep.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["baza"]
         with tab2:
-            rezultate["financiar"] = cep.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
-
+            rezultate["financiar"] = contracte_cep.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["financiar"]
         with tab3:
-            rezultate["echipa"] = cep.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
-
-    # ── CONTRACTE TERTI ────────────────────────────────────
+            rezultate["echipa"] = contracte_cep.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["echipa"]
     elif cat_sel == "Contracte" and tip_sel == "TERTI":
-        import admin.fise.contracte_terti as terti
-
-        tab1, tab2, tab3 = st.tabs([
-            "📋 Date de bază",
-            "💰 Date financiare",
-            "👥 Echipă",
-        ])
-
+        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
         with tab1:
-            rezultate["baza"] = terti.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-
+            rezultate["baza"] = contracte_terti.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["baza"]
         with tab2:
-            rezultate["financiar"] = terti.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
-
+            rezultate["financiar"] = contracte_terti.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["financiar"]
         with tab3:
-            rezultate["echipa"] = terti.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
-
-    # ── ALTE CATEGORII/TIPURI — fallback generic (urmează) ─
+            rezultate["echipa"] = contracte_terti.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["echipa"]
+    elif cat_sel == "Contracte" and tip_sel == "SPECIALE":
+        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
+        with tab1:
+            rezultate["baza"] = contracte_speciale.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["baza"]
+        with tab2:
+            rezultate["financiar"] = contracte_speciale.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["financiar"]
+        with tab3:
+            rezultate["echipa"] = contracte_speciale.render(
+                supabase, cod_introdus, cat_sel, tip_sel, is_new,
+                date_baza_ex, date_fin_ex, date_echipa_ex
+            )["echipa"]
     else:
         st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
         return
 
-    # 8. Salvare
     if btn_save:
         with st.spinner("Se salvează datele..."):
             erori = []
-
-            # Tabel bază
             if "baza" in rezultate and rezultate["baza"]:
                 row = {**rezultate["baza"]}
                 row["cod_identificare"] = cod_introdus
@@ -178,13 +175,10 @@ def porneste_motorul(supabase):
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
 
-            # Date financiare (listă de rânduri)
             if "financiar" in rezultate:
                 try:
-                    supabase.table("com_date_financiare").delete().eq(
-                        "cod_identificare", cod_introdus
-                    ).execute()
-                except Exception:
+                    supabase.table("com_date_financiare").delete().eq("cod_identificare", cod_introdus).execute()
+                except:
                     pass
                 for row in rezultate["financiar"]:
                     ok, msg = ops.direct_upsert_single_row(
@@ -193,22 +187,17 @@ def porneste_motorul(supabase):
                     if not ok:
                         erori.append(f"Date financiare: {msg}")
 
-            # Echipă (listă de rânduri)
             if "echipa" in rezultate:
                 try:
-                    supabase.table("com_echipe_proiect").delete().eq(
-                        "cod_identificare", cod_introdus
-                    ).execute()
-                except Exception:
+                    supabase.table("com_echipe_proiect").delete().eq("cod_identificare", cod_introdus).execute()
+                except:
                     pass
-                randuri_echipa = [
-                    row for row in rezultate["echipa"] if row.get("nume_prenume")
-                ]
+                randuri_echipa = [row for row in rezultate["echipa"] if row.get("nume_prenume")]
                 if randuri_echipa:
                     try:
                         supabase.table("com_echipe_proiect").insert(randuri_echipa).execute()
                     except Exception as e:
-                        erori.append(f"Echipa: {e}")
+                        erori.append(f"Echipă: {e}")
 
             if erori:
                 st.session_state["admin_msg"] = ("error", " | ".join(erori))
@@ -216,16 +205,10 @@ def porneste_motorul(supabase):
                 st.session_state["admin_msg"] = ("success", "Toate datele au fost salvate cu succes.")
             st.rerun()
 
-    # 9. Ștergere
     if btn_delete:
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
         if st.checkbox("Confirm eliminarea din toate tabelele"):
-            tabele_curatare = [
-                base_table,
-                "com_date_financiare",
-                "com_echipe_proiect",
-                "com_aspecte_tehnice",
-            ]
+            tabele_curatare = [base_table, "com_date_financiare", "com_echipe_proiect", "com_aspecte_tehnice"]
             ok, msg = ops.direct_delete_all_tables(supabase, cod_introdus, tabele_curatare)
             if ok:
                 st.session_state["admin_msg"] = ("success", "Înregistrarea a fost eliminată.")
