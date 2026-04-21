@@ -1,6 +1,6 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.1 - Funcții comune pentru administrare contracte (CEP, TERTI, SPECIALE)
+# v.modul.1.2 - Funcții comune pentru administrare contracte (chei unice)
 # =========================================================
 
 import streamlit as st
@@ -67,13 +67,14 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "STATUS CONTRACT": st.column_config.SelectboxColumn("🔖 STATUS CONTRACT", options=status_list),
     }
 
+    # Cheie unică: include codul și numele tabelei
     df_edit = st.data_editor(
         df,
         column_config=col_cfg,
         hide_index=True,
         use_container_width=True,
         num_rows="fixed",
-        key=f"{tabela_nume}_baza_editor",
+        key=f"{tabela_nume}_baza_editor_{cod_introdus}",
     )
     row = df_edit.iloc[0]
 
@@ -148,15 +149,10 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
     }]
 
 # =========================================================
-# FIȘA 3 — ECHIPĂ (comună) – copiată din admin_cep.py original
+# FIȘA 3 — ECHIPĂ (comună)
 # =========================================================
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
-    # =========================================================
-    # Acest cod este identic cu funcția render_echipa din admin_cep.py
-    # Singura modificare: am înlocuit referințele la _safe_select_eq cu safe_select_eq din helper
-    # =========================================================
-    
-    # Citire persoane din det_resurse_umane
+    # Citire persoane
     try:
         res = supabase.table("det_resurse_umane").select(
             "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
@@ -166,7 +162,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         st.error(f"❌ Eroare citire det_resurse_umane: {e}")
         persoane_data = []
 
-    # Citire departamente
     try:
         res2 = supabase.table("nom_departament").select(
             "acronim_departament,denumire_departament"
@@ -178,10 +173,9 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         dep_map = {}
 
     if not persoane_data:
-        st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane. Verificați conexiunea la baza de date.")
+        st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane.")
     persoane_list = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
 
-    # Indexuri rapide pentru completare automată
     info_map = {}
     for p in persoane_data:
         n = p.get("nume_prenume", "")
@@ -196,9 +190,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             "fix":   p.get("telefon_fix", ""),
         }
 
-    # Construire tabel inițial
     NR_RANDURI_INIT = 5
-
     if is_new or not date_existente:
         rows_init = [
             {"NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
@@ -253,10 +245,9 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         hide_index=True,
         use_container_width=True,
         num_rows="fixed",
-        key="echipa_editor",
+        key=f"echipa_editor_{cod_introdus}",
     )
 
-    # Completare automată
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
@@ -270,8 +261,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         st.session_state[key_rows] = df_updated.to_dict("records")
         st.rerun()
 
-    # Buton adăugare rând
-    if st.button("➕ Adaugă membru", key="add_membru"):
+    if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         st.session_state[key_rows].append({
             "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
             "PERSOANĂ DE CONTACT": False,
@@ -280,7 +270,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         })
         st.rerun()
 
-    # Construire listă pentru salvare
     rezultat = []
     for _, row in df_updated.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "")).strip()
