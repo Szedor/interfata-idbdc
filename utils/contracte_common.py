@@ -1,6 +1,6 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.6 - Corecții: durată, mesaje salvare, vizibilitate Calea1
+# v.modul.1.7 - Corecții majore: salvare date, calcul durată, fără rerun la echipă
 # =========================================================
 
 import streamlit as st
