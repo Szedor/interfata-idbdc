@@ -1,14 +1,13 @@
 # =========================================================
 # utils/export_print.py
-# v.modul.1.3 - Corectare fundal alb pentru print
+# v.modul.1.4 - Format corect: două coloane (Camp | Valoare)
 # =========================================================
 
 import html as _html
 
 def generate_print_html_vertical(supabase, cod: str, tabela_gasita: str, titlu_fisa: str, build_vertical_export_data_func) -> str:
     """
-    Generează HTML pentru print, cu structură verticală (câmp | valoare).
-    Fundal alb, text negru, titlu în albastru academic.
+    Generează HTML pentru print, cu structură verticală (câmp | valoare) pe două coloane.
     """
     export_data = build_vertical_export_data_func(supabase, cod, tabela_gasita)
 
@@ -36,9 +35,10 @@ def generate_print_html_vertical(supabase, cod: str, tabela_gasita: str, titlu_f
 """
     for section in export_data["sections"]:
         html += f"<h3>{section['name'].upper()}</h3>"
-        html += " <table> <tr><th>Camp</th><th>Valoare</th></tr>"
+        html += "<table>"
+        html += "<tr><th>Camp</th><th>Valoare</th></tr>"
         for f, v in zip(section["fields"], section["values"]):
-            html += f"<tr><br>{_html.escape(str(f))}</td><br>{_html.escape(str(v))}</td></tr>"
+            html += f"<tr><td>{_html.escape(str(f))}</td><td>{_html.escape(str(v))}</td></tr>"
         html += "</table>"
     html += """
 </body>
