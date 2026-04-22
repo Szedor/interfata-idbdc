@@ -1,6 +1,6 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.7 - Corecții majore: salvare date, calcul durată, fără rerun la echipă
+# v.modul.1.8 - Corecție finală: salvare date calendar + durată
 # =========================================================
 
 import streamlit as st
@@ -28,7 +28,6 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
     ds = to_date(date_existente.get("data_sfarsit"))
     dur_ex = date_existente.get("durata")
 
-    # Calculează durata dacă există datele necesare
     if di and ds and (dur_ex is None or dur_ex == 0):
         dur_ex = calc_durata(di, ds)
     elif di and dur_ex and not ds:
@@ -96,8 +95,8 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "data_contract": _safe_isoformat(row["DATA CONTRACTULUI"]),
         "obiectul_contractului": row["OBIECTUL CONTRACTULUI"],
         "denumire_beneficiar": row["BENEFICIAR"],
-        "data_inceput": _safe_isoformat(di_e),
-        "data_sfarsit": _safe_isoformat(ds_e),
+        "data_inceput": di_e.isoformat() if di_e else None,
+        "data_sfarsit": ds_e.isoformat() if ds_e else None,
         "durata": dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
     }
@@ -238,25 +237,16 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
-    # Actualizare silențioasă (fără rerun imediat)
     df_updated = df_edit.copy()
-    changed = False
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
         info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
-        if (df_updated.at[i, "DEPARTAMENT"] != info["dep"] or
-            df_updated.at[i, "EMAIL"] != info["email"] or
-            df_updated.at[i, "TELEFON MOBIL"] != info["mob"] or
-            df_updated.at[i, "TELEFON FIX"] != info["fix"]):
-            changed = True
-            df_updated.at[i, "DEPARTAMENT"] = info["dep"]
-            df_updated.at[i, "EMAIL"] = info["email"]
-            df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
-            df_updated.at[i, "TELEFON FIX"] = info["fix"]
+        df_updated.at[i, "DEPARTAMENT"] = info["dep"]
+        df_updated.at[i, "EMAIL"] = info["email"]
+        df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
+        df_updated.at[i, "TELEFON FIX"] = info["fix"]
 
-    if changed:
-        st.session_state[key_rows] = df_updated.to_dict("records")
-        st.rerun()
+    st.session_state[key_rows] = df_updated.to_dict("records")
 
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         st.session_state[key_rows].append({
