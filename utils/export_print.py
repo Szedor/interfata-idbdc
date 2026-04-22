@@ -1,6 +1,6 @@
 # =========================================================
 # utils/export_print.py
-# v.modul.1.2 - Revenire la formatul original validat (doar culoare text negru)
+# v.modul.1.3 - Corectare fundal alb pentru print
 # =========================================================
 
 import html as _html
@@ -8,7 +8,7 @@ import html as _html
 def generate_print_html_vertical(supabase, cod: str, tabela_gasita: str, titlu_fisa: str, build_vertical_export_data_func) -> str:
     """
     Generează HTML pentru print, cu structură verticală (câmp | valoare).
-    Format original validat, doar culoarea textului este neagră.
+    Fundal alb, text negru, titlu în albastru academic.
     """
     export_data = build_vertical_export_data_func(supabase, cod, tabela_gasita)
 
@@ -18,7 +18,7 @@ def generate_print_html_vertical(supabase, cod: str, tabela_gasita: str, titlu_f
     <meta charset="UTF-8">
     <title>Fișa {cod}</title>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #ffffff; }}
         h2 {{ color: #0B2A52; }}
         h3 {{ color: #0B2A52; margin-top: 20px; }}
         table {{ border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }}
