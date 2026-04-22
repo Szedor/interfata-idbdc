@@ -1,7 +1,7 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.10 - Corecție finală: inlocuire functie def render date de baza
-# =========================================================
+# v.modul.1.10 - Corecție finală: inlocuire def render_echipa
+===========================================================
 
 import streamlit as st
 import pandas as pd
@@ -247,17 +247,26 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
+    # Actualizare silențioasă a câmpurilor (fără rerun)
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
-        info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
-        df_updated.at[i, "DEPARTAMENT"] = info["dep"]
-        df_updated.at[i, "EMAIL"] = info["email"]
-        df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
-        df_updated.at[i, "TELEFON FIX"] = info["fix"]
+        if n:
+            info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
+            df_updated.at[i, "DEPARTAMENT"] = info["dep"]
+            df_updated.at[i, "EMAIL"] = info["email"]
+            df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
+            df_updated.at[i, "TELEFON FIX"] = info["fix"]
+        else:
+            df_updated.at[i, "DEPARTAMENT"] = ""
+            df_updated.at[i, "EMAIL"] = ""
+            df_updated.at[i, "TELEFON MOBIL"] = ""
+            df_updated.at[i, "TELEFON FIX"] = ""
 
+    # Salvăm datele actualizate în session_state fără rerun
     st.session_state[key_rows] = df_updated.to_dict("records")
 
+    # Buton adăugare rând (singurul care face rerun)
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         st.session_state[key_rows].append({
             "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
@@ -267,6 +276,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         })
         st.rerun()
 
+    # Construim rezultatul pentru salvare
     rezultat = []
     for _, row in df_updated.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "")).strip()
