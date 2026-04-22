@@ -1,7 +1,6 @@
-cat > utils/contracte_common.py << 'EOF'
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.8 - Corecție finală: salvare date calendar + durată
+# v.modul.1.9 - Corecție finală: salvare date calendar + durată
 # =========================================================
 
 import streamlit as st
@@ -271,4 +270,3 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             "functie_upt":      "",
         })
     return rezultat
-EOF
