@@ -1,11 +1,6 @@
-
-**Ultimul: `utils/fisa_completa_orchestrator.py`** – funcția principală care orchestrează toate modulele de mai sus pentru a afișa fișa completă. Îl trimit imediat.```python
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# v.modul.1.0 - Orchestrator pentru afișarea fișei complete (explorator)
-# =========================================================
-# Acest fișier înlocuiește vechea funcție render_fisa_completa din tab1_fisa_completa.py,
-# folosind modulele comune pentru configurare, randare și export.
+# v.modul.1.1 - Orchestrator pentru afișarea fișei complete (explorator)
 # =========================================================
 
 import streamlit as st
@@ -21,12 +16,16 @@ from utils.export_pdf import generate_pdf_vertical
 from utils.export_print import generate_print_html_vertical
 from utils.supabase_helpers import safe_select_eq
 
-# Re-export funcția de autentificare export (dacă există; momentan placeholder)
+# =========================================================
+# Autentificare export (placeholder)
+# =========================================================
 def _render_export_auth_tab1(supabase):
-    # TODO: mutați aici funcția reală de autentificare din calea1_explorator.py
-    # Pentru moment, returnăm True pentru a permite exportul (se va modifica ulterior)
+    # TODO: implementați autentificarea reală
     return True
 
+# =========================================================
+# Funcția principală de randare a fișei complete
+# =========================================================
 def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta: str):
     """
     Funcția principală de afișare a fișei complete.
@@ -43,65 +42,7 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
         unsafe_allow_html=True,
     )
     
-    c1, c2, _ = st.columns([1.2, 0.5, 3.3])
-    with c1:
-        cod_input = st.text_input(
-            "Cod identificare", value=cod if cod else "", key=f"fisa_cod_{tabela_gasita}",
-            placeholder="Ex: 998877 sau 26FDI26",
-        ).strip()
-    
-    # Dacă s-a schimbat codul, reîncărcăm
-    if cod_input != cod:
-        st.rerun()
-    cod = cod_input
-
-    cod_found = False
-    if cod and len(cod) >= 3:
-        rows_check = safe_select_eq(supabase, tabela_gasita, "cod_identificare", cod, limit=1)
-        if rows_check:
-            cod_found = True
-        with c2:
-            if cod_found:
-                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>✅</div>", unsafe_allow_html=True)
-            elif cod and len(cod) >= 3:
-                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>❌</div>", unsafe_allow_html=True)
-
-    if not cod or len(cod) < 3:
-        st.info("Introduceți codul identificare (minim 3 caractere).", icon="ℹ️")
-        return
-
-    if cod_found:
-        st.markdown(
-            "<div style='background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.45);"
-            "border-radius:10px;padding:7px 14px;margin-bottom:4px;display:inline-block;'>"
-            "<span style='color:#4ade80;font-weight:700;font-size:0.92rem;'>"
-            "✅ Înregistrarea este confirmată — fișa este disponibilă și pregătită pentru consultare."
-            "</span></div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<div style='background:rgba(255,100,100,0.15);border:1px solid rgba(255,100,100,0.60);"
-            "border-radius:10px;padding:7px 14px;margin-bottom:4px;display:inline-block;'>"
-            "<span style='color:#ff8888;font-weight:700;font-size:0.92rem;'>"
-            "❌ Codul introdus nu a fost găsit în baza de date."
-            "</span></div>",
-            unsafe_allow_html=True,
-        )
-        return
-
-    st.divider()
-    titlu_fisa = TABLE_LABELS.get(tabela_gasita, "Fișă")
-    titlu_fisa_curat = titlu_fisa.split(" ", 1)[-1] if " " in titlu_fisa else titlu_fisa
-    st.markdown(
-        f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
-        f"letter-spacing:0.03em;margin-bottom:1rem;'>"
-        f"INFORMAȚII {titlu_fisa_curat.upper()}</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-
-    # Checkbox-uri pentru selectarea secțiunilor
+    # Afișare secțiuni cu checkbox-uri
     _p1, _p2, _p3, _p4, _lbl = st.columns([0.7, 0.7, 0.7, 0.7, 5.2])
     with _p1:
         pin_gen = st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
@@ -184,13 +125,13 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
 
     # PDF (vertical)
     pdf_bytes = generate_pdf_vertical(
-        supabase, cod, tabela_gasita, titlu_fisa_curat,
+        supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
         lambda s, c, t: build_vertical_export_data(s, c, t)
     )
 
     # Print HTML (vertical)
     print_html = generate_print_html_vertical(
-        supabase, cod, tabela_gasita, titlu_fisa_curat,
+        supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
         lambda s, c, t: build_vertical_export_data(s, c, t)
     )
 
