@@ -1,6 +1,6 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.5 - Eliminat rerun-ul din echipă pentru a nu sări între tab-uri
+# v.modul.1.6 - Corecții: durată, mesaje salvare, vizibilitate Calea1
 # =========================================================
 
 import streamlit as st
@@ -28,7 +28,8 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
     ds = to_date(date_existente.get("data_sfarsit"))
     dur_ex = date_existente.get("durata")
 
-    if di and ds and not dur_ex:
+    # Calculează durata dacă există datele necesare
+    if di and ds and (dur_ex is None or dur_ex == 0):
         dur_ex = calc_durata(di, ds)
     elif di and dur_ex and not ds:
         ds = add_months(di, dur_ex)
@@ -60,7 +61,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "BENEFICIAR": st.column_config.TextColumn("BENEFICIAR"),
         "DATA DE INCEPUT": st.column_config.DateColumn("📅 DATA DE INCEPUT", format="DD-MM-YYYY"),
         "DATA DE SFARSIT": st.column_config.DateColumn("📅 DATA DE SFARSIT", format="DD-MM-YYYY"),
-        "DURATA": st.column_config.NumberColumn("DURATA", format="%d", min_value=0),
+        "DURATA": st.column_config.NumberColumn("DURATA (luni)", format="%d", min_value=0),
         "STATUS CONTRACT": st.column_config.SelectboxColumn("🔖 STATUS CONTRACT", options=status_list),
     }
 
@@ -142,7 +143,6 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
     }]
 
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
-    # Citire persoane
     try:
         res = supabase.table("det_resurse_umane").select(
             "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
@@ -238,7 +238,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
-    # Actualizare silențioasă a session_state (fără rerun)
+    # Actualizare silențioasă (fără rerun imediat)
     df_updated = df_edit.copy()
     changed = False
     for i, row in df_edit.iterrows():
