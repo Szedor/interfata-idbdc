@@ -1,6 +1,6 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.2 - Funcții comune pentru administrare contracte (chei unice)
+# v.modul.1.3 - Funcții comune pentru administrare contracte (chei unice)
 # =========================================================
 
 import streamlit as st
@@ -96,7 +96,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "cod_identificare": cod_introdus,
         "denumire_categorie": cat_sel,
         "acronim_tip_contract": tip_label,
-        "data_contract": row["DATA CONTRACTULUI"].isoformat() if row["DATA CONTRACTULUI"] else None,
+        "data_contract": row["DATA CONTRACTULUI"].isoformat() if hasattr(row["DATA CONTRACTULUI"], 'isoformat') else None,
         "obiectul_contractului": row["OBIECTUL CONTRACTULUI"],
         "denumire_beneficiar": row["BENEFICIAR"],
         "data_inceput": di_e.isoformat() if di_e else None,
