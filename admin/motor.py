@@ -1,7 +1,6 @@
-cat > admin/motor.py << 'EOF'
 # =========================================================
 # admin/motor.py
-# v.modul.1.3 - Motor principal administrativ (modularizat, chei unice)
+# v.modul.1.4 - Motor principal administrativ (modularizat, chei unice)
 # =========================================================
 
 import streamlit as st
@@ -111,9 +110,6 @@ def porneste_motorul(supabase):
 
     rezultate = {}
 
-    # =========================================================
-    # CONTRACTE CEP
-    # =========================================================
     if cat_sel == "Contracte" and tip_sel == "CEP":
         tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
         with tab1:
@@ -129,9 +125,6 @@ def porneste_motorul(supabase):
                 supabase, cod_introdus, is_new, date_echipa_ex
             )
 
-    # =========================================================
-    # CONTRACTE TERTI
-    # =========================================================
     elif cat_sel == "Contracte" and tip_sel == "TERTI":
         tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
         with tab1:
@@ -147,9 +140,6 @@ def porneste_motorul(supabase):
                 supabase, cod_introdus, is_new, date_echipa_ex
             )
 
-    # =========================================================
-    # CONTRACTE SPECIALE
-    # =========================================================
     elif cat_sel == "Contracte" and tip_sel == "SPECIALE":
         tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
         with tab1:
@@ -169,9 +159,6 @@ def porneste_motorul(supabase):
         st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
         return
 
-    # =========================================================
-    # SALVARE DATE
-    # =========================================================
     if btn_save:
         with st.spinner("Se salvează datele..."):
             erori = []
@@ -213,9 +200,6 @@ def porneste_motorul(supabase):
                 st.session_state["admin_msg"] = ("success", "Toate datele au fost salvate cu succes.")
             st.rerun()
 
-    # =========================================================
-    # ȘTERGERE FIȘĂ (doar ADMIN)
-    # =========================================================
     if btn_delete:
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
         if st.checkbox("Confirm eliminarea din toate tabelele"):
@@ -231,4 +215,3 @@ def porneste_motorul(supabase):
                 st.rerun()
             else:
                 st.error(msg)
-EOF
