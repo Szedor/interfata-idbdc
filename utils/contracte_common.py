@@ -1,6 +1,6 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.9 - Corecție finală: salvare date calendar + durată
+# v.modul.1.10 - Corecție finală: inlocuire functie def render date de baza
 # =========================================================
 
 import streamlit as st
@@ -88,15 +88,25 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         di_e = sub_months(ds_e, dur_e)
         st.caption(f"📅 Data de inceput calculată automat: {di_e}")
 
+    # Convertim datele la string ISO pentru salvare
+    def _fmt_date(date_val):
+        if pd.isna(date_val) or date_val is None:
+            return None
+        if hasattr(date_val, 'strftime'):
+            return date_val.strftime("%Y-%m-%d")
+        if hasattr(date_val, 'isoformat'):
+            return date_val.isoformat()
+        return str(date_val)
+
     return {
         "cod_identificare": cod_introdus,
         "denumire_categorie": cat_sel,
         "acronim_tip_contract": tip_label,
-        "data_contract": _safe_isoformat(row["DATA CONTRACTULUI"]),
+        "data_contract": _fmt_date(row["DATA CONTRACTULUI"]),
         "obiectul_contractului": row["OBIECTUL CONTRACTULUI"],
         "denumire_beneficiar": row["BENEFICIAR"],
-        "data_inceput": di_e.isoformat() if di_e else None,
-        "data_sfarsit": ds_e.isoformat() if ds_e else None,
+        "data_inceput": _fmt_date(di_e),
+        "data_sfarsit": _fmt_date(ds_e),
         "durata": dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
     }
