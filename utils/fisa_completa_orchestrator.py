@@ -1,11 +1,12 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# v.modul.1.1 - Orchestrator pentru afișarea fișei complete (explorator)
+# v.modul.1.2 - Orchestrator cu autentificare export reală
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 import html as _html
+import re as _re
 import streamlit.components.v1 as components
 
 from utils.display_config import TABLE_LABELS
@@ -17,11 +18,58 @@ from utils.export_print import generate_print_html_vertical
 from utils.supabase_helpers import safe_select_eq
 
 # =========================================================
-# Autentificare export (placeholder)
+# Autentificare export (verificare email @upt.ro)
 # =========================================================
-def _render_export_auth_tab1(supabase):
-    # TODO: implementați autentificarea reală
-    return True
+def _render_export_auth_tab1(supabase) -> bool:
+    """Afișează bara de autentificare pentru export. Returnează True dacă utilizatorul este autorizat."""
+    auth_key = "export_auth_tab1"
+    pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
+
+    # Verifică dacă este deja autentificat (prin AI sau prin bara acestui tab)
+    if st.session_state.get("auth_ai", False) or st.session_state.get(auth_key, False):
+        nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
+        st.markdown(
+            f"<div style='background:rgba(255,255,255,0.10);border-radius:10px;padding:8px 16px;color:#ffffff;font-weight:700;margin-bottom:0.5rem;'>✅ Export autorizat — {_html.escape(str(nume))}</div>",
+            unsafe_allow_html=True,
+        )
+        return True
+
+    # Afișează bara de autentificare
+    st.markdown(
+        "<div style='background:rgba(255,255,255,0.08);border-radius:12px;padding:12px 18px;margin-bottom:0.6rem;'>"
+        "<span style='color:#ffffff;font-weight:800;font-size:0.97rem;'>"
+        "🔐 Export disponibil exclusiv pentru cadrele UPT — autentificare cu email instituțional"
+        "</span></div>",
+        unsafe_allow_html=True,
+    )
+    
+    ea1, ea2, _ = st.columns([2.0, 1.0, 3.0])
+    with ea1:
+        email_exp = st.text_input(
+            "Email", value="", key="export_email_tab1",
+            label_visibility="collapsed", placeholder="prenume.nume@upt.ro",
+        ).strip().lower()
+    with ea2:
+        auth_clicked = st.button("✅ Autorizare", key="export_auth_btn_tab1")
+
+    if auth_clicked:
+        if not pattern.match(email_exp):
+            st.error("Email invalid. Format: prenume.nume@upt.ro")
+        else:
+            try:
+                res = supabase.table("det_resurse_umane") \
+                    .select("nume_prenume,email").eq("email", email_exp).limit(1).execute()
+                if res.data:
+                    user = res.data[0]
+                    st.session_state[auth_key] = True
+                    st.session_state.user_email = email_exp
+                    st.session_state.user_name = (user.get("nume_prenume") or "").strip() or email_exp
+                    st.rerun()
+                else:
+                    st.error("Emailul nu există în baza de date IDBDC.")
+            except Exception as e:
+                st.error(f"Eroare verificare: {e}")
+    return False
 
 # =========================================================
 # Funcția principală de randare a fișei complete
@@ -35,13 +83,6 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
         tabela_gasita: numele tabelei SQL de bază (ex: "base_contracte_cep")
         titlu_eticheta: eticheta vizuală (ex: "CEP") – nu se folosește direct, dar păstrată pentru consistență
     """
-    st.markdown("## 📄 Fișă completă")
-    st.markdown(
-        "<div style='color:rgba(255,255,255,0.88);font-size:1.02rem;font-weight:600;"
-        "margin-bottom:0.85rem;'>Introduceți codul și consultați toate informațiile asociate.</div>",
-        unsafe_allow_html=True,
-    )
-    
     # Afișare secțiuni cu checkbox-uri
     _p1, _p2, _p3, _p4, _lbl = st.columns([0.7, 0.7, 0.7, 0.7, 5.2])
     with _p1:
@@ -110,6 +151,8 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
         "margin-bottom:6px;'>📤 Export fișă</div>",
         unsafe_allow_html=True,
     )
+    
+    # Autentificare export
     if not _render_export_auth_tab1(supabase):
         return
 
