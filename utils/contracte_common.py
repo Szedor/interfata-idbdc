@@ -1,15 +1,12 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.10 - Corecție finală: inlocuire def render_echipa
-===========================================================
+# v.modul.1.11 - Corectie finala
+# =========================================================
 
 import streamlit as st
 import pandas as pd
 from utils.date_helpers import to_date, calc_durata, add_months, sub_months
 from utils.supabase_helpers import safe_select_eq
-
-def _safe_isoformat(date_obj):
-    return date_obj.isoformat() if hasattr(date_obj, 'isoformat') else None
 
 def _get_status_list(supabase):
     @st.cache_data(show_spinner=False, ttl=600)
@@ -88,9 +85,10 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         di_e = sub_months(ds_e, dur_e)
         st.caption(f"📅 Data de inceput calculată automat: {di_e}")
 
-    # Convertim datele la string ISO pentru salvare
     def _fmt_date(date_val):
-        if pd.isna(date_val) or date_val is None:
+        if date_val is None:
+            return None
+        if pd.isna(date_val):
             return None
         if hasattr(date_val, 'strftime'):
             return date_val.strftime("%Y-%m-%d")
@@ -247,7 +245,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
-    # Actualizare silențioasă a câmpurilor (fără rerun)
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
@@ -263,10 +260,8 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             df_updated.at[i, "TELEFON MOBIL"] = ""
             df_updated.at[i, "TELEFON FIX"] = ""
 
-    # Salvăm datele actualizate în session_state fără rerun
     st.session_state[key_rows] = df_updated.to_dict("records")
 
-    # Buton adăugare rând (singurul care face rerun)
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         st.session_state[key_rows].append({
             "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
@@ -276,7 +271,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         })
         st.rerun()
 
-    # Construim rezultatul pentru salvare
     rezultat = []
     for _, row in df_updated.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "")).strip()
