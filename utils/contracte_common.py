@@ -1,6 +1,6 @@
 # =========================================================
 # utils/contracte_common.py
-# v.modul.1.4 - Funcții comune pentru administrare contracte (cu safe_isoformat)
+# v.modul.1.5 - Eliminat rerun-ul din echipă pentru a nu sări între tab-uri
 # =========================================================
 
 import streamlit as st
@@ -8,16 +8,9 @@ import pandas as pd
 from utils.date_helpers import to_date, calc_durata, add_months, sub_months
 from utils.supabase_helpers import safe_select_eq
 
-# =========================================================
-# Funcție ajutătoare pentru conversie sigură la ISO format
-# =========================================================
 def _safe_isoformat(date_obj):
-    """Returnează data în format ISO dacă obiectul are metoda isoformat, altfel None."""
     return date_obj.isoformat() if hasattr(date_obj, 'isoformat') else None
 
-# =========================================================
-# Helper pentru status (dropdown)
-# =========================================================
 def _get_status_list(supabase):
     @st.cache_data(show_spinner=False, ttl=600)
     def _fetch():
@@ -28,9 +21,6 @@ def _get_status_list(supabase):
             return []
     return _fetch()
 
-# =========================================================
-# FIȘA 1 — DATE DE BAZĂ (comună)
-# =========================================================
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
     status_list = _get_status_list(supabase)
 
@@ -111,9 +101,6 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
     }
 
-# =========================================================
-# FIȘA 2 — DATE FINANCIARE (comună)
-# =========================================================
 def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
     VALUTE = ["LEI", "EURO", "USD"]
     if is_new or not date_existente:
@@ -154,9 +141,6 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
         "valoare_contract_cep_terti_speciale": float(row["VALOARE CONTRACT"] or 0),
     }]
 
-# =========================================================
-# FIȘA 3 — ECHIPĂ (comună)
-# =========================================================
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
     # Citire persoane
     try:
@@ -254,16 +238,23 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
+    # Actualizare silențioasă a session_state (fără rerun)
     df_updated = df_edit.copy()
+    changed = False
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
         info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
-        df_updated.at[i, "DEPARTAMENT"]   = info["dep"]
-        df_updated.at[i, "EMAIL"]         = info["email"]
-        df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
-        df_updated.at[i, "TELEFON FIX"]   = info["fix"]
+        if (df_updated.at[i, "DEPARTAMENT"] != info["dep"] or
+            df_updated.at[i, "EMAIL"] != info["email"] or
+            df_updated.at[i, "TELEFON MOBIL"] != info["mob"] or
+            df_updated.at[i, "TELEFON FIX"] != info["fix"]):
+            changed = True
+            df_updated.at[i, "DEPARTAMENT"] = info["dep"]
+            df_updated.at[i, "EMAIL"] = info["email"]
+            df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
+            df_updated.at[i, "TELEFON FIX"] = info["fix"]
 
-    if not df_updated.equals(df_edit):
+    if changed:
         st.session_state[key_rows] = df_updated.to_dict("records")
         st.rerun()
 
