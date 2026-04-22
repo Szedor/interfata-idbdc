@@ -1,6 +1,6 @@
 # =========================================================
 # explorator/main.py
-# v.modul.1.0 - Modulul principal Explorator (calea1)
+# v.modul.1.1 - Modulul principal Explorator (calea1) cu poartă de control
 # =========================================================
 
 import streamlit as st
@@ -92,6 +92,59 @@ def _render_export_auth_tab1(supabase):
     # Pentru moment, returnăm True pentru a permite exportul
     # TODO: implementați autentificarea reală
     return True
+
+# =========================================================
+# POARTA DE CONTROL (autentificare consultare)
+# =========================================================
+def gate_control():
+    """Afișează ecranul de autentificare pentru accesul la modulul Explorator."""
+    GATE_ENABLED = bool(st.secrets.get("GATE_ENABLED", True))
+    PASSWORD_CONSULTARE = st.secrets.get("PASSWORD_CONSULTARE", "")
+
+    if not GATE_ENABLED:
+        st.session_state.autorizat_consultare = True
+        return
+
+    if "autorizat_consultare" not in st.session_state:
+        st.session_state.autorizat_consultare = False
+
+    if st.session_state.autorizat_consultare:
+        return
+
+    # Afișare ecran de autentificare
+    hide_streamlit_chrome()
+    st.markdown(
+        f"""
+        <style>
+          .stApp {{ background: {ACADEMIC_BLUE} !important; }}
+          div.block-container {{ padding-top: 4.0rem; padding-bottom: 2.0rem; }}
+          .gate-box {{
+            background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 18px; padding: 26px 22px 18px 22px;
+          }}
+          .gate-title {{ text-align: center; font-size: 1.45rem; font-weight: 900; color: #ffffff; }}
+          .gate-subtitle {{ text-align: center; color: rgba(255,255,255,0.92); font-size: 1.02rem; }}
+          .stTextInput input {{ background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; }}
+          .stButton > button {{ width: 100%; background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    
+    left, mid, right = st.columns([1.8, 1.0, 1.8])
+    with mid:
+        st.markdown('<div class="gate-box">', unsafe_allow_html=True)
+        st.markdown('<div class="gate-title">🛡️ Acces securizat</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gate-subtitle">Interogare baze de date – DCDI</div>', unsafe_allow_html=True)
+        parola = st.text_input("Parola acces:", type="password")
+        if st.button("Autorizare acces", use_container_width=True):
+            if parola == PASSWORD_CONSULTARE:
+                st.session_state.autorizat_consultare = True
+                st.rerun()
+            else:
+                st.error("Parolă greșită.")
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
 
 # =========================================================
 # TAB 1 — FIȘA COMPLETĂ (după cod)
@@ -191,11 +244,14 @@ def render_raportari(supabase):
 # =========================================================
 def run():
     st.set_page_config(page_title="IDBDC – Explorare", layout="wide")
+    
+    # Maintenance gate (blocare generală)
     _maintenance_gate_fn(st, pwd_key="_mw_pwd_c1", btn_key="_mw_btn_c1")
     
-    # Autentificare gate (parolă consultare)
-    # TODO: implementați gate-ul real dacă este necesar
+    # Poarta de control (autentificare consultare)
+    gate_control()
     
+    # Aplică stilurile și ascunde elementele Streamlit
     hide_streamlit_chrome()
     apply_style_full_blue()
     
