@@ -1,6 +1,6 @@
 # =========================================================
 # utils/sectiuni/echipa.py
-# v.modul.1.1 - Fără rerun, menține datele la adăugare membru
+# v.modul.1.2 - Corectie: salveaza rol si persoana contact
 # =========================================================
 
 import streamlit as st
@@ -103,9 +103,14 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     )
 
     # Actualizare câmpuri automate (departament, email, telefon)
+    # IMPORTANT: PĂSTRĂM valorile existente pentru ROL și PERSOANĂ DE CONTACT
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
+        # Păstrăm rolul și bifa din datele editate
+        rol_curent = row.get("ROLUL ÎN CONTRACT", "")
+        contact_curent = row.get("PERSOANĂ DE CONTACT", False)
+        
         if n:
             info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
             df_updated.at[i, "DEPARTAMENT"] = info["dep"]
@@ -117,11 +122,14 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             df_updated.at[i, "EMAIL"] = ""
             df_updated.at[i, "TELEFON MOBIL"] = ""
             df_updated.at[i, "TELEFON FIX"] = ""
+        
+        # Restaurăm rolul și bifa (nu le suprascriem)
+        df_updated.at[i, "ROLUL ÎN CONTRACT"] = rol_curent
+        df_updated.at[i, "PERSOANĂ DE CONTACT"] = contact_curent
 
-    # Salvare directă în session_state fără rerun
     st.session_state[key_rows] = df_updated.to_dict("records")
 
-    # Buton adăugare membru - folosește st.rerun() doar pentru a reîmprospăta tabelul
+    # Buton adăugare membru
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         current_rows = st.session_state[key_rows]
         current_rows.append({
