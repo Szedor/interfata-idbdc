@@ -1,15 +1,12 @@
 # =========================================================
 # utils/sectiuni/echipa.py
-# v.modul.1.0 - Secțiunea ECHIPĂ (comună)
+# v.modul.1.0 - Secțiunea ECHIPĂ
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
-    """
-    Randare și salvare echipă.
-    """
     try:
         res = supabase.table("det_resurse_umane").select(
             "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
@@ -105,7 +102,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
-    # Actualizare câmpuri automate (departament, email, telefon)
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
