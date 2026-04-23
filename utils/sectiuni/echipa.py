@@ -1,6 +1,6 @@
 # =========================================================
 # utils/sectiuni/echipa.py
-# v.modul.2.0 - Rescris complet de la zero, simplu si functional
+# v.modul.2.1 - Afișare date contact în Calea2
 # =========================================================
 
 import streamlit as st
@@ -29,10 +29,8 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         st.error(f"Eroare citire departamente: {e}")
         dep_map = {}
 
-    # Lista pentru dropdown
     persoane_lista = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
 
-    # Mapare informatii persoana
     info_persoana = {}
     for p in persoane_data:
         nume = p.get("nume_prenume", "")
@@ -54,13 +52,11 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     
     if cheie_sesiune not in st.session_state:
         if is_new or not date_existente:
-            # Initializare cu 5 randuri goale
             st.session_state[cheie_sesiune] = [
                 {"nume": "", "rol": "", "contact": False, "departament": "", "email": "", "mobil": "", "fix": ""}
                 for _ in range(5)
             ]
         else:
-            # Incarcare date existente
             st.session_state[cheie_sesiune] = []
             for r in date_existente:
                 nume = r.get("nume_prenume", "")
@@ -74,7 +70,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
                     "mobil": info.get("mobil", ""),
                     "fix": info.get("fix", ""),
                 })
-            # Completam pana la 5 randuri daca sunt mai putine
             while len(st.session_state[cheie_sesiune]) < 5:
                 st.session_state[cheie_sesiune].append(
                     {"nume": "", "rol": "", "contact": False, "departament": "", "email": "", "mobil": "", "fix": ""}
@@ -116,36 +111,35 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     )
 
     # =========================================================
-    # PRELUCRARE DATE DUPA EDITARE
+    # PRELUCRARE DATE DUPA EDITARE - AFIȘARE IMEDIATĂ DATE CONTACT
     # =========================================================
-    rezultat_nou = []
-    for _, row in df_edit.iterrows():
-        nume = str(row.get("NUME ȘI PRENUME", "")).strip()
-        if not nume:
-            continue
-        
-        # Obtine informatiile complete pentru numele ales
-        info = info_persoana.get(nume, {})
-        
-        rezultat_nou.append({
-            "cod_identificare": cod_introdus,
-            "nume_prenume": nume,
-            "rol": str(row.get("ROLUL ÎN CONTRACT", "")).strip(),
-            "persoana_contact": bool(row.get("PERSOANĂ DE CONTACT", False)),
-            "functie_upt": "",
-        })
-        
-        # Actualizeaza si session_state cu informatiile complete
-        for item in st.session_state[cheie_sesiune]:
-            if item["nume"] == nume:
-                item["departament"] = info.get("departament", "")
-                item["email"] = info.get("email", "")
-                item["mobil"] = info.get("mobil", "")
-                item["fix"] = info.get("fix", "")
-                item["rol"] = str(row.get("ROLUL ÎN CONTRACT", "")).strip()
-                item["contact"] = bool(row.get("PERSOANĂ DE CONTACT", False))
-                break
-    
+    df_updated = df_edit.copy()
+    for idx, row in df_edit.iterrows():
+        nume = row.get("NUME ȘI PRENUME", "")
+        if nume:
+            info = info_persoana.get(nume, {})
+            df_updated.at[idx, "DEPARTAMENT"] = info.get("departament", "")
+            df_updated.at[idx, "EMAIL"] = info.get("email", "")
+            df_updated.at[idx, "TELEFON MOBIL"] = info.get("mobil", "")
+            df_updated.at[idx, "TELEFON FIX"] = info.get("fix", "")
+        else:
+            df_updated.at[idx, "DEPARTAMENT"] = ""
+            df_updated.at[idx, "EMAIL"] = ""
+            df_updated.at[idx, "TELEFON MOBIL"] = ""
+            df_updated.at[idx, "TELEFON FIX"] = ""
+
+    # Actualizare session_state
+    for idx, row in df_updated.iterrows():
+        st.session_state[cheie_sesiune][idx] = {
+            "nume": row.get("NUME ȘI PRENUME", ""),
+            "rol": row.get("ROLUL ÎN CONTRACT", ""),
+            "contact": row.get("PERSOANĂ DE CONTACT", False),
+            "departament": row.get("DEPARTAMENT", ""),
+            "email": row.get("EMAIL", ""),
+            "mobil": row.get("TELEFON MOBIL", ""),
+            "fix": row.get("TELEFON FIX", ""),
+        }
+
     # =========================================================
     # BUTON ADAUGARE RAND NOU
     # =========================================================
@@ -155,4 +149,19 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         )
         st.rerun()
 
-    return rezultat_nou
+    # =========================================================
+    # CONSTRUIRE REZULTAT PENTRU SALVARE
+    # =========================================================
+    rezultat = []
+    for item in st.session_state[cheie_sesiune]:
+        nume = item.get("nume", "").strip()
+        if not nume:
+            continue
+        rezultat.append({
+            "cod_identificare": cod_introdus,
+            "nume_prenume": nume,
+            "rol": item.get("rol", ""),
+            "persoana_contact": item.get("contact", False),
+            "functie_upt": "",
+        })
+    return rezultat
