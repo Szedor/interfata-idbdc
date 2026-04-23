@@ -1,6 +1,6 @@
 # =========================================================
 # admin/motor.py
-# v.modul.1.6 - Salvare dintr-un singur click
+# v.modul.1.7 - Revenit la structura simplă 
 # =========================================================
 
 import streamlit as st
@@ -111,83 +111,47 @@ def porneste_motorul(supabase):
     rezultate = {}
 
     if cat_sel == "Contracte" and tip_sel == "CEP":
-        with st.spinner("Se încarcă datele..."):
+        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
+        with tab1:
             rezultate["baza"] = contracte_cep.render_date_de_baza(
                 supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
             )
+        with tab2:
             rezultate["financiar"] = contracte_cep.render_date_financiare(
                 supabase, cod_introdus, is_new, date_fin_ex
             )
-            rezultate["echipa"] = contracte_cep.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
-        
-        # Afișare tabs DOAR după ce avem datele
-        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        
-        # Re-afișăm datele în fiecare tab (folosind aceleași funcții, dar fără a mai salva din nou)
-        with tab1:
-            contracte_cep.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-        with tab2:
-            contracte_cep.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
         with tab3:
-            contracte_cep.render_echipa(
+            rezultate["echipa"] = contracte_cep.render_echipa(
                 supabase, cod_introdus, is_new, date_echipa_ex
             )
 
     elif cat_sel == "Contracte" and tip_sel == "TERTI":
-        with st.spinner("Se încarcă datele..."):
+        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
+        with tab1:
             rezultate["baza"] = contracte_terti.render_date_de_baza(
                 supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
             )
+        with tab2:
             rezultate["financiar"] = contracte_terti.render_date_financiare(
                 supabase, cod_introdus, is_new, date_fin_ex
             )
-            rezultate["echipa"] = contracte_terti.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
-        
-        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        with tab1:
-            contracte_terti.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-        with tab2:
-            contracte_terti.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
         with tab3:
-            contracte_terti.render_echipa(
+            rezultate["echipa"] = contracte_terti.render_echipa(
                 supabase, cod_introdus, is_new, date_echipa_ex
             )
 
     elif cat_sel == "Contracte" and tip_sel == "SPECIALE":
-        with st.spinner("Se încarcă datele..."):
+        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
+        with tab1:
             rezultate["baza"] = contracte_speciale.render_date_de_baza(
                 supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
             )
+        with tab2:
             rezultate["financiar"] = contracte_speciale.render_date_financiare(
                 supabase, cod_introdus, is_new, date_fin_ex
             )
-            rezultate["echipa"] = contracte_speciale.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
-        
-        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        with tab1:
-            contracte_speciale.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-        with tab2:
-            contracte_speciale.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
         with tab3:
-            contracte_speciale.render_echipa(
+            rezultate["echipa"] = contracte_speciale.render_echipa(
                 supabase, cod_introdus, is_new, date_echipa_ex
             )
 
