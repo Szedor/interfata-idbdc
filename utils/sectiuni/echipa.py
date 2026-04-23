@@ -1,6 +1,6 @@
 # =========================================================
 # utils/sectiuni/echipa.py
-# v.modul.1.0 - Secțiunea ECHIPĂ
+# v.modul.1.1 - Fără rerun, menține datele la adăugare membru
 # =========================================================
 
 import streamlit as st
@@ -102,6 +102,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
+    # Actualizare câmpuri automate (departament, email, telefon)
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
@@ -117,17 +118,22 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             df_updated.at[i, "TELEFON MOBIL"] = ""
             df_updated.at[i, "TELEFON FIX"] = ""
 
+    # Salvare directă în session_state fără rerun
     st.session_state[key_rows] = df_updated.to_dict("records")
 
+    # Buton adăugare membru - folosește st.rerun() doar pentru a reîmprospăta tabelul
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
-        st.session_state[key_rows].append({
+        current_rows = st.session_state[key_rows]
+        current_rows.append({
             "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
             "PERSOANĂ DE CONTACT": False,
             "DEPARTAMENT": "", "EMAIL": "",
             "TELEFON MOBIL": "", "TELEFON FIX": ""
         })
+        st.session_state[key_rows] = current_rows
         st.rerun()
 
+    # Construire rezultat pentru salvare
     rezultat = []
     for _, row in df_updated.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "")).strip()
