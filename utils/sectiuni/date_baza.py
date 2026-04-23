@@ -1,12 +1,11 @@
 # =========================================================
 # utils/sectiuni/date_baza.py
-# v.modul.1.0 - Secțiunea DATE DE BAZĂ (comună pentru toate tipurile)
+# v.modul.1.0 - Secțiunea DATE DE BAZĂ
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 from utils.date_helpers import to_date, calc_durata, add_months, sub_months
-from utils.supabase_helpers import safe_select_eq
 
 def _get_status_list(supabase):
     @st.cache_data(show_spinner=False, ttl=600)
@@ -30,24 +29,12 @@ def _fmt_date(date_val):
     return str(date_val)
 
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
-    """
-    Randare și salvare date de bază pentru orice tip de entitate.
-    Parametri:
-        supabase: clientul Supabase
-        cod_introdus: codul identificator
-        cat_sel: categoria selectată (ex: "Contracte")
-        tip_label: eticheta vizuală a tipului (ex: "CEP", "TERȚI", "SPECIALE")
-        tabela_nume: numele tabelei SQL (ex: "base_contracte_cep")
-        is_new: boolean - dacă este înregistrare nouă
-        date_existente: dict cu datele existente (pentru editare)
-    """
     status_list = _get_status_list(supabase)
 
     di = to_date(date_existente.get("data_inceput"))
     ds = to_date(date_existente.get("data_sfarsit"))
     dur_ex = date_existente.get("durata")
 
-    # Calcule automate
     if di and ds and (dur_ex is None or dur_ex == 0):
         dur_ex = calc_durata(di, ds)
     elif di and dur_ex and not ds:
