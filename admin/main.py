@@ -1,6 +1,6 @@
 # =========================================================
 # admin/main.py
-# v.modul.2.1 - Corectii autentificare: fundal alb la parole, buton Iesire/Resetare redimensionat
+# v.modul.2.2 - Corectii: fundal alb pentru inputuri, text negru in dropdown-uri
 # =========================================================
 
 import streamlit as st
@@ -9,7 +9,7 @@ from supabase import Client, create_client
 from config import Config
 from admin.motor import porneste_motorul
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
-from utils.styling import apply_global_styles, hide_streamlit_chrome
+from utils.styling import apply_global_styles, hide_streamlit_chrome, apply_admin_styles
 
 TITLE_LINE_1 = "🛠️ Administrare baze de date"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
@@ -50,72 +50,7 @@ def run():
 
     hide_streamlit_chrome()
     apply_global_styles()
-
-    # Stiluri specifice pentru admin
-    st.markdown(
-        """
-        <style>
-            /* Sidebar */
-            [data-testid="stSidebar"] {
-                background-color: #0b2a52 !important;
-                border-right: 2px solid rgba(255,255,255,0.20);
-            }
-            [data-testid="stSidebar"] p, 
-            [data-testid="stSidebar"] label,
-            [data-testid="stSidebar"] h1,
-            [data-testid="stSidebar"] h2,
-            [data-testid="stSidebar"] h3 {
-                color: white !important;
-            }
-            
-            /* Casete parole - fundal alb, text negru */
-            .stTextInput input[type="password"] {
-                background-color: #ffffff !important;
-                color: #000000 !important;
-                border: 1px solid #cccccc !important;
-            }
-            .stTextInput input[type="password"]::placeholder {
-                color: #000000 !important;
-                opacity: 0.7 !important;
-            }
-            
-            /* Caseta text pentru cod operator - fundal alb, text negru, placeholder alb */
-            .stTextInput input:not([type="password"]) {
-                background-color: #ffffff !important;
-                color: #000000 !important;
-                border: 1px solid #cccccc !important;
-            }
-            .stTextInput input:not([type="password"])::placeholder {
-                color: #000000 !important;
-                opacity: 0.5 !important;
-            }
-            
-            /* Buton Iesire/Resetare - aceeasi latime ca mesajul operator */
-            div.stButton > button {
-                border: 1px solid white !important;
-                color: #0b1f3a !important;
-                -webkit-text-fill-color: #0b1f3a !important;
-                background-color: rgba(255,255,255,0.96) !important;
-                opacity: 1 !important;
-                width: 100%;
-                font-size: 14px !important;
-                font-weight: bold !important;
-                height: 42px !important;
-            }
-            div.stButton > button:hover {
-                background-color: white !important;
-                color: #003366 !important;
-            }
-            
-            /* Mesaj succes operator - latime fixa pentru aliniere */
-            .stSuccess {
-                width: 100%;
-                display: inline-block;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    apply_admin_styles()  # Stiluri specifice pentru admin
 
     supabase: Client = get_supabase()
 
@@ -199,7 +134,7 @@ def run():
         st.info("Introduceți codul de operator în bara din stânga pentru a intra în modul.")
         st.stop()
 
-    # Afișare operator cu stil pentru aliniere
+    # Afișare operator
     st.sidebar.markdown(
         f"""
         <div style="background-color: rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; margin-bottom: 15px; text-align: center;">
@@ -209,7 +144,6 @@ def run():
         unsafe_allow_html=True,
     )
 
-    # Buton Iesire/Resetare cu aceeasi latime
     if st.sidebar.button("Ieșire / Resetare", use_container_width=True, key="btn_iesire"):
         st.session_state.clear()
         st.rerun()
