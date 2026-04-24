@@ -1,6 +1,6 @@
 # =========================================================
 # admin/main.py
-# v.modul.2.0 - Folosește stiluri centralizate din utils.styling
+# v.modul.2.1 - Corectii autentificare: fundal alb la parole, buton Iesire/Resetare redimensionat
 # =========================================================
 
 import streamlit as st
@@ -48,14 +48,14 @@ def run():
 
     _maintenance_gate_fn(st, pwd_key="_mw_pwd_c2", btn_key="_mw_btn_c2")
 
-    # Aplică stilurile centralizate
     hide_streamlit_chrome()
     apply_global_styles()
 
-    # Stil suplimentar pentru sidebar în admin
+    # Stiluri specifice pentru admin
     st.markdown(
         """
         <style>
+            /* Sidebar */
             [data-testid="stSidebar"] {
                 background-color: #0b2a52 !important;
                 border-right: 2px solid rgba(255,255,255,0.20);
@@ -67,6 +67,30 @@ def run():
             [data-testid="stSidebar"] h3 {
                 color: white !important;
             }
+            
+            /* Casete parole - fundal alb, text negru */
+            .stTextInput input[type="password"] {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #cccccc !important;
+            }
+            .stTextInput input[type="password"]::placeholder {
+                color: #000000 !important;
+                opacity: 0.7 !important;
+            }
+            
+            /* Caseta text pentru cod operator - fundal alb, text negru, placeholder alb */
+            .stTextInput input:not([type="password"]) {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #cccccc !important;
+            }
+            .stTextInput input:not([type="password"])::placeholder {
+                color: #000000 !important;
+                opacity: 0.5 !important;
+            }
+            
+            /* Buton Iesire/Resetare - aceeasi latime ca mesajul operator */
             div.stButton > button {
                 border: 1px solid white !important;
                 color: #0b1f3a !important;
@@ -81,6 +105,12 @@ def run():
             div.stButton > button:hover {
                 background-color: white !important;
                 color: #003366 !important;
+            }
+            
+            /* Mesaj succes operator - latime fixa pentru aliniere */
+            .stSuccess {
+                width: 100%;
+                display: inline-block;
             }
         </style>
         """,
@@ -130,7 +160,12 @@ def run():
 
         st.sidebar.markdown("### Pas 2 — Cod operator")
 
-        cod_in = st.sidebar.text_input("Cod Identificare:", type="password", key="p2_cod_input")
+        cod_in = st.sidebar.text_input(
+            "Cod Identificare:", 
+            type="password", 
+            key="p2_cod_input",
+            placeholder="Introduceți codul..."
+        )
 
         if cod_in:
 
@@ -164,9 +199,18 @@ def run():
         st.info("Introduceți codul de operator în bara din stânga pentru a intra în modul.")
         st.stop()
 
-    st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
+    # Afișare operator cu stil pentru aliniere
+    st.sidebar.markdown(
+        f"""
+        <div style="background-color: rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; margin-bottom: 15px; text-align: center;">
+            <span style="color: white; font-weight: bold;">👤 Operator: {st.session_state.operator_identificat}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    if st.sidebar.button("Ieșire / Resetare"):
+    # Buton Iesire/Resetare cu aceeasi latime
+    if st.sidebar.button("Ieșire / Resetare", use_container_width=True, key="btn_iesire"):
         st.session_state.clear()
         st.rerun()
 
