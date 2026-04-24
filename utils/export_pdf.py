@@ -1,110 +1,61 @@
 # =========================================================
 # utils/export_pdf.py
-# v.modul.1.3 - PDF cu antet frumos (diacritice incluse)
+# v.modul.2.0 - Folosește weasyprint (HTML -> PDF)
 # =========================================================
 
 import io
-import os
-import urllib.request
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm
-from reportlab.lib.colors import HexColor
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
-def _register_font():
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "C:\\Windows\\Fonts\\arial.ttf",
-        "/tmp/DejaVuSans.ttf",
-    ]
-    for path in font_paths:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont("CustomFont", path))
-                return "CustomFont"
-            except:
-                continue
-    try:
-        font_url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
-        font_local = "/tmp/DejaVuSans.ttf"
-        urllib.request.urlretrieve(font_url, font_local)
-        pdfmetrics.registerFont(TTFont("CustomFont", font_local))
-        return "CustomFont"
-    except:
-        return "Helvetica"
+from weasyprint import HTML
 
 def generate_pdf_vertical(supabase, cod: str, tabela_gasita: str, titlu_fisa: str, build_vertical_export_data_func) -> bytes:
+    """
+    Generează PDF folosind weasyprint, bazat pe HTML-ul existent de la Print.
+    Avantaj: diacriticele sunt păstrate 100%.
+    """
     try:
-        font_name = _register_font()
-
-        pdf_buf = io.BytesIO()
-        doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
-                                leftMargin=1.8*cm, rightMargin=1.8*cm,
-                                topMargin=1.5*cm, bottomMargin=1.5*cm)
-
-        styles = getSampleStyleSheet()
-        
-        # Stil antet frumos
-        title_style = ParagraphStyle(
-            "TitleStyle", parent=styles["Title"],
-            fontName=font_name, fontSize=14, textColor=HexColor("#0B2A52"), alignment=1, spaceAfter=6
-        )
-        subtitle_style = ParagraphStyle(
-            "SubtitleStyle", parent=styles["Normal"],
-            fontName=font_name, fontSize=9, textColor=HexColor("#2C5F8A"), alignment=1, spaceAfter=12
-        )
-        section_style = ParagraphStyle(
-            "SectionStyle", parent=styles["Normal"],
-            fontName=font_name, fontSize=11, textColor=HexColor("#0B2A52"), alignment=0, spaceAfter=6
-        )
-        cell_label_style = ParagraphStyle(
-            "CellLabelStyle", parent=styles["Normal"],
-            fontName=font_name, fontSize=8, textColor=HexColor("#2C5F8A"), leading=10
-        )
-        cell_value_style = ParagraphStyle(
-            "CellValueStyle", parent=styles["Normal"],
-            fontName=font_name, fontSize=8, textColor=HexColor("#1A2A3A"), leading=10
-        )
-
-        story = []
-        # Antet
-        story.append(Paragraph("UNIVERSITATEA POLITEHNICA TIMIȘOARA", title_style))
-        story.append(Paragraph("Departamentul Cercetare Dezvoltare Inovare - IDBDC", subtitle_style))
-        story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph(f"Fișă {titlu_fisa} — Cod: {cod}", section_style))
-        story.append(Spacer(1, 0.5*cm))
-
+        # Obținem datele structurate pentru export vertical
         export_data = build_vertical_export_data_func(supabase, cod, tabela_gasita)
-
-        for section in export_data["sections"]:
-            story.append(Paragraph(f"▸ {section['name'].upper()}", section_style))
-            story.append(Spacer(1, 0.2*cm))
-            table_data = []
-            for f, v in zip(section["fields"], section["values"]):
-                f_safe = str(f).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                v_safe = str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                table_data.append([Paragraph(f_safe, cell_label_style), Paragraph(v_safe, cell_value_style)])
-            if table_data:
-                t = Table(table_data, colWidths=[4.5*cm, 11*cm])
-                t.setStyle(TableStyle([
-                    ("FONTNAME", (0, 0), (-1, -1), font_name),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.3, colors.lightgrey),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ]))
-                story.append(t)
-                story.append(Spacer(1, 0.3*cm))
-
-        doc.build(story)
-        pdf_buf.seek(0)
-        return pdf_buf.getvalue()
+        
+        # Construim HTML-ul (același care funcționează la Print)
+        html_content = _build_print_html(export_data, cod, titlu_fisa)
+        
+        # Convertim HTML în PDF
+        pdf_bytes = HTML(string=html_content).write_pdf()
+        return pdf_bytes
     except Exception as e:
         return None
+
+def _build_print_html(export_data: dict, cod: str, titlu_fisa: str) -> str:
+    """Construiește HTML-ul pentru print (același care funcționează corect)."""
+    import html as _html
+    
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Fișa {cod}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #ffffff; }}
+        h2 {{ color: #0B2A52; }}
+        h3 {{ color: #0B2A52; margin-top: 20px; }}
+        table {{ border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }}
+        th, td {{ border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }}
+        th {{ background-color: #0B2A52; color: white; font-size: 11px; }}
+        td {{ color: #000000; font-size: 10px; }}
+        @media print {{
+            button {{ display: none; }}
+        }}
+    </style>
+</head>
+<body>
+    <h2>IDBDC UPT - Fișa {titlu_fisa} - Cod: {cod}</h2>
+"""
+    for section in export_data["sections"]:
+        html += f"<h3>{section['name'].upper()}</h3>"
+        html += " <table> <tr><th>Camp</th><th>Valoare</th></tr>"
+        for f, v in zip(section["fields"], section["values"]):
+            html += f" hilabbert<td>{_html.escape(str(f))}</td>\n<td>{_html.escape(str(v))}</td\n</tr>"
+        html += "</table>"
+    html += """
+</body>
+</html>"""
+    return html
