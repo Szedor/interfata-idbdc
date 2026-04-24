@@ -1,6 +1,6 @@
 # =========================================================
 # utils/styling.py
-# v.modul.1.0 - Stiluri centralizate pentru toate modulele
+# v.modul.1.1 - Corectii culori: font alb pentru taburi si sectiuni
 # =========================================================
 
 import streamlit as st
@@ -12,24 +12,69 @@ def apply_global_styles():
     st.markdown(
         f"""
         <style>
+            /* Fundal general */
             .stApp {{ background: {ACADEMIC_BLUE} !important; }}
+            
+            /* Container principal */
             div.block-container {{ padding-top: 1.1rem; padding-bottom: 1.0rem; max-width: 1550px; }}
-            label, .stMarkdown, .stCaption, .stText {{ color: #ffffff !important; }}
-            [data-testid="stMarkdownContainer"] p {{ color: #ffffff !important; }}
+            
+            /* Culoare text general */
+            label, .stMarkdown, .stCaption, .stText, p, span, div {{
+                color: #ffffff !important;
+            }}
+            
+            /* Tab-uri (st.tabs) - font alb */
+            button[data-baseweb="tab"] {{
+                color: #ffffff !important;
+                font-weight: 600 !important;
+            }}
+            button[data-baseweb="tab"]:hover {{
+                color: #ffcccc !important;
+            }}
+            button[data-baseweb="tab"][aria-selected="true"] {{
+                color: #ff6666 !important;
+                font-weight: 700 !important;
+            }}
+            
+            /* Checkbox-uri si etichete sectiuni */
+            .stCheckbox label, .stCheckbox span {{
+                color: #ffffff !important;
+            }}
+            
+            /* Input-uri text */
             .stTextInput > div > div, .stTextInput > div > div > input,
             .stTextInput input, .stTextInput input:hover, .stTextInput input:focus,
             .stSelectbox > div > div, .stSelectbox [data-baseweb="select"],
             .stMultiSelect > div > div, .stMultiSelect [data-baseweb="select"] > div {{
-                background: #1a3a5c !important; color: #ffffff !important;
-                border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.30) !important;
+                background: #1a3a5c !important;
+                color: #ffffff !important;
+                border-radius: 10px !important;
+                border: 1px solid rgba(255,255,255,0.30) !important;
             }}
+            
+            /* Placeholder-uri */
+            .stTextInput input::placeholder {{
+                color: rgba(255,255,255,0.70) !important;
+            }}
+            
+            /* Butoane */
             .stButton > button {{
-                border-radius: 10px !important; font-weight: 900 !important;
-                background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important;
+                border-radius: 10px !important;
+                font-weight: 900 !important;
+                background: rgba(255,255,255,0.96) !important;
+                color: #0b1f3a !important;
                 border: 1px solid rgba(255,255,255,0.55) !important;
             }}
-            .stButton > button p {{ color: #0b1f3a !important; }}
-            h1, h2, h3, h4, h5, h6 {{ color: #ffffff !important; }}
+            .stButton > button p {{
+                color: #0b1f3a !important;
+            }}
+            
+            /* Headings */
+            h1, h2, h3, h4, h5, h6 {{
+                color: #ffffff !important;
+            }}
+            
+            /* Ascundere elemente Streamlit */
             [data-testid="stToolbar"] {{ display: none !important; }}
             [data-testid="stDecoration"] {{ display: none !important; }}
             #MainMenu {{ visibility: hidden !important; }}
