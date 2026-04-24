@@ -1,6 +1,6 @@
 # =========================================================
 # utils/styling.py
-# v.modul.1.1 - Corectii culori: font alb pentru taburi si sectiuni
+# v.modul.1.2 - Corectii definitive pentru Calea1 si Calea2
 # =========================================================
 
 import streamlit as st
@@ -14,47 +14,59 @@ def apply_global_styles():
         <style>
             /* Fundal general */
             .stApp {{ background: {ACADEMIC_BLUE} !important; }}
-            
-            /* Container principal */
             div.block-container {{ padding-top: 1.1rem; padding-bottom: 1.0rem; max-width: 1550px; }}
             
             /* Culoare text general */
-            label, .stMarkdown, .stCaption, .stText, p, span, div {{
+            label, .stMarkdown, .stCaption, .stText, p, span, div, .stCheckbox label {{
                 color: #ffffff !important;
             }}
             
-            /* Tab-uri (st.tabs) - font alb */
+            /* TAB-URI (st.tabs) - font ALB permanent */
             button[data-baseweb="tab"] {{
                 color: #ffffff !important;
                 font-weight: 600 !important;
+                background-color: transparent !important;
             }}
             button[data-baseweb="tab"]:hover {{
                 color: #ffcccc !important;
             }}
             button[data-baseweb="tab"][aria-selected="true"] {{
-                color: #ff6666 !important;
+                color: #ff8888 !important;
                 font-weight: 700 !important;
             }}
             
-            /* Checkbox-uri si etichete sectiuni */
-            .stCheckbox label, .stCheckbox span {{
+            /* Checkbox-uri */
+            .stCheckbox label span {{
                 color: #ffffff !important;
             }}
             
-            /* Input-uri text */
-            .stTextInput > div > div, .stTextInput > div > div > input,
-            .stTextInput input, .stTextInput input:hover, .stTextInput input:focus,
-            .stSelectbox > div > div, .stSelectbox [data-baseweb="select"],
-            .stMultiSelect > div > div, .stMultiSelect [data-baseweb="select"] > div {{
-                background: #1a3a5c !important;
+            /* Headings */
+            h1, h2, h3, h4, h5, h6 {{
+                color: #ffffff !important;
+            }}
+            
+            /* Input-uri text generale */
+            .stTextInput > div > div, .stTextInput input {{
+                background-color: #1a3a5c !important;
                 color: #ffffff !important;
                 border-radius: 10px !important;
                 border: 1px solid rgba(255,255,255,0.30) !important;
             }}
-            
-            /* Placeholder-uri */
             .stTextInput input::placeholder {{
                 color: rgba(255,255,255,0.70) !important;
+            }}
+            
+            /* Dropdown-uri (Selectbox) */
+            .stSelectbox > div > div {{
+                background-color: #1a3a5c !important;
+                border-radius: 10px !important;
+                border: 1px solid rgba(255,255,255,0.30) !important;
+            }}
+            .stSelectbox [data-baseweb="select"] span {{
+                color: #ffffff !important;
+            }}
+            .stSelectbox svg {{
+                fill: #ffffff !important;
             }}
             
             /* Butoane */
@@ -69,11 +81,6 @@ def apply_global_styles():
                 color: #0b1f3a !important;
             }}
             
-            /* Headings */
-            h1, h2, h3, h4, h5, h6 {{
-                color: #ffffff !important;
-            }}
-            
             /* Ascundere elemente Streamlit */
             [data-testid="stToolbar"] {{ display: none !important; }}
             [data-testid="stDecoration"] {{ display: none !important; }}
@@ -86,7 +93,6 @@ def apply_global_styles():
     )
 
 def hide_streamlit_chrome():
-    """Ascunde elementele implicite Streamlit (header, footer, toolbar)."""
     st.markdown(
         """
         <style>
@@ -95,6 +101,53 @@ def hide_streamlit_chrome():
             footer { visibility: hidden; height: 0px; }
             [data-testid="stToolbar"] { display: none !important; }
             [data-testid="stDecoration"] { display: none !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def apply_admin_styles():
+    """Stiluri specifice pentru Calea2 (admin)."""
+    st.markdown(
+        """
+        <style>
+            /* Dropdown-uri in Sidebar - text negru pe fundal alb */
+            .stSidebar .stSelectbox > div > div {
+                background-color: #ffffff !important;
+                border: 1px solid #cccccc !important;
+            }
+            .stSidebar .stSelectbox [data-baseweb="select"] span {
+                color: #000000 !important;
+            }
+            .stSidebar .stSelectbox svg {
+                fill: #000000 !important;
+            }
+            
+            /* Input text in Sidebar - fundal alb, text negru */
+            .stSidebar .stTextInput input {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #cccccc !important;
+            }
+            .stSidebar .stTextInput input::placeholder {
+                color: #888888 !important;
+            }
+            
+            /* Input parola in Sidebar - ochi magic vizibil */
+            .stSidebar .stTextInput input[type="password"] {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #cccccc !important;
+            }
+            .stSidebar .stTextInput input[type="password"]::placeholder {
+                color: #888888 !important;
+            }
+            
+            /* Mesaj succes operator - latime deplina */
+            .stSidebar .stSuccess {
+                width: 100%;
+                text-align: center;
+            }
         </style>
         """,
         unsafe_allow_html=True,
