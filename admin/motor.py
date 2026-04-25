@@ -1,6 +1,6 @@
 # =========================================================
 # admin/motor.py
-# v.modul.1.6 - Simplificat, fără restaurare tab
+# v.modul.1.4 - Motor principal administrativ (modularizat, chei unice)
 # =========================================================
 
 import streamlit as st
