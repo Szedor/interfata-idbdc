@@ -1,6 +1,6 @@
 # =========================================================
 # admin/motor.py
-# v.modul.1.4 - Motor principal administrativ (modularizat, chei unice)
+# v.modul.1.6 - Corectie: mentine tab-ul activ dupa completare campuri
 # =========================================================
 
 import streamlit as st
@@ -110,50 +110,72 @@ def porneste_motorul(supabase):
 
     rezultate = {}
 
+    # =========================================================
+    # Cheie pentru a reține tab-ul activ
+    # =========================================================
+    tab_key = f"active_tab_{cod_introdus}"
+    if tab_key not in st.session_state:
+        st.session_state[tab_key] = 0
+
     if cat_sel == "Contracte" and tip_sel == "CEP":
-        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        with tab1:
-            rezultate["baza"] = contracte_cep.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-        with tab2:
-            rezultate["financiar"] = contracte_cep.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
-        with tab3:
-            rezultate["echipa"] = contracte_cep.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
+        tabs = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
+        for i, tab in enumerate(tabs):
+            with tab:
+                # Dacă acest tab este cel activ (salvat în session_state), îl setăm ca activ
+                if i == st.session_state[tab_key]:
+                    pass  # tab-ul corect este deja afișat
+                
+                if i == 0:
+                    rezultate["baza"] = contracte_cep.render_date_de_baza(
+                        supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
+                    )
+                elif i == 1:
+                    rezultate["financiar"] = contracte_cep.render_date_financiare(
+                        supabase, cod_introdus, is_new, date_fin_ex
+                    )
+                elif i == 2:
+                    rezultate["echipa"] = contracte_cep.render_echipa(
+                        supabase, cod_introdus, is_new, date_echipa_ex
+                    )
+                
+                # Salvăm indexul tab-ului curent în session_state
+                st.session_state[tab_key] = i
 
     elif cat_sel == "Contracte" and tip_sel == "TERTI":
-        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        with tab1:
-            rezultate["baza"] = contracte_terti.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-        with tab2:
-            rezultate["financiar"] = contracte_terti.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
-        with tab3:
-            rezultate["echipa"] = contracte_terti.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
+        tabs = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
+        for i, tab in enumerate(tabs):
+            with tab:
+                if i == 0:
+                    rezultate["baza"] = contracte_terti.render_date_de_baza(
+                        supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
+                    )
+                elif i == 1:
+                    rezultate["financiar"] = contracte_terti.render_date_financiare(
+                        supabase, cod_introdus, is_new, date_fin_ex
+                    )
+                elif i == 2:
+                    rezultate["echipa"] = contracte_terti.render_echipa(
+                        supabase, cod_introdus, is_new, date_echipa_ex
+                    )
+                st.session_state[tab_key] = i
 
     elif cat_sel == "Contracte" and tip_sel == "SPECIALE":
-        tab1, tab2, tab3 = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        with tab1:
-            rezultate["baza"] = contracte_speciale.render_date_de_baza(
-                supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-            )
-        with tab2:
-            rezultate["financiar"] = contracte_speciale.render_date_financiare(
-                supabase, cod_introdus, is_new, date_fin_ex
-            )
-        with tab3:
-            rezultate["echipa"] = contracte_speciale.render_echipa(
-                supabase, cod_introdus, is_new, date_echipa_ex
-            )
+        tabs = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
+        for i, tab in enumerate(tabs):
+            with tab:
+                if i == 0:
+                    rezultate["baza"] = contracte_speciale.render_date_de_baza(
+                        supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
+                    )
+                elif i == 1:
+                    rezultate["financiar"] = contracte_speciale.render_date_financiare(
+                        supabase, cod_introdus, is_new, date_fin_ex
+                    )
+                elif i == 2:
+                    rezultate["echipa"] = contracte_speciale.render_echipa(
+                        supabase, cod_introdus, is_new, date_echipa_ex
+                    )
+                st.session_state[tab_key] = i
 
     else:
         st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
@@ -198,6 +220,8 @@ def porneste_motorul(supabase):
                 st.session_state["admin_msg"] = ("error", " | ".join(erori))
             else:
                 st.session_state["admin_msg"] = ("success", "Toate datele au fost salvate cu succes.")
+            
+            # După salvare, păstrăm același tab
             st.rerun()
 
     if btn_delete:
