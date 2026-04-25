@@ -1,6 +1,6 @@
 # =========================================================
 # admin/motor.py
-# v.modul.1.7 - Foloseste query_params pentru a mentine tab-ul activ
+# v.modul.1.8 - Eliminat dropdown-ul Actiune, mesaje directe
 # =========================================================
 
 import streamlit as st
@@ -67,17 +67,10 @@ def porneste_motorul(supabase):
     with st.sidebar:
         if este_existent:
             st.success(f"✅ Cod recunoscut: {cod_introdus}")
+            st.info("✏️ S-a identificat o fișă existentă în secțiunile căreia poți modifica/completa datele.")
         else:
             st.warning(f"🆕 Cod nou: {cod_introdus}")
-
-        actiune = st.selectbox(
-            "Acțiune",
-            [
-                "- Alege -",
-                "Modificare / Completare fișă existentă",
-                "Fișă nouă",
-            ],
-        )
+            st.info("🆕 S-a creat o fișă nouă în secțiunile căreia poți înregistra date.")
 
         st.divider()
         btn_save = st.button(
@@ -90,11 +83,8 @@ def porneste_motorul(supabase):
         if is_admin and este_existent:
             btn_delete = st.button("🗑️ ȘTERGE FIȘA", use_container_width=True)
 
-    if actiune == "- Alege -":
-        st.info("Selectați acțiunea din meniul lateral.")
-        return
-
-    is_new = (actiune == "Fișă nouă")
+    # Setare automată is_new
+    is_new = not este_existent
 
     def _fetch(table, cod):
         try:
@@ -127,7 +117,6 @@ def porneste_motorul(supabase):
         for i, tab in enumerate(tabs):
             with tab:
                 if i == active_tab:
-                    # Setează query_param pentru a memora tab-ul activ
                     st.query_params[tab_key] = i
                 
                 if i == 0:
