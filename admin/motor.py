@@ -67,10 +67,10 @@ def porneste_motorul(supabase):
     with st.sidebar:
         if este_existent:
             st.success(f"✅ Cod recunoscut: {cod_introdus}")
-            st.info("✏️ S-a identificat o fișă existentă în secțiunile căreia poți modifica/completa datele.")
+            st.info("✏️ S-a identificat o fișă existentă, în secțiunile căreia poți modifica/completa datele.")
         else:
             st.warning(f"🆕 Cod nou: {cod_introdus}")
-            st.info("🆕 S-a creat o fișă nouă în secțiunile căreia poți înregistra date.")
+            st.info("🆕 S-a creat o fișă nouă, în secțiunile căreia poți înregistra date.")
 
         st.divider()
         btn_save = st.button(
