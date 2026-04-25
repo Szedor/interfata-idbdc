@@ -1,8 +1,3 @@
-# =========================================================
-# calea3_brainstorming.py
-# v.modul.2.0 - Folosește stiluri centralizate din utils.styling
-# =========================================================
-
 import re
 
 import streamlit as st
@@ -14,8 +9,10 @@ from grant_navigator.engine import ai_documents
 from grant_navigator.engine import ai_radar
 from grant_navigator.engine import ai_recommendations
 
+# ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ────────────────────────
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
-from utils.styling import apply_global_styles, hide_streamlit_chrome
+# ──────────────────────────────────────────────────────────────────────────────
+
 
 TITLE_LINE_1 = "🤖 Oportunități și Analiză Cercetare — AI"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
@@ -52,18 +49,20 @@ def lookup_user(supabase: Client, email: str):
 
 
 # =========================================================
-# STYLE - folosește centralizat + ajustări specifice
+# STYLE
 # =========================================================
 
-def apply_style_ai():
-    """Stiluri specifice pentru modulul AI."""
+def apply_style():
     st.markdown(
         f"""
         <style>
+            .stApp {{ background-color: {APP_BLUE} !important; }}
+
             [data-testid="stSidebar"] {{
                 background-color: {SIDEBAR_BLUE} !important;
                 border-right: 2px solid rgba(255,255,255,0.20);
             }}
+
             .stApp h1, .stApp h2, .stApp h3, .stApp h4,
             .stApp p, .stApp label, .stApp .stMarkdown,
             [data-testid="stSidebar"] p, [data-testid="stSidebar"] label,
@@ -71,10 +70,12 @@ def apply_style_ai():
             [data-testid="stSidebar"] h3 {{
                 color: white !important;
             }}
+
             input {{
                 color: #000000 !important;
                 background-color: #ffffff !important;
             }}
+
             div.stButton > button {{
                 border: 1px solid white !important;
                 color: #0b1f3a !important;
@@ -87,21 +88,30 @@ def apply_style_ai():
                 height: 46px !important;
                 border-radius: 12px !important;
             }}
+
             div.stButton > button:hover {{
                 background-color: white !important;
                 color: {APP_BLUE} !important;
             }}
+
+            [data-testid="stToolbar"] {{ visibility: hidden !important; height: 0px !important; }}
+            [data-testid="stHeader"] {{ visibility: hidden !important; height: 0px !important; }}
+            [data-testid="stDecoration"] {{ visibility: hidden !important; height: 0px !important; }}
+            #MainMenu {{ visibility: hidden !important; }}
+
             .idbdc-header {{
                 text-align: center;
                 margin-top: 0.25rem;
                 margin-bottom: 0.6rem;
             }}
+
             .idbdc-title-1 {{
                 font-size: 2.0rem;
                 font-weight: 900;
                 margin: 0;
                 color: #ffffff;
             }}
+
             .idbdc-title-2 {{
                 font-size: 1.7rem;
                 font-weight: 800;
@@ -109,12 +119,14 @@ def apply_style_ai():
                 color: #ffffff;
                 opacity: 0.95;
             }}
+
             .welcome-wrap {{
                 width: 40%;
                 min-width: 320px;
                 margin: 0.6rem auto 0.8rem auto;
                 text-align: center;
             }}
+
             .welcome-box {{
                 display: inline-block;
                 padding: 10px 20px;
@@ -125,11 +137,13 @@ def apply_style_ai():
                 font-weight: 900;
                 font-size: 1.05rem;
             }}
+
             .nav-note {{
                 text-align: center;
                 opacity: 0.92;
                 margin-bottom: 0.4rem;
             }}
+
             .ai-badge {{
                 display: inline-block;
                 background: rgba(255,255,255,0.15);
@@ -247,13 +261,11 @@ def render_nav_buttons():
 def run():
     st.set_page_config(page_title="IDBDC – Modul 3 AI", layout="wide")
 
+    # ── MAINTENANCE LOCK ── !! BETONAT — NU SE MODIFICA !! ──────────────
     _maintenance_gate_fn(st, pwd_key="_mw_pwd_c3", btn_key="_mw_btn_c3")
+    # ────────────────────────────────────────────────────────────────────
 
-    # Aplică stilurile centralizate
-    hide_streamlit_chrome()
-    apply_global_styles()
-    apply_style_ai()
-
+    apply_style()
     supabase = get_supabase()
 
     email_gate(supabase)
