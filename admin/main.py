@@ -159,9 +159,7 @@ def run():
 
     st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
 
-    if st.sidebar.button("Ieșire / Resetare"):
-        st.session_state.clear()
-        st.rerun()
+   if st.sidebar.button("Ieșire / Resetare", use_container_width=True):
 
     porneste_motorul(supabase)
 
