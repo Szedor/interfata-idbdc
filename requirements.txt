@@ -5,4 +5,4 @@ openpyxl
 reportlab
 requests
 matplotlib
-weasyprint
+fpdf2
