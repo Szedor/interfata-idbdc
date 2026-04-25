@@ -1,3 +1,10 @@
+# =========================================================
+# admin/main.py
+# versiune modul: 2.5
+# data versiunii: 26/04/2026
+# descriere: Adaugat use_container_width la butonul Iesire/Resetare
+# =========================================================
+
 import streamlit as st
 from supabase import Client, create_client
 
@@ -159,7 +166,8 @@ def run():
 
     st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
 
-    if st.sidebar.button("Ieșire / Resetare"):
+    # Modificare: buton cu use_container_width=True pentru latime deplina
+    if st.sidebar.button("Ieșire / Resetare", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
