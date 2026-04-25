@@ -1,61 +1,103 @@
 # =========================================================
 # utils/export_pdf.py
-# v.modul.2.0 - Folosește weasyprint (HTML -> PDF)
+# v.modul.1.0 - Generare PDF (vertical, cu diacritice)
 # =========================================================
 
 import io
-from weasyprint import HTML
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.lib.colors import HexColor
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import os
+import urllib.request
 
 def generate_pdf_vertical(supabase, cod: str, tabela_gasita: str, titlu_fisa: str, build_vertical_export_data_func) -> bytes:
     """
-    Generează PDF folosind weasyprint, bazat pe HTML-ul existent de la Print.
-    Avantaj: diacriticele sunt păstrate 100%.
+    Generează PDF cu structură verticală (câmp | valoare).
+    build_vertical_export_data_func: funcția care returnează datele structurate (din export_common.py)
     """
     try:
-        # Obținem datele structurate pentru export vertical
+        # Înregistrare font cu suport diacritice
+        font_registered = False
+        font_name = "Helvetica"
+        
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "C:\\Windows\\Fonts\\arial.ttf",
+            "/tmp/DejaVuSans.ttf",
+        ]
+        for path in font_paths:
+            if os.path.exists(path):
+                try:
+                    pdfmetrics.registerFont(TTFont("CustomFont", path))
+                    font_name = "CustomFont"
+                    font_registered = True
+                    break
+                except:
+                    continue
+        
+        if not font_registered:
+            try:
+                font_url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
+                font_local = "/tmp/DejaVuSans.ttf"
+                urllib.request.urlretrieve(font_url, font_local)
+                pdfmetrics.registerFont(TTFont("CustomFont", font_local))
+                font_name = "CustomFont"
+            except:
+                pass
+
+        pdf_buf = io.BytesIO()
+        doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
+                                leftMargin=1.5*cm, rightMargin=1.5*cm,
+                                topMargin=1.5*cm, bottomMargin=1.5*cm)
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "TitleStyle", parent=styles["Title"],
+            fontName=font_name, fontSize=12, textColor=HexColor("#0B2A52"), alignment=1
+        )
+        section_style = ParagraphStyle(
+            "SectionStyle", parent=styles["Normal"],
+            fontName=font_name, fontSize=10, textColor=HexColor("#0B2A52"), alignment=0
+        )
+        cell_style = ParagraphStyle(
+            "CellStyle", parent=styles["Normal"],
+            fontName=font_name, fontSize=8, leading=9
+        )
+
+        story = []
+        story.append(Paragraph(f"IDBDC UPT - Fișa {titlu_fisa} - Cod: {cod}", title_style))
+        story.append(Spacer(1, 0.5*cm))
+
         export_data = build_vertical_export_data_func(supabase, cod, tabela_gasita)
-        
-        # Construim HTML-ul (același care funcționează la Print)
-        html_content = _build_print_html(export_data, cod, titlu_fisa)
-        
-        # Convertim HTML în PDF
-        pdf_bytes = HTML(string=html_content).write_pdf()
-        return pdf_bytes
+
+        for section in export_data["sections"]:
+            story.append(Paragraph(section["name"].upper(), section_style))
+            story.append(Spacer(1, 0.2*cm))
+            table_data = []
+            for f, v in zip(section["fields"], section["values"]):
+                f_safe = str(f).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                v_safe = str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                table_data.append([Paragraph(f_safe, cell_style), Paragraph(v_safe, cell_style)])
+            if table_data:
+                t = Table(table_data, colWidths=[4.5*cm, 11*cm])
+                t.setStyle(TableStyle([
+                    ("FONTNAME", (0, 0), (-1, -1), font_name),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 0.3*cm))
+
+        doc.build(story)
+        pdf_buf.seek(0)
+        return pdf_buf.getvalue()
     except Exception as e:
         return None
-
-def _build_print_html(export_data: dict, cod: str, titlu_fisa: str) -> str:
-    """Construiește HTML-ul pentru print (același care funcționează corect)."""
-    import html as _html
-    
-    html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Fișa {cod}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #ffffff; }}
-        h2 {{ color: #0B2A52; }}
-        h3 {{ color: #0B2A52; margin-top: 20px; }}
-        table {{ border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 20px; }}
-        th, td {{ border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top; }}
-        th {{ background-color: #0B2A52; color: white; font-size: 11px; }}
-        td {{ color: #000000; font-size: 10px; }}
-        @media print {{
-            button {{ display: none; }}
-        }}
-    </style>
-</head>
-<body>
-    <h2>IDBDC UPT - Fișa {titlu_fisa} - Cod: {cod}</h2>
-"""
-    for section in export_data["sections"]:
-        html += f"<h3>{section['name'].upper()}</h3>"
-        html += " <table> <tr><th>Camp</th><th>Valoare</th></tr>"
-        for f, v in zip(section["fields"], section["values"]):
-            html += f" hilabbert<td>{_html.escape(str(f))}</td>\n<td>{_html.escape(str(v))}</td\n</tr>"
-        html += "</table>"
-    html += """
-</body>
-</html>"""
-    return html
