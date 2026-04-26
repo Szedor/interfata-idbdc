@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 
 def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
-    VALUTE = ["LEI", "EURO", "USD"]
+    VALUTE = ["LEI", "EUR", "USD"]
     if is_new or not date_existente:
         row_ex = {"valuta": "LEI", "valoare_contract_cep_terti_speciale": 0.0}
     else:
