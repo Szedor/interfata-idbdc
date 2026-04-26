@@ -1,15 +1,17 @@
 # =========================================================
 # admin/motor.py
-# v.modul.1.8 - Eliminat dropdown-ul Actiune, mesaje directe
+# vers.modul.2.0
+# 2026.04.27
+# Fix navigare tab-uri + stabilitate session_state
 # =========================================================
 
 import streamlit as st
 import admin.config as cfg
-import admin.rules as rules
 import admin.data_ops as ops
 import admin.ui as ui
 
 from admin.fise import contracte_cep, contracte_terti, contracte_speciale
+
 
 def porneste_motorul(supabase):
     ui.apply_admin_styles()
@@ -83,7 +85,6 @@ def porneste_motorul(supabase):
         if is_admin and este_existent:
             btn_delete = st.button("🗑️ ȘTERGE FIȘA", use_container_width=True)
 
-    # Setare automată is_new
     is_new = not este_existent
 
     def _fetch(table, cod):
@@ -93,89 +94,53 @@ def porneste_motorul(supabase):
         except Exception:
             return []
 
-    date_baza_ex    = (_fetch(base_table, cod_introdus)[0]
-                       if not is_new and _fetch(base_table, cod_introdus) else {})
-    date_fin_ex     = _fetch("com_date_financiare", cod_introdus) if not is_new else []
-    date_echipa_ex  = _fetch("com_echipe_proiect",  cod_introdus) if not is_new else []
+    date_baza_ex   = (_fetch(base_table, cod_introdus)[0]
+                      if not is_new and _fetch(base_table, cod_introdus) else {})
+    date_fin_ex    = _fetch("com_date_financiare", cod_introdus) if not is_new else []
+    date_echipa_ex = _fetch("com_echipe_proiect",  cod_introdus) if not is_new else []
 
     rezultate = {}
 
     # =========================================================
-    # Folosim query_params pentru a reține tab-ul activ
+    # Determinăm modulul de fișă în funcție de selecție
     # =========================================================
-    query_params = st.query_params
-    tab_key = f"tab_{cod_introdus}"
-    
-    # Obținem tab-ul activ din URL sau folosim 0 ca implicit
-    if tab_key in query_params:
-        active_tab = int(query_params[tab_key])
-    else:
-        active_tab = 0
-
     if cat_sel == "Contracte" and tip_sel == "CEP":
-        tabs = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        for i, tab in enumerate(tabs):
-            with tab:
-                if i == active_tab:
-                    st.query_params[tab_key] = i
-                
-                if i == 0:
-                    rezultate["baza"] = contracte_cep.render_date_de_baza(
-                        supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-                    )
-                elif i == 1:
-                    rezultate["financiar"] = contracte_cep.render_date_financiare(
-                        supabase, cod_introdus, is_new, date_fin_ex
-                    )
-                elif i == 2:
-                    rezultate["echipa"] = contracte_cep.render_echipa(
-                        supabase, cod_introdus, is_new, date_echipa_ex
-                    )
-
+        modul = contracte_cep
     elif cat_sel == "Contracte" and tip_sel == "TERTI":
-        tabs = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        for i, tab in enumerate(tabs):
-            with tab:
-                if i == active_tab:
-                    st.query_params[tab_key] = i
-                
-                if i == 0:
-                    rezultate["baza"] = contracte_terti.render_date_de_baza(
-                        supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-                    )
-                elif i == 1:
-                    rezultate["financiar"] = contracte_terti.render_date_financiare(
-                        supabase, cod_introdus, is_new, date_fin_ex
-                    )
-                elif i == 2:
-                    rezultate["echipa"] = contracte_terti.render_echipa(
-                        supabase, cod_introdus, is_new, date_echipa_ex
-                    )
-
+        modul = contracte_terti
     elif cat_sel == "Contracte" and tip_sel == "SPECIALE":
-        tabs = st.tabs(["📋 Date de bază", "💰 Date financiare", "👥 Echipă"])
-        for i, tab in enumerate(tabs):
-            with tab:
-                if i == active_tab:
-                    st.query_params[tab_key] = i
-                
-                if i == 0:
-                    rezultate["baza"] = contracte_speciale.render_date_de_baza(
-                        supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
-                    )
-                elif i == 1:
-                    rezultate["financiar"] = contracte_speciale.render_date_financiare(
-                        supabase, cod_introdus, is_new, date_fin_ex
-                    )
-                elif i == 2:
-                    rezultate["echipa"] = contracte_speciale.render_echipa(
-                        supabase, cod_introdus, is_new, date_echipa_ex
-                    )
-
+        modul = contracte_speciale
     else:
         st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
         return
 
+    # =========================================================
+    # Tab-uri — fiecare tab randează INDEPENDENT, nu în buclă.
+    # Streamlit gestionează intern tab-ul activ; nu folosim
+    # query_params pentru asta (cauzau reruns în buclă).
+    # =========================================================
+    tab_baza, tab_fin, tab_echipa = st.tabs(
+        ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"]
+    )
+
+    with tab_baza:
+        rezultate["baza"] = modul.render_date_de_baza(
+            supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
+        )
+
+    with tab_fin:
+        rezultate["financiar"] = modul.render_date_financiare(
+            supabase, cod_introdus, is_new, date_fin_ex
+        )
+
+    with tab_echipa:
+        rezultate["echipa"] = modul.render_echipa(
+            supabase, cod_introdus, is_new, date_echipa_ex
+        )
+
+    # =========================================================
+    # Salvare
+    # =========================================================
     if btn_save:
         with st.spinner("Se salvează datele..."):
             erori = []
@@ -190,7 +155,7 @@ def porneste_motorul(supabase):
             if "financiar" in rezultate:
                 try:
                     supabase.table("com_date_financiare").delete().eq("cod_identificare", cod_introdus).execute()
-                except:
+                except Exception:
                     pass
                 for row in rezultate["financiar"]:
                     ok, msg = ops.direct_upsert_single_row(
@@ -202,9 +167,9 @@ def porneste_motorul(supabase):
             if "echipa" in rezultate:
                 try:
                     supabase.table("com_echipe_proiect").delete().eq("cod_identificare", cod_introdus).execute()
-                except:
+                except Exception:
                     pass
-                randuri_echipa = [row for row in rezultate["echipa"] if row.get("nume_prenume")]
+                randuri_echipa = [r for r in rezultate["echipa"] if r.get("nume_prenume")]
                 if randuri_echipa:
                     try:
                         supabase.table("com_echipe_proiect").insert(randuri_echipa).execute()
@@ -215,9 +180,12 @@ def porneste_motorul(supabase):
                 st.session_state["admin_msg"] = ("error", " | ".join(erori))
             else:
                 st.session_state["admin_msg"] = ("success", "Toate datele au fost salvate cu succes.")
-            
+
             st.rerun()
 
+    # =========================================================
+    # Ștergere
+    # =========================================================
     if btn_delete:
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
         if st.checkbox("Confirm eliminarea din toate tabelele"):
