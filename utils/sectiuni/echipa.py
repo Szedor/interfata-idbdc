@@ -1,15 +1,23 @@
 # =========================================================
 # utils/sectiuni/echipa.py
-# v.modul.1.0 - Secțiunea ECHIPĂ (comună)
+# vers.modul.2.0
+# 2026.04.27
+# Fix pierdere date la editare câmpuri
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 
+
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
     """
     Randare și salvare echipă.
+    Fix: datele introduse nu se mai pierd la trecerea între câmpuri.
     """
+
+    # ----------------------------------------------------------
+    # 1. Citire date de referință (persoane + departamente)
+    # ----------------------------------------------------------
     try:
         res = supabase.table("det_resurse_umane").select(
             "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
@@ -23,14 +31,17 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         res2 = supabase.table("nom_departament").select(
             "acronim_departament,denumire_departament"
         ).execute()
-        dep_map = {r["acronim_departament"]: r["denumire_departament"]
-                   for r in (res2.data or []) if r.get("acronim_departament")}
+        dep_map = {
+            r["acronim_departament"]: r["denumire_departament"]
+            for r in (res2.data or []) if r.get("acronim_departament")
+        }
     except Exception as e:
         st.error(f"❌ Eroare citire nom_departament: {e}")
         dep_map = {}
 
     if not persoane_data:
         st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane.")
+
     persoane_list = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
 
     info_map = {}
@@ -47,41 +58,62 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             "fix":   p.get("telefon_fix", ""),
         }
 
+    # ----------------------------------------------------------
+    # 2. Construire date inițiale pentru session_state
+    #    IMPORTANT: inițializăm session_state O SINGURĂ DATĂ,
+    #    la prima afișare a fișei pentru acest cod.
+    #    Cheia include codul pentru a separa fișe diferite.
+    # ----------------------------------------------------------
     NR_RANDURI_INIT = 5
-    if is_new or not date_existente:
-        rows_init = [
-            {"NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
-             "PERSOANĂ DE CONTACT": False,
-             "DEPARTAMENT": "", "EMAIL": "",
-             "TELEFON MOBIL": "", "TELEFON FIX": ""}
-            for _ in range(NR_RANDURI_INIT)
-        ]
-    else:
-        rows_init = []
-        for r in date_existente:
-            n = r.get("nume_prenume", "")
-            info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
-            rows_init.append({
-                "NUME ȘI PRENUME":     n,
-                "ROLUL ÎN CONTRACT":   r.get("rol", ""),
-                "PERSOANĂ DE CONTACT": bool(r.get("persoana_contact", False)),
-                "DEPARTAMENT":         info["dep"],
-                "EMAIL":               info["email"],
-                "TELEFON MOBIL":       info["mob"],
-                "TELEFON FIX":         info["fix"],
-            })
-        while len(rows_init) < NR_RANDURI_INIT:
-            rows_init.append({
-                "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
-                "PERSOANĂ DE CONTACT": False,
-                "DEPARTAMENT": "", "EMAIL": "",
-                "TELEFON MOBIL": "", "TELEFON FIX": ""
-            })
-
     key_rows = f"echipa_rows_{cod_introdus}"
-    if key_rows not in st.session_state:
-        st.session_state[key_rows] = rows_init
+    key_init = f"echipa_init_{cod_introdus}"  # flag "am inițializat deja?"
 
+    if key_init not in st.session_state:
+        # Prima afișare — construim datele inițiale
+        if is_new or not date_existente:
+            rows_init = [
+                {
+                    "NUME ȘI PRENUME": "",
+                    "ROLUL ÎN CONTRACT": "",
+                    "PERSOANĂ DE CONTACT": False,
+                    "DEPARTAMENT": "",
+                    "EMAIL": "",
+                    "TELEFON MOBIL": "",
+                    "TELEFON FIX": "",
+                }
+                for _ in range(NR_RANDURI_INIT)
+            ]
+        else:
+            rows_init = []
+            for r in date_existente:
+                n = r.get("nume_prenume", "")
+                info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
+                rows_init.append({
+                    "NUME ȘI PRENUME":     n,
+                    "ROLUL ÎN CONTRACT":   r.get("rol", ""),
+                    "PERSOANĂ DE CONTACT": bool(r.get("persoana_contact", False)),
+                    "DEPARTAMENT":         info["dep"],
+                    "EMAIL":               info["email"],
+                    "TELEFON MOBIL":       info["mob"],
+                    "TELEFON FIX":         info["fix"],
+                })
+            while len(rows_init) < NR_RANDURI_INIT:
+                rows_init.append({
+                    "NUME ȘI PRENUME": "",
+                    "ROLUL ÎN CONTRACT": "",
+                    "PERSOANĂ DE CONTACT": False,
+                    "DEPARTAMENT": "",
+                    "EMAIL": "",
+                    "TELEFON MOBIL": "",
+                    "TELEFON FIX": "",
+                })
+
+        st.session_state[key_rows] = rows_init
+        st.session_state[key_init] = True
+
+    # ----------------------------------------------------------
+    # 3. Afișare data_editor cu datele din session_state
+    # ----------------------------------------------------------
     df = pd.DataFrame(st.session_state[key_rows])
 
     col_cfg = {
@@ -105,33 +137,48 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
-    # Actualizare câmpuri automate (departament, email, telefon)
+    # ----------------------------------------------------------
+    # 4. Actualizare câmpuri automate (departament, email, tel)
+    #    și salvare înapoi în session_state.
+    #    IMPORTANT: actualizăm DOAR câmpurile automate, păstrând
+    #    tot ce a tastat utilizatorul (rol, persoana_contact).
+    # ----------------------------------------------------------
     df_updated = df_edit.copy()
     for i, row in df_edit.iterrows():
         n = row.get("NUME ȘI PRENUME", "")
-        if n:
-            info = info_map.get(n, {"dep": "", "email": "", "mob": "", "fix": ""})
-            df_updated.at[i, "DEPARTAMENT"] = info["dep"]
-            df_updated.at[i, "EMAIL"] = info["email"]
+        if n and n in info_map:
+            info = info_map[n]
+            df_updated.at[i, "DEPARTAMENT"]   = info["dep"]
+            df_updated.at[i, "EMAIL"]         = info["email"]
             df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
-            df_updated.at[i, "TELEFON FIX"] = info["fix"]
-        else:
-            df_updated.at[i, "DEPARTAMENT"] = ""
-            df_updated.at[i, "EMAIL"] = ""
+            df_updated.at[i, "TELEFON FIX"]   = info["fix"]
+        elif not n:
+            df_updated.at[i, "DEPARTAMENT"]   = ""
+            df_updated.at[i, "EMAIL"]         = ""
             df_updated.at[i, "TELEFON MOBIL"] = ""
-            df_updated.at[i, "TELEFON FIX"] = ""
+            df_updated.at[i, "TELEFON FIX"]   = ""
 
+    # Salvăm starea curentă (inclusiv tot ce a tastat utilizatorul)
     st.session_state[key_rows] = df_updated.to_dict("records")
 
+    # ----------------------------------------------------------
+    # 5. Buton adăugare rând nou
+    # ----------------------------------------------------------
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         st.session_state[key_rows].append({
-            "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
+            "NUME ȘI PRENUME": "",
+            "ROLUL ÎN CONTRACT": "",
             "PERSOANĂ DE CONTACT": False,
-            "DEPARTAMENT": "", "EMAIL": "",
-            "TELEFON MOBIL": "", "TELEFON FIX": ""
+            "DEPARTAMENT": "",
+            "EMAIL": "",
+            "TELEFON MOBIL": "",
+            "TELEFON FIX": "",
         })
         st.rerun()
 
+    # ----------------------------------------------------------
+    # 6. Returnare date pentru salvare
+    # ----------------------------------------------------------
     rezultat = []
     for _, row in df_updated.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "")).strip()
