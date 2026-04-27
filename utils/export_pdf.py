@@ -1,12 +1,13 @@
 # =========================================================
 # utils/export_pdf.py
-# vers.modul.3.2
+# vers.modul.3.3
 # 2026.04.28
-# DEBUG cai font
+# Cautare exhaustiva fonturi sistem
 # =========================================================
 
 import io
 import os
+import glob
 
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -20,38 +21,65 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 def _get_font() -> tuple:
     """
+    Caută exhaustiv orice font TTF disponibil pe sistem care suportă Unicode.
     Returnează (font_name, debug_msg).
     """
-    font_name = "DejaVuSans"
     log = []
+    font_name = "UniFont"
 
-    base_dir   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    font_local = os.path.join(base_dir, "assets", "fonts", "DejaVuSans.ttf")
-    log.append(f"__file__={__file__}")
-    log.append(f"base_dir={base_dir}")
-    log.append(f"font_local={font_local} exists={os.path.exists(font_local)}")
-
-    sistem_paths = [
-        font_local,
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    # Căutare în toate locațiile standard Linux
+    search_patterns = [
+        "/usr/share/fonts/**/*.ttf",
+        "/usr/local/share/fonts/**/*.ttf",
+        "/home/**/.fonts/*.ttf",
+        "/root/.fonts/*.ttf",
     ]
 
-    for path in sistem_paths:
-        exists = os.path.exists(path)
-        log.append(f"trying {path} exists={exists}")
-        if exists:
-            try:
-                pdfmetrics.registerFont(TTFont(font_name, path))
-                log.append(f"REGISTERED OK from {path}")
-                return font_name, " | ".join(log)
-            except Exception as e:
-                log.append(f"registerFont FAILED: {e}")
-                continue
+    # Fonturi preferate în ordine
+    preferred = [
+        "FreeSans",
+        "FreeSerif",
+        "NotoSans",
+        "NotoSans-Regular",
+        "DejaVuSans",
+        "LiberationSans-Regular",
+        "Ubuntu-R",
+        "Arial",
+    ]
 
-    log.append("FALLBACK Helvetica")
-    return "Helvetica", " | ".join(log)
+    # Colectăm toate TTF-urile găsite
+    all_ttf = []
+    for pattern in search_patterns:
+        found = glob.glob(pattern, recursive=True)
+        all_ttf.extend(found)
+
+    log.append(f"Total TTF gasite pe sistem: {len(all_ttf)}")
+    if all_ttf:
+        log.append(f"Exemple: {all_ttf[:5]}")
+
+    # Încercăm mai întâi fonturile preferate
+    for pref in preferred:
+        for path in all_ttf:
+            if pref.lower() in os.path.basename(path).lower():
+                try:
+                    pdfmetrics.registerFont(TTFont(font_name, path))
+                    log.append(f"REGISTERED OK: {path}")
+                    return font_name, " | ".join(str(x) for x in log)
+                except Exception as e:
+                    log.append(f"FAILED {path}: {e}")
+                    continue
+
+    # Dacă nu am găsit niciun preferat, încercăm orice TTF
+    for path in all_ttf:
+        try:
+            pdfmetrics.registerFont(TTFont(font_name, path))
+            log.append(f"REGISTERED fallback OK: {path}")
+            return font_name, " | ".join(str(x) for x in log)
+        except Exception:
+            continue
+
+    log.append("FALLBACK Helvetica — niciun font TTF utilizabil")
+    return "Helvetica", " | ".join(str(x) for x in log)
 
 
 def generate_pdf_vertical(
