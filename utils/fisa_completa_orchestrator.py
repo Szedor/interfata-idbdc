@@ -1,8 +1,8 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# vers.modul.1.3
+# vers.modul.1.4
 # 2026.04.28
-# Orchestrator cu autentificare export reala + debug font
+# Orchestrator cu autentificare export reala
 # =========================================================
 
 import streamlit as st
@@ -20,6 +20,7 @@ from utils.export_pdf import generate_pdf_vertical
 from utils.export_print import generate_print_html_vertical
 from utils.supabase_helpers import safe_select_eq
 
+
 # =========================================================
 # Autentificare export (verificare email @upt.ro)
 # =========================================================
@@ -30,7 +31,9 @@ def _render_export_auth_tab1(supabase) -> bool:
     if st.session_state.get("auth_ai", False) or st.session_state.get(auth_key, False):
         nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
         st.markdown(
-            f"<div style='background:rgba(255,255,255,0.10);border-radius:10px;padding:8px 16px;color:#ffffff;font-weight:700;margin-bottom:0.5rem;'>✅ Export autorizat — {_html.escape(str(nume))}</div>",
+            f"<div style='background:rgba(255,255,255,0.10);border-radius:10px;padding:8px 16px;"
+            f"color:#ffffff;font-weight:700;margin-bottom:0.5rem;'>"
+            f"✅ Export autorizat — {_html.escape(str(nume))}</div>",
             unsafe_allow_html=True,
         )
         return True
@@ -146,13 +149,6 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
     if not _render_export_auth_tab1(supabase):
         return
 
-    # DEBUG font — afișează calea și dacă există pe server
-    _font_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "assets", "fonts", "DejaVuSans.ttf"
-    )
-    st.caption(f"🔍 DEBUG font: `{_font_path}` — găsit: `{os.path.exists(_font_path)}`")
-
     export_data_horizontal = build_horizontal_export_data(supabase, cod, tabela_gasita)
     if not export_data_horizontal["headers"]:
         st.info("Nu există date de exportat pentru acest cod.")
@@ -173,13 +169,16 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.download_button("⬇️ CSV", data=csv_bytes, file_name=f"fisa_{cod}.csv", mime="text/csv", key=f"fisa_csv_{cod}")
+        st.download_button("⬇️ CSV", data=csv_bytes, file_name=f"fisa_{cod}.csv",
+                           mime="text/csv", key=f"fisa_csv_{cod}")
     with col2:
         st.download_button("⬇️ Excel", data=excel_bytes, file_name=f"fisa_{cod}.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"fisa_xlsx_{cod}")
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           key=f"fisa_xlsx_{cod}")
     with col3:
         if pdf_bytes:
-            st.download_button("⬇️ PDF", data=pdf_bytes, file_name=f"fisa_{cod}.pdf", mime="application/pdf", key=f"fisa_pdf_{cod}")
+            st.download_button("⬇️ PDF", data=pdf_bytes, file_name=f"fisa_{cod}.pdf",
+                               mime="application/pdf", key=f"fisa_pdf_{cod}")
         else:
             st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați reportlab")
     with col4:
