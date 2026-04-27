@@ -1,6 +1,8 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# v.modul.1.2 - Orchestrator cu autentificare export reală
+# vers.modul.1.2
+# 2026.04.28
+# Orchestrator cu autentificare export reală
 # =========================================================
 
 import streamlit as st
