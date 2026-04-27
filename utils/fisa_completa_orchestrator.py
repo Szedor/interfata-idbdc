@@ -1,14 +1,13 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# vers.modul.1.5
+# vers.modul.1.6
 # 2026.04.28
-# DEBUG pdf
+# Orchestrator cu autentificare export reala
 # =========================================================
 
 import streamlit as st
 import html as _html
 import re as _re
-import os
 import streamlit.components.v1 as components
 
 from utils.display_config import TABLE_LABELS
@@ -150,13 +149,11 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
     csv_bytes   = build_csv_bytes(export_data_horizontal)
     excel_bytes = build_excel_bytes(export_data_horizontal)
 
-    # generate_pdf_vertical returnează acum (bytes, debug_msg)
-    pdf_result  = generate_pdf_vertical(
+    pdf_result = generate_pdf_vertical(
         supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
         lambda s, c, t: build_vertical_export_data(s, c, t)
     )
-    pdf_bytes, pdf_debug = pdf_result if isinstance(pdf_result, tuple) else (pdf_result, "")
-    st.caption(f"🔍 DEBUG PDF: {pdf_debug}")
+    pdf_bytes = pdf_result[0] if isinstance(pdf_result, tuple) else pdf_result
 
     print_html = generate_print_html_vertical(
         supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
