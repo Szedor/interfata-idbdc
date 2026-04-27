@@ -1,8 +1,6 @@
 # =========================================================
 # utils/export_pdf.py
-# vers.modul.3.0
-# 2026.04.28
-# Font inregistrat la fiecare apel — fara variabile globale
+# vers.modul.3.1 - DEBUG eroare vizibila
 # =========================================================
 
 import io
@@ -17,20 +15,17 @@ from reportlab.lib.colors import HexColor
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
+# Variabila globala pentru mesajul de debug
+_debug_font_msg = "neinitialized"
+
 
 def _get_font() -> str:
-    """
-    Înregistrează DejaVuSans la fiecare apel.
-    Dacă fontul e deja înregistrat, ReportLab îl ignoră silențios.
-    Returnează numele fontului de folosit.
-    """
+    global _debug_font_msg
     font_name = "DejaVuSans"
 
-    # Calea fontului din proiect (assets/fonts/DejaVuSans.ttf)
     base_dir   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     font_local = os.path.join(base_dir, "assets", "fonts", "DejaVuSans.ttf")
 
-    # Căi alternative pe sistem Linux
     sistem_paths = [
         font_local,
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -42,12 +37,18 @@ def _get_font() -> str:
         if os.path.exists(path):
             try:
                 pdfmetrics.registerFont(TTFont(font_name, path))
+                _debug_font_msg = f"OK: font inregistrat din {path}"
                 return font_name
-            except Exception:
+            except Exception as e:
+                _debug_font_msg = f"EROARE registerFont din {path}: {e}"
                 continue
 
-    # Fallback — fara diacritice
+    _debug_font_msg = "FALLBACK Helvetica — niciun font gasit"
     return "Helvetica"
+
+
+def get_debug_font_msg() -> str:
+    return _debug_font_msg
 
 
 def generate_pdf_vertical(
@@ -56,12 +57,15 @@ def generate_pdf_vertical(
     tabela_gasita: str,
     titlu_fisa: str,
     build_vertical_export_data_func,
-) -> bytes:
+) -> tuple:
     """
-    Generează PDF cu structură verticală (câmp | valoare).
+    Returnează (pdf_bytes, debug_msg).
+    pdf_bytes poate fi None dacă apare o eroare.
     """
+    debug_msgs = []
     try:
         font_name = _get_font()
+        debug_msgs.append(_debug_font_msg)
 
         pdf_buf = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -101,7 +105,7 @@ def generate_pdf_vertical(
 
         story = []
         story.append(
-            Paragraph(f"IDBDC UPT — Fișa {titlu_fisa} — Cod: {cod}", title_style)
+            Paragraph(f"IDBDC UPT — Fisa {titlu_fisa} — Cod: {cod}", title_style)
         )
         story.append(Spacer(1, 0.5 * cm))
 
@@ -113,42 +117,30 @@ def generate_pdf_vertical(
 
             table_data = []
             for f, v in zip(section.get("fields", []), section.get("values", [])):
-                f_safe = (
-                    str(f)
-                    .replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                )
-                v_safe = (
-                    str(v)
-                    .replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                )
+                f_safe = str(f).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                v_safe = str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 table_data.append(
                     [Paragraph(f_safe, cell_style), Paragraph(v_safe, cell_style)]
                 )
 
             if table_data:
                 t = Table(table_data, colWidths=[4.5 * cm, 11 * cm])
-                t.setStyle(
-                    TableStyle([
-                        ("FONTNAME",       (0, 0), (-1, -1), font_name),
-                        ("FONTSIZE",       (0, 0), (-1, -1), 8),
-                        ("GRID",           (0, 0), (-1, -1), 0.3, colors.grey),
-                        ("VALIGN",         (0, 0), (-1, -1), "TOP"),
-                        ("BACKGROUND",     (0, 0), (0, -1),  HexColor("#EEF2F7")),
-                        ("TEXTCOLOR",      (0, 0), (0, -1),  HexColor("#0B2A52")),
-                        ("ROWBACKGROUNDS", (0, 0), (-1, -1),
-                         [HexColor("#FFFFFF"), HexColor("#F7F9FC")]),
-                    ])
-                )
+                t.setStyle(TableStyle([
+                    ("FONTNAME",       (0, 0), (-1, -1), font_name),
+                    ("FONTSIZE",       (0, 0), (-1, -1), 8),
+                    ("GRID",           (0, 0), (-1, -1), 0.3, colors.grey),
+                    ("VALIGN",         (0, 0), (-1, -1), "TOP"),
+                    ("BACKGROUND",     (0, 0), (0, -1),  HexColor("#EEF2F7")),
+                    ("TEXTCOLOR",      (0, 0), (0, -1),  HexColor("#0B2A52")),
+                    ("ROWBACKGROUNDS", (0, 0), (-1, -1),
+                     [HexColor("#FFFFFF"), HexColor("#F7F9FC")]),
+                ]))
                 story.append(t)
                 story.append(Spacer(1, 0.3 * cm))
 
         doc.build(story)
         pdf_buf.seek(0)
-        return pdf_buf.getvalue()
+        return pdf_buf.getvalue(), " | ".join(debug_msgs)
 
-    except Exception:
-        return None
+    except Exception as e:
+        return None, f"EXCEPTIE generate_pdf: {e}"
