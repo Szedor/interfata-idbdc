@@ -1,8 +1,9 @@
 # =========================================================
 # utils/sectiuni/echipa.py
-# vers.modul.2.0
+# vers.modul.3.0
 # 2026.04.27
-# Fix pierdere date la editare câmpuri
+# Arhitectura corecta: data_editor gestionat prin cheia
+# proprie Streamlit, session_state doar pentru nr. randuri
 # =========================================================
 
 import streamlit as st
@@ -12,7 +13,6 @@ import pandas as pd
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
     """
     Randare și salvare echipă.
-    Fix: datele introduse nu se mai pierd la trecerea între câmpuri.
     """
 
     # ----------------------------------------------------------
@@ -59,17 +59,16 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         }
 
     # ----------------------------------------------------------
-    # 2. Construire date inițiale pentru session_state
-    #    IMPORTANT: inițializăm session_state O SINGURĂ DATĂ,
-    #    la prima afișare a fișei pentru acest cod.
-    #    Cheia include codul pentru a separa fișe diferite.
+    # 2. Date inițiale — construite O SINGURĂ DATĂ per cod.
+    #    La reruns, data_editor își păstrează starea intern
+    #    prin cheia sa (key_editor), deci df_init servește
+    #    doar ca structură de pornire, nu suprascrie editările.
     # ----------------------------------------------------------
     NR_RANDURI_INIT = 5
-    key_rows = f"echipa_rows_{cod_introdus}"
-    key_init = f"echipa_init_{cod_introdus}"  # flag "am inițializat deja?"
+    key_editor     = f"echipa_editor_{cod_introdus}"
+    key_data_init  = f"echipa_data_init_{cod_introdus}"
 
-    if key_init not in st.session_state:
-        # Prima afișare — construim datele inițiale
+    if key_data_init not in st.session_state:
         if is_new or not date_existente:
             rows_init = [
                 {
@@ -108,13 +107,15 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
                     "TELEFON FIX": "",
                 })
 
-        st.session_state[key_rows] = rows_init
-        st.session_state[key_init] = True
+        st.session_state[key_data_init] = rows_init
 
     # ----------------------------------------------------------
-    # 3. Afișare data_editor cu datele din session_state
+    # 3. Afișare data_editor
+    #    Îi dăm mereu df_init ca structură, dar Streamlit
+    #    aplică peste el editările din session_state[key_editor],
+    #    deci datele utilizatorului NU se pierd la rerun.
     # ----------------------------------------------------------
-    df = pd.DataFrame(st.session_state[key_rows])
+    df_init = pd.DataFrame(st.session_state[key_data_init])
 
     col_cfg = {
         "NUME ȘI PRENUME": st.column_config.SelectboxColumn(
@@ -129,43 +130,21 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     }
 
     df_edit = st.data_editor(
-        df,
+        df_init,
         column_config=col_cfg,
         hide_index=True,
         use_container_width=True,
         num_rows="fixed",
-        key=f"echipa_editor_{cod_introdus}",
+        key=key_editor,
     )
 
     # ----------------------------------------------------------
-    # 4. Actualizare câmpuri automate (departament, email, tel)
-    #    și salvare înapoi în session_state.
-    #    IMPORTANT: actualizăm DOAR câmpurile automate, păstrând
-    #    tot ce a tastat utilizatorul (rol, persoana_contact).
-    # ----------------------------------------------------------
-    df_updated = df_edit.copy()
-    for i, row in df_edit.iterrows():
-        n = row.get("NUME ȘI PRENUME", "")
-        if n and n in info_map:
-            info = info_map[n]
-            df_updated.at[i, "DEPARTAMENT"]   = info["dep"]
-            df_updated.at[i, "EMAIL"]         = info["email"]
-            df_updated.at[i, "TELEFON MOBIL"] = info["mob"]
-            df_updated.at[i, "TELEFON FIX"]   = info["fix"]
-        elif not n:
-            df_updated.at[i, "DEPARTAMENT"]   = ""
-            df_updated.at[i, "EMAIL"]         = ""
-            df_updated.at[i, "TELEFON MOBIL"] = ""
-            df_updated.at[i, "TELEFON FIX"]   = ""
-
-    # Salvăm starea curentă (inclusiv tot ce a tastat utilizatorul)
-    st.session_state[key_rows] = df_updated.to_dict("records")
-
-    # ----------------------------------------------------------
-    # 5. Buton adăugare rând nou
+    # 4. Buton adăugare rând nou
+    #    Adăugăm rândul în key_data_init și ștergem cheia
+    #    editorului pentru a-l reseta cu noul număr de rânduri.
     # ----------------------------------------------------------
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
-        st.session_state[key_rows].append({
+        st.session_state[key_data_init].append({
             "NUME ȘI PRENUME": "",
             "ROLUL ÎN CONTRACT": "",
             "PERSOANĂ DE CONTACT": False,
@@ -174,13 +153,35 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             "TELEFON MOBIL": "",
             "TELEFON FIX": "",
         })
+        if key_editor in st.session_state:
+            del st.session_state[key_editor]
         st.rerun()
+
+    # ----------------------------------------------------------
+    # 5. Completare automată câmpuri readonly
+    #    FĂRĂ rerun și FĂRĂ scriere în session_state —
+    #    doar pentru returnarea valorilor corecte la salvare.
+    # ----------------------------------------------------------
+    df_final = df_edit.copy()
+    for i, row in df_edit.iterrows():
+        n = row.get("NUME ȘI PRENUME", "")
+        if n and n in info_map:
+            info = info_map[n]
+            df_final.at[i, "DEPARTAMENT"]   = info["dep"]
+            df_final.at[i, "EMAIL"]         = info["email"]
+            df_final.at[i, "TELEFON MOBIL"] = info["mob"]
+            df_final.at[i, "TELEFON FIX"]   = info["fix"]
+        else:
+            df_final.at[i, "DEPARTAMENT"]   = ""
+            df_final.at[i, "EMAIL"]         = ""
+            df_final.at[i, "TELEFON MOBIL"] = ""
+            df_final.at[i, "TELEFON FIX"]   = ""
 
     # ----------------------------------------------------------
     # 6. Returnare date pentru salvare
     # ----------------------------------------------------------
     rezultat = []
-    for _, row in df_updated.iterrows():
+    for _, row in df_final.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "")).strip()
         if not n:
             continue
