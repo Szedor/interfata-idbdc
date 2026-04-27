@@ -1,6 +1,8 @@
 # =========================================================
 # utils/export_pdf.py
-# vers.modul.3.1 - DEBUG eroare vizibila
+# vers.modul.3.2
+# 2026.04.28
+# DEBUG cai font
 # =========================================================
 
 import io
@@ -15,16 +17,19 @@ from reportlab.lib.colors import HexColor
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Variabila globala pentru mesajul de debug
-_debug_font_msg = "neinitialized"
 
-
-def _get_font() -> str:
-    global _debug_font_msg
+def _get_font() -> tuple:
+    """
+    Returnează (font_name, debug_msg).
+    """
     font_name = "DejaVuSans"
+    log = []
 
     base_dir   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     font_local = os.path.join(base_dir, "assets", "fonts", "DejaVuSans.ttf")
+    log.append(f"__file__={__file__}")
+    log.append(f"base_dir={base_dir}")
+    log.append(f"font_local={font_local} exists={os.path.exists(font_local)}")
 
     sistem_paths = [
         font_local,
@@ -34,21 +39,19 @@ def _get_font() -> str:
     ]
 
     for path in sistem_paths:
-        if os.path.exists(path):
+        exists = os.path.exists(path)
+        log.append(f"trying {path} exists={exists}")
+        if exists:
             try:
                 pdfmetrics.registerFont(TTFont(font_name, path))
-                _debug_font_msg = f"OK: font inregistrat din {path}"
-                return font_name
+                log.append(f"REGISTERED OK from {path}")
+                return font_name, " | ".join(log)
             except Exception as e:
-                _debug_font_msg = f"EROARE registerFont din {path}: {e}"
+                log.append(f"registerFont FAILED: {e}")
                 continue
 
-    _debug_font_msg = "FALLBACK Helvetica — niciun font gasit"
-    return "Helvetica"
-
-
-def get_debug_font_msg() -> str:
-    return _debug_font_msg
+    log.append("FALLBACK Helvetica")
+    return "Helvetica", " | ".join(log)
 
 
 def generate_pdf_vertical(
@@ -60,12 +63,9 @@ def generate_pdf_vertical(
 ) -> tuple:
     """
     Returnează (pdf_bytes, debug_msg).
-    pdf_bytes poate fi None dacă apare o eroare.
     """
-    debug_msgs = []
     try:
-        font_name = _get_font()
-        debug_msgs.append(_debug_font_msg)
+        font_name, debug_msg = _get_font()
 
         pdf_buf = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -80,33 +80,22 @@ def generate_pdf_vertical(
         styles = getSampleStyleSheet()
 
         title_style = ParagraphStyle(
-            "TitleStyle",
-            parent=styles["Title"],
-            fontName=font_name,
-            fontSize=12,
-            textColor=HexColor("#0B2A52"),
-            alignment=1,
+            "TitleStyle", parent=styles["Title"],
+            fontName=font_name, fontSize=12,
+            textColor=HexColor("#0B2A52"), alignment=1,
         )
         section_style = ParagraphStyle(
-            "SectionStyle",
-            parent=styles["Normal"],
-            fontName=font_name,
-            fontSize=10,
-            textColor=HexColor("#0B2A52"),
-            alignment=0,
+            "SectionStyle", parent=styles["Normal"],
+            fontName=font_name, fontSize=10,
+            textColor=HexColor("#0B2A52"), alignment=0,
         )
         cell_style = ParagraphStyle(
-            "CellStyle",
-            parent=styles["Normal"],
-            fontName=font_name,
-            fontSize=8,
-            leading=10,
+            "CellStyle", parent=styles["Normal"],
+            fontName=font_name, fontSize=8, leading=10,
         )
 
         story = []
-        story.append(
-            Paragraph(f"IDBDC UPT — Fisa {titlu_fisa} — Cod: {cod}", title_style)
-        )
+        story.append(Paragraph(f"IDBDC UPT — Fisa {titlu_fisa} — Cod: {cod}", title_style))
         story.append(Spacer(1, 0.5 * cm))
 
         export_data = build_vertical_export_data_func(supabase, cod, tabela_gasita)
@@ -140,7 +129,7 @@ def generate_pdf_vertical(
 
         doc.build(story)
         pdf_buf.seek(0)
-        return pdf_buf.getvalue(), " | ".join(debug_msgs)
+        return pdf_buf.getvalue(), debug_msg
 
     except Exception as e:
-        return None, f"EXCEPTIE generate_pdf: {e}"
+        return None, f"EXCEPTIE: {e}"
