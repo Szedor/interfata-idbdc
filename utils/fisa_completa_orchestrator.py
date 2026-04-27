@@ -167,6 +167,10 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
     excel_bytes = build_excel_bytes(export_data_horizontal)
 
     # PDF (vertical)
+    import os
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath("utils/export_pdf.py")))
+_font_path = os.path.join(_BASE_DIR, "assets", "fonts", "DejaVuSans.ttf")
+st.write(f"DEBUG font path: `{_font_path}` — există: `{os.path.exists(_font_path)}`")
     pdf_bytes = generate_pdf_vertical(
         supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
         lambda s, c, t: build_vertical_export_data(s, c, t)
