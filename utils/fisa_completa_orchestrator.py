@@ -1,14 +1,15 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# vers.modul.1.2
+# vers.modul.1.3
 # 2026.04.28
-# Orchestrator cu autentificare export reală
+# Orchestrator cu autentificare export reala + debug font
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 import html as _html
 import re as _re
+import os
 import streamlit.components.v1 as components
 
 from utils.display_config import TABLE_LABELS
@@ -23,11 +24,9 @@ from utils.supabase_helpers import safe_select_eq
 # Autentificare export (verificare email @upt.ro)
 # =========================================================
 def _render_export_auth_tab1(supabase) -> bool:
-    """Afișează bara de autentificare pentru export. Returnează True dacă utilizatorul este autorizat."""
     auth_key = "export_auth_tab1"
     pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
 
-    # Verifică dacă este deja autentificat (prin AI sau prin bara acestui tab)
     if st.session_state.get("auth_ai", False) or st.session_state.get(auth_key, False):
         nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
         st.markdown(
@@ -36,7 +35,6 @@ def _render_export_auth_tab1(supabase) -> bool:
         )
         return True
 
-    # Afișează bara de autentificare
     st.markdown(
         "<div style='background:rgba(255,255,255,0.08);border-radius:12px;padding:12px 18px;margin-bottom:0.6rem;'>"
         "<span style='color:#ffffff;font-weight:800;font-size:0.97rem;'>"
@@ -44,7 +42,7 @@ def _render_export_auth_tab1(supabase) -> bool:
         "</span></div>",
         unsafe_allow_html=True,
     )
-    
+
     ea1, ea2, _ = st.columns([2.0, 1.0, 3.0])
     with ea1:
         email_exp = st.text_input(
@@ -73,19 +71,11 @@ def _render_export_auth_tab1(supabase) -> bool:
                 st.error(f"Eroare verificare: {e}")
     return False
 
+
 # =========================================================
 # Funcția principală de randare a fișei complete
 # =========================================================
 def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta: str):
-    """
-    Funcția principală de afișare a fișei complete.
-    Parametri:
-        supabase: clientul Supabase
-        cod: codul identificator (string)
-        tabela_gasita: numele tabelei SQL de bază (ex: "base_contracte_cep")
-        titlu_eticheta: eticheta vizuală (ex: "CEP") – nu se folosește direct, dar păstrată pentru consistență
-    """
-    # Afișare secțiuni cu checkbox-uri
     _p1, _p2, _p3, _p4, _lbl = st.columns([0.7, 0.7, 0.7, 0.7, 5.2])
     with _p1:
         pin_gen = st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
@@ -145,7 +135,6 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
                     render_sectiune_tabel(sec_label, rows, sec_table, tabela_baza_ctx=tabela_gasita)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Secțiunea de export
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     st.divider()
     st.markdown(
@@ -153,32 +142,30 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
         "margin-bottom:6px;'>📤 Export fișă</div>",
         unsafe_allow_html=True,
     )
-    
-    # Autentificare export
+
     if not _render_export_auth_tab1(supabase):
         return
 
-    # Construire date export
+    # DEBUG font — afișează calea și dacă există pe server
+    _font_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "assets", "fonts", "DejaVuSans.ttf"
+    )
+    st.caption(f"🔍 DEBUG font: `{_font_path}` — găsit: `{os.path.exists(_font_path)}`")
+
     export_data_horizontal = build_horizontal_export_data(supabase, cod, tabela_gasita)
     if not export_data_horizontal["headers"]:
         st.info("Nu există date de exportat pentru acest cod.")
         return
 
-    # CSV și Excel (orizontal)
-    csv_bytes = build_csv_bytes(export_data_horizontal)
+    csv_bytes   = build_csv_bytes(export_data_horizontal)
     excel_bytes = build_excel_bytes(export_data_horizontal)
 
-    # PDF (vertical)
-    import os
-_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath("utils/export_pdf.py")))
-_font_path = os.path.join(_BASE_DIR, "assets", "fonts", "DejaVuSans.ttf")
-st.write(f"DEBUG font path: `{_font_path}` — există: `{os.path.exists(_font_path)}`")
     pdf_bytes = generate_pdf_vertical(
         supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
         lambda s, c, t: build_vertical_export_data(s, c, t)
     )
 
-    # Print HTML (vertical)
     print_html = generate_print_html_vertical(
         supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
         lambda s, c, t: build_vertical_export_data(s, c, t)
@@ -189,7 +176,7 @@ st.write(f"DEBUG font path: `{_font_path}` — există: `{os.path.exists(_font_p
         st.download_button("⬇️ CSV", data=csv_bytes, file_name=f"fisa_{cod}.csv", mime="text/csv", key=f"fisa_csv_{cod}")
     with col2:
         st.download_button("⬇️ Excel", data=excel_bytes, file_name=f"fisa_{cod}.xlsx",
-                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"fisa_xlsx_{cod}")
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"fisa_xlsx_{cod}")
     with col3:
         if pdf_bytes:
             st.download_button("⬇️ PDF", data=pdf_bytes, file_name=f"fisa_{cod}.pdf", mime="application/pdf", key=f"fisa_pdf_{cod}")
