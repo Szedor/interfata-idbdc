@@ -1,8 +1,8 @@
 # =========================================================
 # utils/export_pdf.py
-# vers.modul.2.0
+# vers.modul.3.0
 # 2026.04.28
-# Diacritice corecte prin font local (assets/fonts/DejaVuSans.ttf)
+# Font inregistrat la fiecare apel — fara variabile globale
 # =========================================================
 
 import io
@@ -18,52 +18,36 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 
-# ----------------------------------------------------------
-# Calea spre fontul local — relativ la rădăcina proiectului.
-# Fontul trebuie pus manual în assets/fonts/DejaVuSans.ttf
-# Descarcă de la:
-# https://github.com/dejavu-fonts/dejavu-fonts/releases
-# ----------------------------------------------------------
-_BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_FONT_LOCAL = os.path.join(_BASE_DIR, "assets", "fonts", "DejaVuSans.ttf")
-_FONT_NAME  = "DejaVuSans"
-_font_ready = False
+def _get_font() -> str:
+    """
+    Înregistrează DejaVuSans la fiecare apel.
+    Dacă fontul e deja înregistrat, ReportLab îl ignoră silențios.
+    Returnează numele fontului de folosit.
+    """
+    font_name = "DejaVuSans"
 
+    # Calea fontului din proiect (assets/fonts/DejaVuSans.ttf)
+    base_dir   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    font_local = os.path.join(base_dir, "assets", "fonts", "DejaVuSans.ttf")
 
-def _ensure_font():
-    """Înregistrează fontul DejaVuSans o singură dată."""
-    global _font_ready, _FONT_NAME
-    if _font_ready:
-        return _FONT_NAME
-
-    # 1. Font local din proiect (calea preferată)
-    if os.path.exists(_FONT_LOCAL):
-        try:
-            pdfmetrics.registerFont(TTFont(_FONT_NAME, _FONT_LOCAL))
-            _font_ready = True
-            return _FONT_NAME
-        except Exception:
-            pass
-
-    # 2. Fonturi instalate pe sistem (Linux)
+    # Căi alternative pe sistem Linux
     sistem_paths = [
+        font_local,
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
     ]
+
     for path in sistem_paths:
         if os.path.exists(path):
             try:
-                pdfmetrics.registerFont(TTFont(_FONT_NAME, path))
-                _font_ready = True
-                return _FONT_NAME
+                pdfmetrics.registerFont(TTFont(font_name, path))
+                return font_name
             except Exception:
                 continue
 
-    # 3. Fallback Helvetica (fara diacritice — doar pentru debugging)
-    _FONT_NAME = "Helvetica"
-    _font_ready = True
-    return _FONT_NAME
+    # Fallback — fara diacritice
+    return "Helvetica"
 
 
 def generate_pdf_vertical(
@@ -77,7 +61,7 @@ def generate_pdf_vertical(
     Generează PDF cu structură verticală (câmp | valoare).
     """
     try:
-        font_name = _ensure_font()
+        font_name = _get_font()
 
         pdf_buf = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -148,19 +132,16 @@ def generate_pdf_vertical(
             if table_data:
                 t = Table(table_data, colWidths=[4.5 * cm, 11 * cm])
                 t.setStyle(
-                    TableStyle(
-                        [
-                            ("FONTNAME",    (0, 0), (-1, -1), font_name),
-                            ("FONTSIZE",    (0, 0), (-1, -1), 8),
-                            ("GRID",        (0, 0), (-1, -1), 0.3, colors.grey),
-                            ("VALIGN",      (0, 0), (-1, -1), "TOP"),
-                            ("BACKGROUND",  (0, 0), (0, -1), HexColor("#EEF2F7")),
-                            ("TEXTCOLOR",   (0, 0), (0, -1), HexColor("#0B2A52")),
-                            ("FONTNAME",    (0, 0), (0, -1), font_name),
-                            ("ROWBACKGROUNDS", (0, 0), (-1, -1),
-                             [HexColor("#FFFFFF"), HexColor("#F7F9FC")]),
-                        ]
-                    )
+                    TableStyle([
+                        ("FONTNAME",       (0, 0), (-1, -1), font_name),
+                        ("FONTSIZE",       (0, 0), (-1, -1), 8),
+                        ("GRID",           (0, 0), (-1, -1), 0.3, colors.grey),
+                        ("VALIGN",         (0, 0), (-1, -1), "TOP"),
+                        ("BACKGROUND",     (0, 0), (0, -1),  HexColor("#EEF2F7")),
+                        ("TEXTCOLOR",      (0, 0), (0, -1),  HexColor("#0B2A52")),
+                        ("ROWBACKGROUNDS", (0, 0), (-1, -1),
+                         [HexColor("#FFFFFF"), HexColor("#F7F9FC")]),
+                    ])
                 )
                 story.append(t)
                 story.append(Spacer(1, 0.3 * cm))
