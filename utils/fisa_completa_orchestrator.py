@@ -1,12 +1,9 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# vers.modul.1.4
-# 2026.04.28
-# Orchestrator cu autentificare export reala
+# vers.modul.1.5 - DEBUG pdf
 # =========================================================
 
 import streamlit as st
-import pandas as pd
 import html as _html
 import re as _re
 import os
@@ -21,9 +18,6 @@ from utils.export_print import generate_print_html_vertical
 from utils.supabase_helpers import safe_select_eq
 
 
-# =========================================================
-# Autentificare export (verificare email @upt.ro)
-# =========================================================
 def _render_export_auth_tab1(supabase) -> bool:
     auth_key = "export_auth_tab1"
     pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
@@ -75,9 +69,6 @@ def _render_export_auth_tab1(supabase) -> bool:
     return False
 
 
-# =========================================================
-# Funcția principală de randare a fișei complete
-# =========================================================
 def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta: str):
     _p1, _p2, _p3, _p4, _lbl = st.columns([0.7, 0.7, 0.7, 0.7, 5.2])
     with _p1:
@@ -157,10 +148,13 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
     csv_bytes   = build_csv_bytes(export_data_horizontal)
     excel_bytes = build_excel_bytes(export_data_horizontal)
 
-    pdf_bytes = generate_pdf_vertical(
+    # generate_pdf_vertical returnează acum (bytes, debug_msg)
+    pdf_result  = generate_pdf_vertical(
         supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
         lambda s, c, t: build_vertical_export_data(s, c, t)
     )
+    pdf_bytes, pdf_debug = pdf_result if isinstance(pdf_result, tuple) else (pdf_result, "")
+    st.caption(f"🔍 DEBUG PDF: {pdf_debug}")
 
     print_html = generate_print_html_vertical(
         supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
@@ -180,7 +174,7 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
             st.download_button("⬇️ PDF", data=pdf_bytes, file_name=f"fisa_{cod}.pdf",
                                mime="application/pdf", key=f"fisa_pdf_{cod}")
         else:
-            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați reportlab")
+            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil")
     with col4:
         if st.button("🖨️ Print", key=f"fisa_print_{cod}"):
             components.html(print_html, height=700, scrolling=True)
