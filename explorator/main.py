@@ -1,8 +1,7 @@
 # =========================================================
-# explorator/main.py
-# vers.modul.1.2
-# 2026.04.28
-# Fix culoare text butoane export
+# STATUS: FUNCTIONAL
+# DATA CONFIRMARE: 2026.04.28
+# VERSIUNE: 3.2
 # =========================================================
 
 import streamlit as st
