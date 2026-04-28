@@ -1,8 +1,7 @@
 # =========================================================
-# utils/export_print.py
-# vers.modul.2.0
-# 2026.04.28
-# Titlu + font inchis pe fond alb
+# STATUS: FUNCTIONAL
+# DATA CONFIRMARE: 2026.04.28
+# VERSIUNE: 2.0
 # =========================================================
 
 import html as _html
