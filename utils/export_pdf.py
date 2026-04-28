@@ -1,8 +1,7 @@
 # =========================================================
-# utils/export_pdf.py
-# vers.modul.5.0
-# 2026.04.28
-# Font DejaVuSans din matplotlib — garantat pe Streamlit Cloud
+# STATUS: FUNCTIONAL
+# DATA CONFIRMARE: 2026.04.28
+# VERSIUNE: 5.1
 # =========================================================
 
 import os
