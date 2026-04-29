@@ -8,6 +8,7 @@
 import streamlit as st
 import html as _html
 import re as _re
+import base64
 import streamlit.components.v1 as components
 
 from utils.display_config import TABLE_LABELS
