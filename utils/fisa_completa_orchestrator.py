@@ -176,7 +176,4 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
             st.button("⬇️ PDF", disabled=True, help="PDF indisponibil")
     with col4:
         if st.button("🖨️ Print", key=f"fisa_print_{cod}"):
-             import base64
-    b64 = base64.b64encode(print_html.encode()).decode()
-    href = f'<a href="data:text/html;base64,{b64}" target="_blank">Deschide print într-un tab nou</a>'
-    st.markdown(href, unsafe_allow_html=True)
+            components.html(print_html, height=700, scrolling=True)
