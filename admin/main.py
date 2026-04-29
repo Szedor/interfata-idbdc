@@ -1,8 +1,8 @@
 # =========================================================
-# admin/main.py
-# versiune modul: 2.5
-# data versiunii: 26/04/2026
-# descriere: Adaugat use_container_width la butonul Iesire/Resetare
+# IDBDC/admin/main.py
+# VERSIUNE: 2.5
+# STATUS: Adaugat use_container_width la butonul Iesire/Resetare
+# DATA: 2026.04.26 
 # =========================================================
 
 import streamlit as st
