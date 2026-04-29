@@ -2,7 +2,7 @@
 # IDBDC/utils/fisa_completa_orchestrator.py
 # VERSIUNE: 1.7
 # STATUS: Print in fereastra noua la dimensiune completa
-# DATA: 2026.04.29 
+# DATA: 2026.04.29
 # =========================================================
 
 import streamlit as st
@@ -103,7 +103,6 @@ def _render_print_button(print_html: str, cod: str):
         font-weight: 900;
         font-size: 14px;
         cursor: pointer;
-        width: 100%;
     ">🖨️ Print</button>
     """
     components.html(js_snippet, height=50)
