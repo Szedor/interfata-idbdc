@@ -1,8 +1,8 @@
 # =========================================================
-# admin/motor.py
-# vers.modul.3.0
-# 2026.04.29
-# Tab activ retinut in session_state — nu mai revine la Date de baza
+# IDBDC/admin/motor.py
+# VERSIUNE: 3.0
+# STATUS: Tab activ retinut in session_state — nu mai revine la Date de baza
+# DATA: 2026.04.29 
 # =========================================================
 
 import streamlit as st
