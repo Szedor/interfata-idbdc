@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/utils/fisa_completa_orchestrator.py
-# VERSIUNE: 1.7
+# VERSIUNE: 1.8
 # STATUS: Print in fereastra noua la dimensiune completa
-# DATA: 2026.04.29
+# DATA: 2026.04.30
 # =========================================================
 
 import streamlit as st
@@ -94,16 +94,30 @@ def _render_print_button(print_html: str, cod: str):
         }}
     }}
     </script>
-    <button onclick="deschidePrint()" style="
-        padding: 8px 18px;
+    <style>
+    .btn-print {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 0.25rem 0.75rem;
         background: rgba(255,255,255,0.96);
         color: #0b1f3a;
         border: 1px solid rgba(255,255,255,0.55);
-        border-radius: 10px;
-        font-weight: 900;
-        font-size: 14px;
+        border-radius: 0.5rem;
+        font-family: "Source Sans Pro", sans-serif;
+        font-size: 1rem;
+        font-weight: 400;
         cursor: pointer;
-    ">🖨️ Print</button>
+        box-sizing: border-box;
+        height: 2.4rem;
+    }}
+    .btn-print:hover {{
+        background: #ffffff;
+        color: #0b1f3a;
+    }}
+    </style>
+    <button class="btn-print" onclick="deschidePrint()">🖨️ Print</button>
     """
     components.html(js_snippet, height=50)
 
