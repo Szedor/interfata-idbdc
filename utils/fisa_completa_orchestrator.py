@@ -176,4 +176,4 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
             st.button("⬇️ PDF", disabled=True, help="PDF indisponibil")
     with col4:
         if st.button("🖨️ Print", key=f"fisa_print_{cod}"):
-            components.html(print_html, height=700, scrolling=True)
+            components.html(print_html, height=700, width=800, scrolling=True)
