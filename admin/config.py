@@ -1,7 +1,8 @@
 # =========================================================
 # IDBDC/admin/config.py
 # STATUS: Adăugat SPECIALE în Contracte
-# Versiune: 5.3 - Adăugat SPECIALE în Contracte
+# DATA: 2026.04.29
+# VERSIUNE: 5.3
 # =========================================================
 
 import streamlit as st
