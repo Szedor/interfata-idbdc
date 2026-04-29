@@ -1,5 +1,6 @@
 # =========================================================
 # IDBDC/admin/config.py
+# STATUS: Adăugat SPECIALE în Contracte
 # Versiune: 5.3 - Adăugat SPECIALE în Contracte
 # =========================================================
 
