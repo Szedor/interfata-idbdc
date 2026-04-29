@@ -1,3 +1,10 @@
+# =========================================================
+# IDBDC/admin/ui.py
+# VERSIUNE: 5.1
+# STATUS: in adaptare
+# DATA: 2026.04.30
+# =========================================================
+
 import streamlit as st
 
 class Config:
