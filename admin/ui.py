@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/admin/ui.py
-# STATUS: FUNCTIONAL
-# DATA: 2026.04.28
 # VERSIUNE: 1.3
+# STATUS: FUNCTIONAL
+# DATA: 2026.04.28 
 # =========================================================
 
 import streamlit as st
