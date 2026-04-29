@@ -1,8 +1,8 @@
 # =========================================================
-# utils/fisa_completa_orchestrator.py
-# vers.modul.1.7
-# 2026.04.29
-# Print in fereastra noua la dimensiune completa
+# IDBDC/utils/fisa_completa_orchestrator.py
+# VERSIUNE: 1.7
+# STATUS: Print in fereastra noua la dimensiune completa
+# DATA: 2026.04.29 
 # =========================================================
 
 import streamlit as st
