@@ -1,14 +1,13 @@
 # =========================================================
 # IDBDC/utils/fisa_completa_orchestrator.py
-# VERSIUNE: 1.8
-# STATUS: Print in fereastra noua la dimensiune completa
-# DATA: 2026.04.30
+# VERSIUNE: 1.6
+# STATUS: Orchestrator cu autentificare export reala
+# DATA: 2026.04.28
 # =========================================================
 
 import streamlit as st
 import html as _html
 import re as _re
-import base64
 import streamlit.components.v1 as components
 
 from utils.display_config import TABLE_LABELS
@@ -69,57 +68,6 @@ def _render_export_auth_tab1(supabase) -> bool:
             except Exception as e:
                 st.error(f"Eroare verificare: {e}")
     return False
-
-
-def _render_print_button(print_html: str, cod: str):
-    """
-    Redă butonul Print care deschide HTML-ul într-o fereastră nouă
-    la dimensiune completă, fără limitările unui iframe.
-    Folosește un data URI base64 pentru a transmite HTML-ul complet.
-    """
-    # Encodăm HTML-ul în base64 pentru a-l pasa în JavaScript
-    html_b64 = base64.b64encode(print_html.encode("utf-8")).decode("utf-8")
-
-    # JavaScript care decodează base64, creează un Blob și deschide fereastra
-    js_snippet = f"""
-    <script>
-    function deschidePrint() {{
-        var htmlB64 = "{html_b64}";
-        var htmlStr = decodeURIComponent(escape(atob(htmlB64)));
-        var blob = new Blob([htmlStr], {{type: "text/html;charset=utf-8"}});
-        var url  = URL.createObjectURL(blob);
-        var win  = window.open(url, "_blank", "width=1100,height=800,scrollbars=yes");
-        if (!win) {{
-            alert("Browserul a blocat fereastra pop-up. Permite pop-up-uri pentru acest site.");
-        }}
-    }}
-    </script>
-    <style>
-    .btn-print {{
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        padding: 0.25rem 0.75rem;
-        background: rgba(255,255,255,0.96);
-        color: #0b1f3a;
-        border: 1px solid rgba(255,255,255,0.55);
-        border-radius: 0.5rem;
-        font-family: "Source Sans Pro", sans-serif;
-        font-size: 1rem;
-        font-weight: 400;
-        cursor: pointer;
-        box-sizing: border-box;
-        height: 2.4rem;
-    }}
-    .btn-print:hover {{
-        background: #ffffff;
-        color: #0b1f3a;
-    }}
-    </style>
-    <button class="btn-print" onclick="deschidePrint()">🖨️ Print</button>
-    """
-    components.html(js_snippet, height=50)
 
 
 def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta: str):
@@ -227,4 +175,5 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
         else:
             st.button("⬇️ PDF", disabled=True, help="PDF indisponibil")
     with col4:
-        _render_print_button(print_html, cod)
+        if st.button("🖨️ Print", key=f"fisa_print_{cod}"):
+            components.html(print_html, height=700, scrolling=True)
