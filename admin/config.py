@@ -1,6 +1,6 @@
 # =========================================================
-# IDBDC - MODUL ADMIN - CONFIGURARE STRUCTURĂ (admin/config.py)
-# Versiune: 5.2 - Adăugat TERTI
+# IDBDC/admin/config.py
+# Versiune: 5.3 - Adăugat SPECIALE în Contracte
 # =========================================================
 
 import streamlit as st
@@ -8,8 +8,9 @@ import streamlit as st
 # --- MAPARE TABELE BAZĂ ---
 BASE_TABLE_MAP = {
     "Contracte": {
-        "TERTI": "base_contracte_terti",
-        "CEP":   "base_contracte_cep",
+        "CEP":      "base_contracte_cep",
+        "TERTI":    "base_contracte_terti",
+        "SPECIALE": "base_contracte_speciale",
     },
     "Proiecte": {
         "FDI":            "base_proiecte_fdi",
@@ -37,8 +38,9 @@ COMPLEMENTARY_TABLES = [
 
 # --- TAB-URI PER CATEGORIE/TIP ---
 TABS_MAP = {
-    ("Contracte", "CEP"):   ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
-    ("Contracte", "TERTI"): ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
+    ("Contracte", "CEP"):      ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
+    ("Contracte", "TERTI"):    ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
+    ("Contracte", "SPECIALE"): ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
 }
 
 def get_tabs_for_category(categorie, tip=None):
