@@ -1,9 +1,9 @@
 # =========================================================
-# utils/sectiuni/echipa.py
-# vers.modul.3.0
-# 2026.04.27
-# Arhitectura corecta: data_editor gestionat prin cheia
+# IDBDC/utils/sectiuni/echipa.py
+# VERSIUNE: 3.0
+# STATUS: Arhitectura corecta: data_editor gestionat prin cheia
 # proprie Streamlit, session_state doar pentru nr. randuri
+# DATA: 2026.04.28
 # =========================================================
 
 import streamlit as st
