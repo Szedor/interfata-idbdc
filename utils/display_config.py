@@ -1,6 +1,8 @@
 # =========================================================
-# utils/display_config.py
-# v.modul.1.0 - Configurații comune pentru afișare (constante)
+# IDBDC/utils/display_config.py
+# VERSIUNE: 1.0 
+# STATUS: Configurații comune pentru afișare (constante)
+# DATA: 2026.04.24
 # =========================================================
 
 COL_LABELS = {
