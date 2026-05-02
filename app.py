@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/utils/app.py
 # VERSIUNE: 2.0
-# STATUS: FUNCTIONAL
+# STATUS: Modificat pentru sidebar lateral in Calea 2 - Administrare
 # DATA: 2026.05.03
 # =========================================================
 
