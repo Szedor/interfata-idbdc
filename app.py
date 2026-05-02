@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/utils/app.py
-# VERSIUNE: 2.1
-# STATUS: CORECTAT - eliminat CSS header generic care ascundea sidebar-ul
+# VERSIUNE: 2.2
+# STATUS: FUNCTIONAL
 # DATA: 2026.05.03
 # =========================================================
 
@@ -13,8 +13,10 @@ st.set_page_config(page_title="IDBDC UPT - Sistem Integrat", layout="wide", init
 st.markdown(
     """
     <style>
+        [data-testid="stSidebar"] { display: block !important; visibility: visible !important; opacity: 1 !important; width: auto !important; transform: none !important; }
         #MainMenu { visibility: hidden !important; }
         footer { visibility: hidden !important; }
+        header { visibility: hidden !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="stStatusWidget"] { display: none !important; }
