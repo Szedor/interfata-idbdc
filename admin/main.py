@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/admin/main.py
-# VERSIUNE: 2.5
-# STATUS: Adaugat use_container_width la butonul Iesire/Resetare
-# DATA: 2026.04.26 
+# VERSIUNE: 2.6
+# STATUS: Bara laterala fortata deschisa permanent
+# DATA: 2026.05.02 
 # =========================================================
 
 import streamlit as st
@@ -34,7 +34,7 @@ def _check_gate_password(supabase: Client, gate: str, password: str) -> bool:
 
 
 def run():
-    st.set_page_config(page_title="IDBDC – Administrare", layout="wide")
+    st.set_page_config(page_title="IDBDC – Administrare", layout="wide", initial_sidebar_state="expanded")  # CORECȚIE: bara laterală rămâne întotdeauna deschisă
     _maintenance_gate_fn(st, pwd_key="_mw_pwd_c2", btn_key="_mw_btn_c2")
 
     supabase: Client = get_supabase()
