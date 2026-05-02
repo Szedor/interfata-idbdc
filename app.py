@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/utils/app.py
-# VERSIUNE: 2.0
-# STATUS: Modificat pentru sidebar lateral in Calea 2 - Administrare
+# VERSIUNE: 2.1
+# STATUS: CORECTAT - eliminat CSS header generic care ascundea sidebar-ul
 # DATA: 2026.05.03
 # =========================================================
 
@@ -15,7 +15,6 @@ st.markdown(
     <style>
         #MainMenu { visibility: hidden !important; }
         footer { visibility: hidden !important; }
-        header { visibility: hidden !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="stStatusWidget"] { display: none !important; }
