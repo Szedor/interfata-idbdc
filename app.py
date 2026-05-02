@@ -1,4 +1,9 @@
-import streamlit as st
+# =========================================================
+# IDBDC/utils/app.py
+# VERSIUNE: 1.0
+# STATUS: FUNCTIONAL
+# DATA: 2026.03.05
+# =========================================================import streamlit as st
 from config import Config
 
 st.set_page_config(page_title="IDBDC UPT - Sistem Integrat", layout="wide")
