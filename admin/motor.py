@@ -1,8 +1,22 @@
 # =========================================================
 # IDBDC/admin/motor.py
-# VERSIUNE: 4.0
-# STATUS: CORECTAT - salvare completă cross-tab + fetch optimizat
-# DATA: 2026.05.02
+# VERSIUNE: 5.0
+# STATUS: CORECTAT - sidebar lățime fixă constantă
+# DATA: 2026.05.03
+# =========================================================
+# CONȚINUT:
+#   Motorul principal al modulului Admin. Gestionează
+#   navigarea între categorii/tipuri de contracte, afișarea
+#   tab-urilor (Date de bază, Financiar, Echipă) și salvarea
+#   datelor în PostgreSQL prin Supabase.
+#
+# MODIFICĂRI VERSIUNEA 5.0:
+#   - Adăugat CSS pentru lățime fixă a sidebar-ului (320px),
+#     constantă indiferent de etapa de autentificare sau de
+#     conținutul afișat în sidebar. Anterior, sidebar-ul se
+#     lățea la ~40-45% din ecran după introducerea codului
+#     de identificare, din cauza elementelor cu
+#     use_container_width=True care forțau expansiunea.
 # =========================================================
 
 import streamlit as st
@@ -13,9 +27,26 @@ import admin.ui as ui
 from admin.fise import contracte_cep, contracte_terti, contracte_speciale
 
 
-# Stiluri pentru navigarea tip tab (radio orizontal)
+# =========================================================
+# CSS global pentru tab-uri și sidebar lățime fixă
+# ADĂUGAT v5.0: secțiunea [data-testid="stSidebar"] fixează
+# lățimea la 320px indiferent de conținut sau etapă.
+# Valoarea min-width și max-width identice forțează lățimea
+# strictă, iar overflow:hidden previne expansiunea accidentală.
+# =========================================================
 _TAB_CSS = """
 <style>
+[data-testid="stSidebar"] {
+    min-width: 320px !important;
+    max-width: 320px !important;
+    width: 320px !important;
+    overflow: hidden !important;
+}
+[data-testid="stSidebar"] > div:first-child {
+    min-width: 320px !important;
+    max-width: 320px !important;
+    width: 320px !important;
+}
 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
     padding: 0 !important;
 }
@@ -43,6 +74,11 @@ div.tab-nav [data-testid="stMarkdownContainer"] { display: none; }
 
 
 def porneste_motorul(supabase):
+    # ADĂUGAT v5.0: CSS-ul se injectează primul, înainte de orice
+    # element de interfață, pentru a garanta că lățimea sidebar-ului
+    # este fixată înainte ca Streamlit să randeze conținutul.
+    st.markdown(_TAB_CSS, unsafe_allow_html=True)
+
     ui.apply_admin_styles()
     ui.display_admin_message()
 
@@ -116,20 +152,6 @@ def porneste_motorul(supabase):
 
     is_new = not este_existent
 
-    # =========================================================
-    # CORECȚIE [5A]: Fetch optimizat — o singură interogare per tabel.
-    #
-    # PROBLEMA ORIGINALĂ: Linia pentru date_baza_ex apela _fetch()
-    # de DOUĂ ORI pentru același tabel și același cod:
-    #   _fetch(base_table, cod_introdus)[0]          <- apel 1
-    #   if not is_new and _fetch(base_table, cod_introdus)  <- apel 2
-    # Fiecare apel = un drum la baza de date PostgreSQL.
-    # Cu 3 secțiuni × 2 apeluri = până la 6 interogări în loc de 3.
-    # Aceasta contribuia la timpul mare de răspuns.
-    #
-    # SOLUȚIA: Apelăm _fetch() o singură dată, salvăm rezultatul
-    # într-o variabilă intermediară, și folosim variabila de 2 ori.
-    # =========================================================
     def _fetch(table, cod):
         try:
             res = supabase.table(table).select("*").eq("cod_identificare", cod).execute()
@@ -137,9 +159,8 @@ def porneste_motorul(supabase):
         except Exception:
             return []
 
-    # CORECȚIE [5B]: Un singur apel per tabel, rezultat salvat în variabilă.
     if not is_new:
-        _baza_list  = _fetch(base_table, cod_introdus)
+        _baza_list     = _fetch(base_table, cod_introdus)
         date_baza_ex   = _baza_list[0] if _baza_list else {}
         date_fin_ex    = _fetch("com_date_financiare", cod_introdus)
         date_echipa_ex = _fetch("com_echipe_proiect",  cod_introdus)
@@ -150,9 +171,6 @@ def porneste_motorul(supabase):
 
     rezultate = {}
 
-    # =========================================================
-    # Modulul de fișă
-    # =========================================================
     if cat_sel == "Contracte" and tip_sel == "CEP":
         modul = contracte_cep
     elif cat_sel == "Contracte" and tip_sel == "TERTI":
@@ -163,16 +181,12 @@ def porneste_motorul(supabase):
         st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
         return
 
-    # =========================================================
-    # Navigare tab-uri cu reținere în session_state
-    # =========================================================
     TAB_LABELS = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"]
     key_tab = f"tab_activ_{cod_introdus}"
 
     if key_tab not in st.session_state:
         st.session_state[key_tab] = TAB_LABELS[0]
 
-    st.markdown(_TAB_CSS, unsafe_allow_html=True)
     st.markdown('<div class="tab-nav">', unsafe_allow_html=True)
     tab_activ = st.radio(
         "Secțiune",
@@ -191,43 +205,13 @@ def porneste_motorul(supabase):
         unsafe_allow_html=True,
     )
 
-    # =========================================================
-    # CORECȚIE [6A]: Chei session_state pentru datele din tab-uri
-    # care nu sunt vizibile în momentul salvării.
-    #
-    # PROBLEMA PRINCIPALĂ (cauza Calea1 afișează date lipsă):
-    # Aplicația folosește 3 tab-uri: Date de bază, Financiar, Echipă.
-    # La un moment dat, utilizatorul poate vedea DOAR UN TAB.
-    # Când apasă "Salvează toate datele", codul original salva
-    # NUMAI secțiunea vizibilă în acel moment (cea din `rezultate`).
-    # Celelalte două secțiuni NU se salvau — sau mai rău, dacă
-    # nu fuseseră niciodată vizitate în sesiunea curentă,
-    # datele lor din baza de date rămâneau din sesiuni anterioare.
-    # Fișa completă din Calea1 citea direct din baza de date și
-    # găsea date incomplete sau lipsă.
-    #
-    # SOLUȚIA: Salvăm datele fiecărui tab în session_state pe
-    # chei dedicate (key_baza, key_fin, key_echipa) de fiecare
-    # dată când tab-ul respectiv este afișat și completat.
-    # La apăsarea "Salvează", colectăm datele din TOATE cheile
-    # disponibile în session_state, indiferent de tab-ul activ.
-    # Astfel, chiar dacă utilizatorul este pe tab-ul Echipă când
-    # apasă Salvează, și datele de bază și cele financiare
-    # (introduse anterior în sesiunea curentă) se salvează.
-    # =========================================================
-    key_baza_ss  = f"ss_baza_{cod_introdus}"
-    key_fin_ss   = f"ss_fin_{cod_introdus}"
-    # Nota: echipa folosește deja key_data_init din echipa.py
+    key_baza_ss = f"ss_baza_{cod_introdus}"
+    key_fin_ss  = f"ss_fin_{cod_introdus}"
 
-    # =========================================================
-    # Conținut tab activ + salvare în session_state
-    # =========================================================
     if tab_activ == "📋 Date de bază":
         rezultat_baza = modul.render_date_de_baza(
             supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex
         )
-        # CORECȚIE [6B]: Salvăm rezultatul în session_state imediat
-        # după ce utilizatorul îl completează/vizualizează.
         if rezultat_baza:
             st.session_state[key_baza_ss] = rezultat_baza
         rezultate["baza"] = rezultat_baza
@@ -236,7 +220,6 @@ def porneste_motorul(supabase):
         rezultat_fin = modul.render_date_financiare(
             supabase, cod_introdus, is_new, date_fin_ex
         )
-        # CORECȚIE [6C]: Idem pentru date financiare.
         if rezultat_fin is not None:
             st.session_state[key_fin_ss] = rezultat_fin
         rezultate["financiar"] = rezultat_fin
@@ -246,17 +229,10 @@ def porneste_motorul(supabase):
             supabase, cod_introdus, is_new, date_echipa_ex
         )
 
-    # =========================================================
-    # Salvare — colectăm datele din TOATE secțiunile,
-    # inclusiv cele din tab-urile care nu sunt active acum
-    # =========================================================
     if btn_save:
         with st.spinner("Se salvează datele..."):
             erori = []
 
-            # CORECȚIE [6D]: Date de bază — luăm din tab activ dacă
-            # disponibil, altfel din session_state (vizitat anterior
-            # în aceeași sesiune), altfel lăsăm ce e în DB.
             baza_de_salvat = rezultate.get("baza") or st.session_state.get(key_baza_ss)
             if baza_de_salvat:
                 row = {**baza_de_salvat, "cod_identificare": cod_introdus}
@@ -264,9 +240,8 @@ def porneste_motorul(supabase):
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
             elif not is_new:
-                pass  # Lăsăm ce există deja în DB
+                pass
 
-            # CORECȚIE [6E]: Date financiare — același principiu.
             fin_de_salvat = rezultate.get("financiar")
             if fin_de_salvat is None:
                 fin_de_salvat = st.session_state.get(key_fin_ss)
@@ -284,11 +259,6 @@ def porneste_motorul(supabase):
                     if not ok:
                         erori.append(f"Date financiare: {msg}")
 
-            # CORECȚIE [6F]: Echipă — datele echipei sunt deja
-            # gestionate prin session_state în echipa.py (key_data_init).
-            # Dacă tab-ul Echipă a fost vizitat, rezultate["echipa"]
-            # conține datele curente. Dacă nu a fost vizitat,
-            # nu ștergem echipa existentă din DB — o lăsăm intactă.
             if "echipa" in rezultate:
                 try:
                     supabase.table("com_echipe_proiect").delete().eq(
@@ -308,22 +278,12 @@ def porneste_motorul(supabase):
             else:
                 st.session_state["admin_msg"] = ("success", "Toate datele au fost salvate cu succes.")
 
-            # CORECȚIE [7A]: Nu mai ștergem key_data_init după salvare.
-            # PROBLEMA ORIGINALĂ: Un st.rerun() după salvare putea în
-            # anumite condiții redesena editorul cu date vechi dacă
-            # key_editor nu era resetat. Acum păstrăm key_data_init
-            # intact (datele rămân pe ecran) și resetăm doar key_editor
-            # pentru a forța Streamlit să redeseneze editorul cu
-            # valorile corecte din session_state.
             key_editor_echipa = f"echipa_editor_{cod_introdus}"
             if key_editor_echipa in st.session_state:
                 del st.session_state[key_editor_echipa]
 
             st.rerun()
 
-    # =========================================================
-    # Ștergere
-    # =========================================================
     if btn_delete:
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
         if st.checkbox("Confirm eliminarea din toate tabelelor"):
@@ -335,10 +295,6 @@ def porneste_motorul(supabase):
             ]
             ok, msg = ops.direct_delete_all_tables(supabase, cod_introdus, tabele_curatare)
             if ok:
-                # CORECȚIE [7B]: La ștergere, curățăm și cheile
-                # din session_state specifice acestui cod,
-                # pentru a preveni afișarea de date reziduale
-                # dacă același cod este refolosit ulterior.
                 for k in [key_baza_ss, key_fin_ss,
                            f"echipa_data_init_{cod_introdus}",
                            f"echipa_editor_{cod_introdus}",
