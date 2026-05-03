@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/explorator/main.py
-# VERSIUNE: 3.3
-# STATUS: CORECTAT - cursorul vizibil în câmpul Cod identificare
+# VERSIUNE: 3.4
+# STATUS: CORECTAT - caret-color alb pentru cursorul vizibil în input
 # DATA: 2026.05.03
 # =========================================================
 # CONȚINUT:
@@ -12,6 +12,13 @@
 #   contract/proiect pe baza codului de identificare introdus.
 #
 # MODIFICĂRI VERSIUNEA 3.3:
+#   (vezi istoric git)
+# MODIFICĂRI VERSIUNEA 3.4:
+#   - Adăugat caret-color: #ffffff la regulile CSS pentru câmpurile
+#     de input (.stTextInput input). Cursorul text era invizibil în
+#     câmpul Cod identificare din Calea1 deoarece culoarea implicită
+#     a cursorului se confunda cu fundalul închis (#1a3a5c).
+#     Acum cursorul apare alb și vizibil pe orice câmp de text.
 #   - Corectat CSS în funcția hide_streamlit_chrome():
 #     regula "header { visibility: hidden; height: 0px; }"
 #     a fost înlocuită cu "[data-testid='stHeader'] { ... }"
@@ -73,6 +80,7 @@ def apply_style_full_blue():
           .stMultiSelect > div > div, .stMultiSelect [data-baseweb="select"] > div {{
             background: #1a3a5c !important; color: #ffffff !important;
             border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.30) !important;
+            caret-color: #ffffff !important;
           }}
           .stButton > button,
           .stDownloadButton > button {{
