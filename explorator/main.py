@@ -1,7 +1,25 @@
 # =========================================================
-# STATUS: FUNCTIONAL
-# DATA CONFIRMARE: 2026.04.28
-# VERSIUNE: 3.2
+# IDBDC/explorator/main.py
+# VERSIUNE: 3.3
+# STATUS: CORECTAT - cursorul vizibil în câmpul Cod identificare
+# DATA: 2026.05.03
+# =========================================================
+# CONȚINUT:
+#   Modulul principal al Căii1 (Explorator). Gestionează
+#   autentificarea cu parolă (gate_control), afișarea header-ului,
+#   și cele trei tab-uri: Fișă completă după cod, Explorare
+#   universală și Raportări. Afișează fișa completă a unui
+#   contract/proiect pe baza codului de identificare introdus.
+#
+# MODIFICĂRI VERSIUNEA 3.3:
+#   - Corectat CSS în funcția hide_streamlit_chrome():
+#     regula "header { visibility: hidden; height: 0px; }"
+#     a fost înlocuită cu "[data-testid='stHeader'] { ... }"
+#     (țintire specifică în loc de tag generic).
+#     Regula generică "header" ascundea și cursorul de mouse
+#     în câmpurile de input (inclusiv câmpul Cod identificare)
+#     deoarece Streamlit randează unele componente în elemente
+#     de tip header. Acum cursorul este vizibil și funcțional.
 # =========================================================
 
 import streamlit as st
@@ -27,7 +45,7 @@ def hide_streamlit_chrome():
     st.markdown(
         """
         <style>
-          header { visibility: hidden; height: 0px; }
+          [data-testid="stHeader"] { visibility: hidden; height: 0px; }
           #MainMenu { visibility: hidden; }
           footer { visibility: hidden; height: 0px; }
           [data-testid="stToolbar"] { display: none !important; }
@@ -56,7 +74,6 @@ def apply_style_full_blue():
             background: #1a3a5c !important; color: #ffffff !important;
             border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.30) !important;
           }}
-          /* Butoane normale si butoane download — text inchis pe fond deschis */
           .stButton > button,
           .stDownloadButton > button {{
             border-radius: 10px !important;
