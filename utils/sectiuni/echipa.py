@@ -1,8 +1,28 @@
 # =========================================================
 # IDBDC/utils/sectiuni/echipa.py
-# VERSIUNE: 6.0
-# STATUS: CORECTAT - sincronizare completă session_state
-# DATA: 2026.05.02
+# VERSIUNE: 7.0
+# STATUS: CORECTAT - ROL sincronizat corect la prima tastare
+# DATA: 2026.05.03
+# =========================================================
+# CONȚINUT:
+#   Secțiunea ECHIPĂ comună pentru toate tipurile de contracte
+#   și proiecte. Randează tabelul editabil cu membrii echipei,
+#   completează automat departament/email/telefon la selectarea
+#   numelui, gestionează adăugarea de membri noi și returnează
+#   datele pentru salvare în PostgreSQL (tabela com_echipe_proiect).
+#
+# MODIFICĂRI VERSIUNEA 7.0:
+#   - Corectat comportamentul câmpului ROLUL ÎN CONTRACT care
+#     se pierdea la prima tastare când se trecea la alt câmp.
+#     CAUZA: la prima tastare într-un câmp ROL, Streamlit nu
+#     declanșează un rerun imediat — valoarea din df_edit era
+#     corectă pe ecran dar nu ajungea în session_state înainte
+#     ca utilizatorul să treacă la câmpul următor.
+#     SOLUȚIA: citim valorile ROL direct din
+#     st.session_state[key_editor] (starea internă a editorului
+#     Streamlit) când este disponibil, ca sursă prioritară față
+#     de df_edit. Aceasta garantează că orice valoare tastată,
+#     chiar și la prima interacțiune, este capturată corect.
 # =========================================================
 
 import streamlit as st
@@ -12,17 +32,8 @@ import pandas as pd
 def render_echipa(supabase, cod_introdus, is_new, date_existente):
 
     # ----------------------------------------------------------
-    # 1. Citire date de referință
-    # CORECȚIE [1A]: Interogările către baza de date sunt
-    # acum protejate cu @st.cache_data, exact ca în date_baza.py.
-    # Efectul: datele despre persoane și departamente se citesc
-    # O SINGURĂ DATĂ și se păstrează în memorie 10 minute.
-    # Anterior, la FIECARE reîncărcare a paginii (inclusiv la
-    # fiecare literă tastată), aplicația mergea la baza de date
-    # de 2 ori. Acesta era principalul vinovat pentru "licarire"
-    # și pentru timpul mare de răspuns.
+    # 1. Citire date de referință (cu cache 10 minute)
     # ----------------------------------------------------------
-
     @st.cache_data(show_spinner=False, ttl=600)
     def _fetch_persoane(_supabase):
         try:
@@ -30,7 +41,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
                 "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
             ).order("nume_prenume").execute()
             return res.data or []
-        except Exception as e:
+        except Exception:
             return []
 
     @st.cache_data(show_spinner=False, ttl=600)
@@ -43,7 +54,7 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
                 r["acronim_departament"]: r["denumire_departament"]
                 for r in (res2.data or []) if r.get("acronim_departament")
             }
-        except Exception as e:
+        except Exception:
             return {}
 
     persoane_data = _fetch_persoane(supabase)
@@ -145,28 +156,28 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     )
 
     # ----------------------------------------------------------
-    # 5. Detectare schimbări nume + completare automată
+    # 5. Detectare schimbări + sincronizare completă session_state
     #
-    # CORECȚIE [2A]: Sincronizare COMPLETĂ a tuturor rândurilor
-    # înainte de a decide dacă este necesar un rerun.
+    # CORECȚIE [v7.0]: Citim valorile ROL direct din starea
+    # internă a editorului (st.session_state[key_editor])
+    # când este disponibilă, ca sursă prioritară.
     #
-    # PROBLEMA ORIGINALĂ: Bucla verifica rând cu rând dacă s-a
-    # schimbat numele. Când găsea o schimbare, marca needs_rerun=True
-    # și continua bucla — dar rândurile URMĂTOARE (care poate aveau
-    # deja ROLUL completat de utilizator) erau salvate corect doar
-    # dacă utilizatorul nu acționa prea repede. Dacă utilizatorul
-    # trecea rapid la alt câmp, Streamlit reîncărca pagina cu starea
-    # veche a rândurilor neprocessate încă, ștergând ce se scrisese.
-    #
-    # SOLUȚIA: Salvăm ÎNTOTDEAUNA toate rândurile (inclusiv ROLUL
-    # și PERSOANA DE CONTACT) pentru TOATE rândurile din editor,
-    # indiferent dacă s-a schimbat sau nu numele. Abia DUPĂ ce
-    # toate datele sunt în siguranță în session_state, facem rerun
-    # dacă este nevoie. Astfel, chiar dacă utilizatorul acționează
-    # rapid, datele sale sunt deja salvate înainte de reîncărcare.
+    # DE CE: Streamlit's data_editor stochează starea editată
+    # în st.session_state[key_editor] sub cheia "edited_rows"
+    # imediat la orice modificare, ÎNAINTE de rerun. Astfel,
+    # chiar dacă utilizatorul tastează ROL și trece rapid la
+    # alt câmp (fără rerun intermediar), valoarea este deja
+    # în session_state[key_editor]["edited_rows"] și o putem
+    # citi de acolo. df_edit reflectă starea DUPĂ rerun —
+    # dacă reruns-ul nu s-a produs încă, df_edit poate conține
+    # valoarea veche (goală) pentru ROL.
     # ----------------------------------------------------------
     rows_curente = st.session_state[key_data_init]
     needs_rerun = False
+
+    # Extragem edited_rows din starea internă a editorului
+    editor_state = st.session_state.get(key_editor, {})
+    edited_rows = editor_state.get("edited_rows", {}) if isinstance(editor_state, dict) else {}
 
     for i, row in df_edit.iterrows():
         if i >= len(rows_curente):
@@ -175,17 +186,25 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         nume_nou   = row.get("NUME ȘI PRENUME", "") or ""
         nume_vechi = rows_curente[i].get("NUME ȘI PRENUME", "") or ""
 
-        # CORECȚIE [2B]: Salvăm ROLUL și PERSOANA DE CONTACT
-        # pentru ORICE rând, indiferent dacă s-a schimbat numele.
-        # Anterior, în ramura "if nume_nou != nume_vechi", se salva
-        # rolul corect, dar în anumite condiții de timing rapid,
-        # rândurile din afara ramurii if puteau fi suprascrise cu
-        # valorile vechi din session_state în loc de cele din editor.
-        rows_curente[i]["ROLUL ÎN CONTRACT"]   = row.get("ROLUL ÎN CONTRACT", "") or ""
-        rows_curente[i]["PERSOANĂ DE CONTACT"] = bool(row.get("PERSOANĂ DE CONTACT", False))
+        # CORECȚIE [v7.0]: Pentru ROL, verificăm mai întâi în
+        # edited_rows (starea internă a editorului) — aceasta
+        # conține valoarea tastată chiar dacă reruns-ul nu s-a
+        # produs încă. Fallback pe df_edit dacă nu există în
+        # edited_rows.
+        rol_din_editor = (
+            edited_rows.get(i, {}).get("ROLUL ÎN CONTRACT")
+            if i in edited_rows else None
+        )
+        rol_final = rol_din_editor if rol_din_editor is not None \
+            else (row.get("ROLUL ÎN CONTRACT", "") or "")
+
+        rows_curente[i]["ROLUL ÎN CONTRACT"]   = str(rol_final).strip()
+        rows_curente[i]["PERSOANĂ DE CONTACT"] = bool(
+            edited_rows.get(i, {}).get("PERSOANĂ DE CONTACT",
+                row.get("PERSOANĂ DE CONTACT", False))
+        )
 
         if nume_nou != nume_vechi:
-            # Completăm automat departament/email/telefon din info_map
             info = info_map.get(nume_nou, {"dep": "", "email": "", "mob": "", "fix": ""})
             rows_curente[i]["NUME ȘI PRENUME"] = nume_nou
             rows_curente[i]["DEPARTAMENT"]     = info["dep"]
@@ -194,10 +213,6 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
             rows_curente[i]["TELEFON FIX"]     = info["fix"]
             needs_rerun = True
 
-    # CORECȚIE [2C]: Salvăm session_state ÎNAINTE de orice rerun.
-    # Anterior această linie exista, dar ordinea operațiilor putea
-    # cauza ca într-un rerun rapid să se folosească starea veche.
-    # Acum toate modificările sunt consolidate mai sus înainte de save.
     st.session_state[key_data_init] = rows_curente
 
     if needs_rerun:
@@ -212,8 +227,14 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         rows_sync = st.session_state[key_data_init]
         for i, row in df_edit.iterrows():
             if i < len(rows_sync):
+                rol_din_editor = (
+                    edited_rows.get(i, {}).get("ROLUL ÎN CONTRACT")
+                    if i in edited_rows else None
+                )
                 rows_sync[i]["NUME ȘI PRENUME"]     = row.get("NUME ȘI PRENUME", "") or ""
-                rows_sync[i]["ROLUL ÎN CONTRACT"]   = row.get("ROLUL ÎN CONTRACT", "") or ""
+                rows_sync[i]["ROLUL ÎN CONTRACT"]   = str(rol_din_editor).strip() \
+                    if rol_din_editor is not None \
+                    else (row.get("ROLUL ÎN CONTRACT", "") or "")
                 rows_sync[i]["PERSOANĂ DE CONTACT"] = bool(row.get("PERSOANĂ DE CONTACT", False))
                 n = rows_sync[i]["NUME ȘI PRENUME"]
                 if n and n in info_map:
@@ -240,37 +261,24 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
 
     # ----------------------------------------------------------
     # 7. Returnare date pentru salvare
-    #
-    # CORECȚIE [3A]: Datele returnate pentru salvare provin
-    # acum din df_edit (ce vede utilizatorul pe ecran în acel
-    # moment), NU din session_state[key_data_init].
-    #
-    # PROBLEMA ORIGINALĂ: Dacă utilizatorul scria ROLUL și apoi
-    # apăsa imediat "Salvează toate datele", session_state putea
-    # conține versiunea anterioară a rândului (fără ultimul ROL
-    # scris), deoarece sincronizarea din secțiunea 5 se bazează
-    # pe detectarea schimbărilor de NUME. Modificările doar în
-    # câmpul ROL, fără schimbare de NUME, puteau fi pierdute
-    # dacă salvarea era apăsată foarte rapid.
-    #
-    # SOLUȚIA: Citim datele direct din df_edit pentru câmpurile
-    # editabile (NUME, ROL, PERSOANA), și din session_state
-    # pentru câmpurile completate automat (DEPARTAMENT etc.).
-    # Astfel ce vede utilizatorul = ce se salvează în baza de date.
+    # CORECȚIE [v7.0]: ROL citit prioritar din edited_rows
+    # pentru a garanta că ultima valoare tastată este salvată.
     # ----------------------------------------------------------
     rezultat = []
-    rows_ref = st.session_state[key_data_init]
-
     for i, row in df_edit.iterrows():
         n = str(row.get("NUME ȘI PRENUME", "") or "").strip()
         if not n:
             continue
-        # CORECȚIE [3B]: ROL și PERSOANA vin din df_edit (ecran),
-        # nu din session_state, pentru a garanta că ultima valoare
-        # introdusă de utilizator este cea care se salvează.
-        rol = str(row.get("ROLUL ÎN CONTRACT", "") or "").strip()
-        contact = bool(row.get("PERSOANĂ DE CONTACT", False))
-
+        rol_din_editor = (
+            edited_rows.get(i, {}).get("ROLUL ÎN CONTRACT")
+            if i in edited_rows else None
+        )
+        rol = str(rol_din_editor).strip() if rol_din_editor is not None \
+            else str(row.get("ROLUL ÎN CONTRACT", "") or "").strip()
+        contact = bool(
+            edited_rows.get(i, {}).get("PERSOANĂ DE CONTACT",
+                row.get("PERSOANĂ DE CONTACT", False))
+        )
         rezultat.append({
             "cod_identificare": cod_introdus,
             "nume_prenume":     n,
