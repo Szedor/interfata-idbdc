@@ -1,8 +1,22 @@
 # =========================================================
 # IDBDC/utils/sectiuni/date_baza.py
-# VERSIUNE: 2.0
-# STATUS: CORECTAT - cache_data cu hash corect pentru supabase
-# DATA: 2026.05.02
+# VERSIUNE: 3.0
+# STATUS: CORECTAT - adăugată coloana OBSERVAȚII (doar Calea2)
+# DATA: 2026.05.03
+# =========================================================
+# CONȚINUT:
+#   Secțiunea DATE DE BAZĂ comună pentru toate tipurile de
+#   contracte (CEP, TERȚI, SPECIALE). Randează tabelul editable
+#   cu datele de bază ale contractului și returnează datele
+#   pentru salvare în PostgreSQL.
+#
+# MODIFICĂRI VERSIUNEA 3.0:
+#   - Adăugată coloana OBSERVAȚII în tabelul Date de bază,
+#     vizibilă și editabilă exclusiv în Calea2 (Admin).
+#     Coloana citește și salvează câmpul `observatii` din
+#     tabelele base_contracte_* din PostgreSQL.
+#     Coloana NU apare în Calea1 (Explorator) deoarece
+#     render_date_de_baza nu este apelată din acel modul.
 # =========================================================
 
 import streamlit as st
@@ -10,21 +24,6 @@ import pandas as pd
 from utils.date_helpers import to_date, calc_durata, add_months, sub_months
 from utils.supabase_helpers import safe_select_eq
 
-# CORECȚIE [4A]: Funcția _get_status_list avea un defect subtil:
-# funcția internă _fetch() era decorată cu @st.cache_data, dar
-# primea obiectul supabase din closure (din exterior), nu ca
-# parametru explicit. Streamlit nu putea "vedea" că supabase
-# s-a schimbat între sesiuni și returna uneori date din cache
-# incorect. Mai grav: în unele versiuni Streamlit, un obiect
-# de conexiune capturat în closure poate cauza erori de
-# serializare care forțează reîncărcarea completă a paginii
-# — contribuind la "licarire".
-#
-# SOLUȚIA: Supabase este transmis ca parametru explicit cu
-# prefix underscore (_supabase), care instruiește Streamlit
-# să NU îl includă în cheia de cache (obiectele de conexiune
-# nu sunt serializabile). Cache-ul funcționează corect pe
-# conținutul interogării, nu pe obiectul conexiunii.
 
 @st.cache_data(show_spinner=False, ttl=600)
 def _get_status_list(_supabase):
@@ -70,11 +69,6 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         is_new: boolean - dacă este înregistrare nouă
         date_existente: dict cu datele existente (pentru editare)
     """
-    # CORECȚIE [4B]: Apelul corect — supabase transmis ca argument,
-    # nu capturat în closure. Efectul imediat: lista de statusuri
-    # se încarcă o singură dată la 10 minute, nu la fiecare
-    # reîncărcare de pagină. Aceasta reduce semnificativ
-    # "licarirea" în secțiunile Date de Bază.
     status_list = _get_status_list(supabase)
 
     di = to_date(date_existente.get("data_inceput"))
@@ -102,6 +96,8 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "DATA DE SFARSIT": ds,
         "DURATA": int(dur_ex) if dur_ex else 0,
         "STATUS CONTRACT": date_existente.get("status_contract_proiect", ""),
+        # ADĂUGAT v3.0: coloana OBSERVAȚII citită din PostgreSQL
+        "OBSERVAȚII": date_existente.get("observatii", ""),
     }
     df = pd.DataFrame([row_init])
 
@@ -116,6 +112,8 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "DATA DE SFARSIT": st.column_config.DateColumn("📅 DATA DE SFARSIT", format="DD-MM-YYYY"),
         "DURATA": st.column_config.NumberColumn("DURATA (luni)", format="%d", min_value=0),
         "STATUS CONTRACT": st.column_config.SelectboxColumn("🔖 STATUS CONTRACT", options=status_list),
+        # ADĂUGAT v3.0: coloana OBSERVAȚII editabilă în Calea2
+        "OBSERVAȚII": st.column_config.TextColumn("📝 OBSERVAȚII", width="large"),
     }
 
     df_edit = st.data_editor(
@@ -153,4 +151,6 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "data_sfarsit": _fmt_date(ds_e),
         "durata": dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
+        # ADĂUGAT v3.0: returnăm observatii pentru salvare în PostgreSQL
+        "observatii": str(row["OBSERVAȚII"]).strip() if row["OBSERVAȚII"] else None,
     }
