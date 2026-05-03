@@ -2,7 +2,7 @@
 # IDBDC/utils/contracte_common.py
 # VERSIUNE: 1.0 
 # STATUS: FUNCTIONAL-Nefinalizat
-# DATA: 2026.04.
+# DATA: 2026.04.25
 # =========================================================
 # Acest fișier conține logica comună pentru toate tipurile de contracte.
 # Nu modifică nimic din ce există deja validat, ci doar mută codul duplicat.
