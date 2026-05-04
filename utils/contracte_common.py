@@ -175,12 +175,4 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     # Vom presupune că această funcție este deja implementată și funcțională.
     # Pentru a nu întrerupe fluxul, voi lăsa un placeholder, dar în realitate codul trebuie copiat.
     # TODO: copiați aici conținutul funcției render_echipa din admin_cep.py (identic pentru toate contractele).
-    pass# =========================================================
-# utils/contracte_common.py
-# v.modul.2.0 - Orchestrator pentru secțiuni
-# =========================================================
-
-from utils.sectiuni.date_baza import render_date_de_baza
-from utils.sectiuni.date_financiare import render_date_financiare
-from utils.sectiuni.echipa import render_echipa
-from utils.sectiuni.aspecte_tehnice import render_aspecte_tehnice
+    pass
