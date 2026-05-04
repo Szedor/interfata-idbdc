@@ -1,5 +1,5 @@
 # =========================================================
-# utils/sectiuni/date_baza_proiecte.py
+# utils/sectiuni/date_baza_proiect.py
 # VERSIUNE: 1.0
 # STATUS: STABIL - Secțiunea DATE DE BAZĂ pentru proiecte
 # DATA: 2026.05.04
