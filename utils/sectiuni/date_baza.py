@@ -1,26 +1,22 @@
 # =========================================================
-# utils/sectiuni/date_baza_proiect.py
-# VERSIUNE: 1.0
-# STATUS: STABIL - Secțiunea DATE DE BAZĂ pentru proiecte
-# DATA: 2026.05.04
+# IDBDC/utils/sectiuni/date_baza.py
+# VERSIUNE: 3.0
+# STATUS: CORECTAT - adăugată coloana OBSERVAȚII (doar Calea2)
+# DATA: 2026.05.03
 # =========================================================
 # CONȚINUT:
-#   Secțiunea DATE DE BAZĂ pentru toate tipurile de proiecte
-#   (FDI, PNCDI, PNRR, Internaționale, Interreg, NonUE,
-#   SEE, Structurale). Randează tabelul editabil cu datele
-#   de bază ale proiectului și returnează datele pentru
-#   salvare în PostgreSQL (tabela base_contracte_cep).
+#   Secțiunea DATE DE BAZĂ comună pentru toate tipurile de
+#   contracte (CEP, TERȚI, SPECIALE). Randează tabelul editable
+#   cu datele de bază ale contractului și returnează datele
+#   pentru salvare în PostgreSQL.
 #
-#   Diferențe față de date_baza.py (contracte):
-#   - Eticheta "TIPUL DE PROIECT" în loc de "TIPUL DE CONTRACT"
-#   - Eticheta "COD FINAL ÎNREGISTRARE" în loc de "NR.CONTRACT"
-#   - Câmpuri specifice proiect: titlul_proiect, acronim_proiect,
-#     program, cod_domeniu_fdi, cod_temporar
-#   - Nu există câmpul "OBIECTUL CONTRACTULUI" / "BENEFICIAR"
-#   - Logică dată reciprocă identică (început ↔ sfârșit ↔ durată)
-#
-# MODIFICĂRI VERSIUNEA 1.0:
-#   - Creare inițială, fișier independent de date_baza.py.
+# MODIFICĂRI VERSIUNEA 3.0:
+#   - Adăugată coloana OBSERVAȚII în tabelul Date de bază,
+#     vizibilă și editabilă exclusiv în Calea2 (Admin).
+#     Coloana citește și salvează câmpul `observatii` din
+#     tabelele base_contracte_* din PostgreSQL.
+#     Coloana NU apare în Calea1 (Explorator) deoarece
+#     render_date_de_baza nu este apelată din acel modul.
 # =========================================================
 
 import streamlit as st
@@ -31,7 +27,11 @@ from utils.supabase_helpers import safe_select_eq
 
 @st.cache_data(show_spinner=False, ttl=600)
 def _get_status_list(_supabase):
-    """Preia lista de statusuri din nomenclatorul nom_status_proiect."""
+    """
+    Preia lista de statusuri din nomenclator.
+    Prefixul _ la parametru îi spune lui Streamlit să nu
+    încerce să serializeze obiectul de conexiune pentru cache.
+    """
     try:
         res = _supabase.table("nom_status_proiect").select(
             "status_contract_proiect"
@@ -46,7 +46,6 @@ def _get_status_list(_supabase):
 
 
 def _fmt_date(date_val):
-    """Formatează o dată la șirul ISO 8601 (AAAA-LL-ZZ) sau None."""
     if date_val is None:
         return None
     if pd.isna(date_val):
@@ -58,41 +57,25 @@ def _fmt_date(date_val):
     return str(date_val)
 
 
-def render_date_de_baza_proiect(
-    supabase,
-    cod_introdus,
-    cat_sel,
-    tip_label,
-    tabela_nume,
-    is_new,
-    date_existente,
-):
+def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
     """
-    Randare și colectare date de bază pentru orice tip de proiect.
-
+    Randare și salvare date de bază pentru orice tip de entitate.
     Parametri:
-        supabase      : clientul Supabase
-        cod_introdus  : codul identificator (COD FINAL ÎNREGISTRARE)
-        cat_sel       : categoria selectată — se inscrie automat ("Proiecte")
-        tip_label     : eticheta tipului — se inscrie automat (ex: "FDI")
-        tabela_nume   : numele tabelei SQL (ex: "base_contracte_cep")
-        is_new        : True dacă este înregistrare nouă
-        date_existente: dict cu datele existente din PostgreSQL
-
-    Returnează:
-        dict cu valorile pentru salvare în tabela base_contracte_cep
+        supabase: clientul Supabase
+        cod_introdus: codul identificator
+        cat_sel: categoria selectată (ex: "Contracte")
+        tip_label: eticheta vizuală a tipului (ex: "CEP", "TERȚI", "SPECIALE")
+        tabela_nume: numele tabelei SQL (ex: "base_contracte_cep")
+        is_new: boolean - dacă este înregistrare nouă
+        date_existente: dict cu datele existente (pentru editare)
     """
     status_list = _get_status_list(supabase)
 
-    # ── Citire date existente ──────────────────────────────────
-    di     = to_date(date_existente.get("data_inceput"))
-    ds     = to_date(date_existente.get("data_sfarsit"))
+    di = to_date(date_existente.get("data_inceput"))
+    ds = to_date(date_existente.get("data_sfarsit"))
     dur_ex = date_existente.get("durata")
 
-    # ── Calcule automate dată reciprocă ───────────────────────
-    # Regula: dacă lipsește una din cele trei valori, se calculează
-    # din celelalte două. Prioritate: dacă există toate trei,
-    # durata se recalculează din date.
+    # Calcule automate
     if di and ds and (dur_ex is None or dur_ex == 0):
         dur_ex = calc_durata(di, ds)
     elif di and dur_ex and not ds:
@@ -102,65 +85,35 @@ def render_date_de_baza_proiect(
     if di and ds:
         dur_ex = calc_durata(di, ds)
 
-    # ── Construire rând inițial ────────────────────────────────
     row_init = {
-        "CATEGORIE":             cat_sel,           # automat
-        "TIPUL DE PROIECT":      tip_label,          # automat
-        "COD FINAL ÎNREGISTRARE": cod_introdus,       # automat / readonly
-        "TITLUL PROIECTULUI":    date_existente.get("titlul_proiect", ""),
-        "ACRONIMUL PROIECTULUI": date_existente.get("acronim_proiect", ""),
-        "DATA DE INCEPUT":       di,
-        "DATA DE SFARSIT":       ds,
-        "DURATA (nr.luni)":      int(dur_ex) if dur_ex else 0,
-        "STATUS PROIECT":        date_existente.get("status_contract_proiect", ""),
-        "PROGRAM DE FINANTARE":  date_existente.get("program", ""),
-        "DOMENIU":               date_existente.get("cod_domeniu_fdi", ""),
-        "COD DEPUNERE":          date_existente.get("cod_temporar", ""),
-        "OBSERVATII":            date_existente.get("observatii", ""),
+        "CATEGORIE": cat_sel,
+        "TIPUL DE CONTRACT": tip_label,
+        "NR.CONTRACT": cod_introdus,
+        "DATA CONTRACTULUI": to_date(date_existente.get("data_contract")),
+        "OBIECTUL CONTRACTULUI": date_existente.get("obiectul_contractului", ""),
+        "BENEFICIAR": date_existente.get("denumire_beneficiar", ""),
+        "DATA DE INCEPUT": di,
+        "DATA DE SFARSIT": ds,
+        "DURATA": int(dur_ex) if dur_ex else 0,
+        "STATUS CONTRACT": date_existente.get("status_contract_proiect", ""),
+        # ADĂUGAT v3.0: coloana OBSERVAȚII citită din PostgreSQL
+        "OBSERVAȚII": date_existente.get("observatii", ""),
     }
     df = pd.DataFrame([row_init])
 
-    # ── Configurare coloane editor ─────────────────────────────
     col_cfg = {
-        "CATEGORIE": st.column_config.TextColumn(
-            "CATEGORIE", disabled=True
-        ),
-        "TIPUL DE PROIECT": st.column_config.TextColumn(
-            "TIPUL DE PROIECT", disabled=True
-        ),
-        "COD FINAL ÎNREGISTRARE": st.column_config.TextColumn(
-            "COD FINAL ÎNREGISTRARE", disabled=True
-        ),
-        "TITLUL PROIECTULUI": st.column_config.TextColumn(
-            "TITLUL PROIECTULUI", width="large"
-        ),
-        "ACRONIMUL PROIECTULUI": st.column_config.TextColumn(
-            "ACRONIMUL PROIECTULUI"
-        ),
-        "DATA DE INCEPUT": st.column_config.DateColumn(
-            "📅 DATA DE INCEPUT", format="YYYY-MM-DD"
-        ),
-        "DATA DE SFARSIT": st.column_config.DateColumn(
-            "📅 DATA DE SFARSIT", format="YYYY-MM-DD"
-        ),
-        "DURATA (nr.luni)": st.column_config.NumberColumn(
-            "DURATA (nr.luni)", format="%d", min_value=0
-        ),
-        "STATUS PROIECT": st.column_config.SelectboxColumn(
-            "🔖 STATUS PROIECT", options=status_list
-        ),
-        "PROGRAM DE FINANTARE": st.column_config.TextColumn(
-            "PROGRAM DE FINANTARE"
-        ),
-        "DOMENIU": st.column_config.TextColumn(
-            "DOMENIU"
-        ),
-        "COD DEPUNERE": st.column_config.TextColumn(
-            "COD DEPUNERE"
-        ),
-        "OBSERVATII": st.column_config.TextColumn(
-            "📝 OBSERVATII", width="large"
-        ),
+        "CATEGORIE": st.column_config.TextColumn("CATEGORIE", disabled=True),
+        "TIPUL DE CONTRACT": st.column_config.TextColumn("TIPUL DE CONTRACT", disabled=True),
+        "NR.CONTRACT": st.column_config.TextColumn("NR.CONTRACT", disabled=True),
+        "DATA CONTRACTULUI": st.column_config.DateColumn("📅 DATA CONTRACTULUI", format="DD-MM-YYYY"),
+        "OBIECTUL CONTRACTULUI": st.column_config.TextColumn("OBIECTUL CONTRACTULUI", width="large"),
+        "BENEFICIAR": st.column_config.TextColumn("BENEFICIAR"),
+        "DATA DE INCEPUT": st.column_config.DateColumn("📅 DATA DE INCEPUT", format="DD-MM-YYYY"),
+        "DATA DE SFARSIT": st.column_config.DateColumn("📅 DATA DE SFARSIT", format="DD-MM-YYYY"),
+        "DURATA": st.column_config.NumberColumn("DURATA (luni)", format="%d", min_value=0),
+        "STATUS CONTRACT": st.column_config.SelectboxColumn("🔖 STATUS CONTRACT", options=status_list),
+        # ADĂUGAT v3.0: coloana OBSERVAȚII editabilă în Calea2
+        "OBSERVAȚII": st.column_config.TextColumn("📝 OBSERVAȚII", width="large"),
     }
 
     df_edit = st.data_editor(
@@ -169,38 +122,35 @@ def render_date_de_baza_proiect(
         hide_index=True,
         use_container_width=True,
         num_rows="fixed",
-        key=f"{tabela_nume}_baza_proiect_editor_{cod_introdus}",
+        key=f"{tabela_nume}_baza_editor_{cod_introdus}",
     )
     row = df_edit.iloc[0]
 
-    # ── Calcule automate post-editare ─────────────────────────
-    di_e  = row["DATA DE INCEPUT"]
-    ds_e  = row["DATA DE SFARSIT"]
-    dur_e = int(row["DURATA (nr.luni)"]) if row["DURATA (nr.luni)"] else 0
+    di_e = row["DATA DE INCEPUT"]
+    ds_e = row["DATA DE SFARSIT"]
+    dur_e = int(row["DURATA"]) if row["DURATA"] else 0
 
     if di_e and ds_e:
         dur_e = calc_durata(di_e, ds_e)
         st.caption(f"📅 Durată calculată automat: {dur_e} luni")
     elif di_e and dur_e and not ds_e:
         ds_e = add_months(di_e, dur_e)
-        st.caption(f"📅 Data de sfârșit calculată automat: {_fmt_date(ds_e)}")
+        st.caption(f"📅 Data de sfarsit calculată automat: {ds_e}")
     elif ds_e and dur_e and not di_e:
         di_e = sub_months(ds_e, dur_e)
-        st.caption(f"📅 Data de început calculată automat: {_fmt_date(di_e)}")
+        st.caption(f"📅 Data de inceput calculată automat: {di_e}")
 
-    # ── Returnare dict pentru salvare PostgreSQL ───────────────
     return {
-        "cod_identificare":       cod_introdus,
-        "denumire_categorie":     cat_sel,
-        "acronim_tip_proiecte":   tip_label,
-        "titlul_proiect":         str(row["TITLUL PROIECTULUI"]).strip()    if row["TITLUL PROIECTULUI"]    else None,
-        "acronim_proiect":        str(row["ACRONIMUL PROIECTULUI"]).strip() if row["ACRONIMUL PROIECTULUI"] else None,
-        "data_inceput":           _fmt_date(di_e),
-        "data_sfarsit":           _fmt_date(ds_e),
-        "durata":                 dur_e if dur_e else None,
-        "status_contract_proiect": row["STATUS PROIECT"] if row["STATUS PROIECT"] else None,
-        "program":                str(row["PROGRAM DE FINANTARE"]).strip() if row["PROGRAM DE FINANTARE"] else None,
-        "cod_domeniu_fdi":        str(row["DOMENIU"]).strip()              if row["DOMENIU"]              else None,
-        "cod_temporar":           str(row["COD DEPUNERE"]).strip()         if row["COD DEPUNERE"]         else None,
-        "observatii":             str(row["OBSERVATII"]).strip()           if row["OBSERVATII"]           else None,
+        "cod_identificare": cod_introdus,
+        "denumire_categorie": cat_sel,
+        "acronim_tip_contract": tip_label,
+        "data_contract": _fmt_date(row["DATA CONTRACTULUI"]),
+        "obiectul_contractului": row["OBIECTUL CONTRACTULUI"],
+        "denumire_beneficiar": row["BENEFICIAR"],
+        "data_inceput": _fmt_date(di_e),
+        "data_sfarsit": _fmt_date(ds_e),
+        "durata": dur_e if dur_e else None,
+        "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
+        # ADĂUGAT v3.0: returnăm observatii pentru salvare în PostgreSQL
+        "observatii": str(row["OBSERVAȚII"]).strip() if row["OBSERVAȚII"] else None,
     }
