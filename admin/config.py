@@ -1,8 +1,22 @@
 # =========================================================
 # IDBDC/admin/config.py
-# VERSIUNE: 5.3
-# STATUS: Adăugat SPECIALE în Contracte
-# DATA: 2026.04.29 
+# VERSIUNE: 6.0
+# STATUS: STABIL - BASE_TABLE_MAP și TABS_MAP complete
+# DATA: 2026.05.05
+# =========================================================
+# CONȚINUT:
+#   Configurarea centrală a modulului Admin:
+#     - BASE_TABLE_MAP: mapare categorie/tip → tabelă bază de date
+#     - TABS_MAP: tab-urile vizibile per categorie/tip
+#     - COMPLEMENTARY_TABLES: tabelele complementare comune
+#     - Nomenclatoare și coloane de control
+#
+# MODIFICĂRI VERSIUNEA 6.0:
+#   - Adăugat STRUCTURALE în Proiecte (lipsea din BASE_TABLE_MAP).
+#   - Completat TABS_MAP pentru toate tipurile de Proiecte
+#     (4 tab-uri: Date de bază, Financiar, Echipă, Aspecte tehnice).
+#   - Completat TABS_MAP pentru Evenimente stiintifice și
+#     Proprietate industriala (2 tab-uri: Date de bază, Echipă).
 # =========================================================
 
 import streamlit as st
@@ -22,6 +36,7 @@ BASE_TABLE_MAP = {
         "INTERREG":       "base_proiecte_interreg",
         "NONEU":          "base_proiecte_noneu",
         "SEE":            "base_proiecte_see",
+        "STRUCTURALE":    "base_proiecte_structurale",
     },
     "Evenimente stiintifice": {
         "CONFERINTE": "base_evenimente_stiintifice",
@@ -39,22 +54,41 @@ COMPLEMENTARY_TABLES = [
 ]
 
 # --- TAB-URI PER CATEGORIE/TIP ---
+_TABS_CONTRACTE  = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"]
+_TABS_PROIECTE   = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă", "🧪 Aspecte tehnice"]
+_TABS_EVT_PROP   = ["📋 Date de bază", "👥 Echipă"]
+
 TABS_MAP = {
-    ("Contracte", "CEP"):      ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
-    ("Contracte", "TERTI"):    ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
-    ("Contracte", "SPECIALE"): ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"],
+    # Contracte
+    ("Contracte", "CEP"):           _TABS_CONTRACTE,
+    ("Contracte", "TERTI"):         _TABS_CONTRACTE,
+    ("Contracte", "SPECIALE"):      _TABS_CONTRACTE,
+    # Proiecte
+    ("Proiecte", "FDI"):            _TABS_PROIECTE,
+    ("Proiecte", "PNCDI"):          _TABS_PROIECTE,
+    ("Proiecte", "PNRR"):           _TABS_PROIECTE,
+    ("Proiecte", "INTERNATIONALE"): _TABS_PROIECTE,
+    ("Proiecte", "INTERREG"):       _TABS_PROIECTE,
+    ("Proiecte", "NONEU"):          _TABS_PROIECTE,
+    ("Proiecte", "SEE"):            _TABS_PROIECTE,
+    ("Proiecte", "STRUCTURALE"):    _TABS_PROIECTE,
+    # Evenimente și Proprietate
+    ("Evenimente stiintifice", "CONFERINTE"):  _TABS_EVT_PROP,
+    ("Proprietate industriala", "BREVETE"):    _TABS_EVT_PROP,
 }
+
 
 def get_tabs_for_category(categorie, tip=None):
     key = (categorie, tip)
     if key in TABS_MAP:
         return TABS_MAP[key]
-    if categorie in ["Evenimente stiintifice", "Proprietate industriala"]:
-        return ["📋 Date de bază"]
-    return ["📋 Date de bază", "💰 Date financiare", "👥 Echipă", "🧪 Aspecte tehnice"]
+    # fallback sigur
+    return ["📋 Date de bază"]
+
 
 def get_base_table(categorie, tip):
     return BASE_TABLE_MAP.get(categorie, {}).get(tip)
+
 
 # --- NOMENCLATOARE ---
 NOMDET_WHITELIST = [
