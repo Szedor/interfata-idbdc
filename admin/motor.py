@@ -1,22 +1,25 @@
 # =========================================================
 # IDBDC/admin/motor.py
-# VERSIUNE: 5.0
-# STATUS: CORECTAT - sidebar lățime fixă constantă
-# DATA: 2026.05.03
+# VERSIUNE: 6.0
+# STATUS: STABIL - Dispatch complet pentru toate categoriile/tipurile
+# DATA: 2026.05.05
 # =========================================================
 # CONȚINUT:
 #   Motorul principal al modulului Admin. Gestionează
-#   navigarea între categorii/tipuri de contracte, afișarea
-#   tab-urilor (Date de bază, Financiar, Echipă) și salvarea
-#   datelor în PostgreSQL prin Supabase.
+#   navigarea între categorii/tipuri, afișarea tab-urilor
+#   și salvarea datelor în PostgreSQL prin Supabase.
 #
-# MODIFICĂRI VERSIUNEA 5.0:
-#   - Adăugat CSS pentru lățime fixă a sidebar-ului (320px),
-#     constantă indiferent de etapa de autentificare sau de
-#     conținutul afișat în sidebar. Anterior, sidebar-ul se
-#     lățea la ~40-45% din ecran după introducerea codului
-#     de identificare, din cauza elementelor cu
-#     use_container_width=True care forțau expansiunea.
+# MODIFICĂRI VERSIUNEA 6.0:
+#   - Adăugat import și dispatch pentru toate tipurile de
+#     Proiecte: FDI, PNCDI, PNRR, INTERNATIONALE, INTERREG,
+#     NONEU, SEE, STRUCTURALE.
+#   - Adăugat import și dispatch pentru Evenimente stiintifice
+#     și Proprietate industriala (2 tab-uri fiecare).
+#   - Tab-urile sunt acum citite din TABS_MAP (admin/config.py)
+#     în loc să fie hardcodate — elimină mesajul
+#     «în curs de configurare» pentru categoriile/tipurile noi.
+#   - Logica de salvare pentru Aspecte tehnice adăugată.
+#   - Tot ce era valid în v5.0 este păstrat neatins.
 # =========================================================
 
 import streamlit as st
@@ -24,15 +27,47 @@ import admin.config as cfg
 import admin.data_ops as ops
 import admin.ui as ui
 
+# ── Contracte ──────────────────────────────────────────────
 from admin.fise import contracte_cep, contracte_terti, contracte_speciale
+
+# ── Proiecte ───────────────────────────────────────────────
+from admin.fise import (
+    proiecte_fdi,
+    proiecte_pncdi,
+    proiecte_pnrr,
+    proiecte_internationale,
+    proiecte_interreg,
+    proiecte_noneu,
+    proiecte_see,
+    proiecte_structurale,
+)
+
+# ── Evenimente și Proprietate ──────────────────────────────
+from admin.fise import evenimente_stiintifice, proprietate_industriala
+
+
+# ── Mapare categorie/tip → modul ───────────────────────────
+_MODUL_MAP = {
+    ("Contracte", "CEP"):           contracte_cep,
+    ("Contracte", "TERTI"):         contracte_terti,
+    ("Contracte", "SPECIALE"):      contracte_speciale,
+    ("Proiecte", "FDI"):            proiecte_fdi,
+    ("Proiecte", "PNCDI"):          proiecte_pncdi,
+    ("Proiecte", "PNRR"):           proiecte_pnrr,
+    ("Proiecte", "INTERNATIONALE"): proiecte_internationale,
+    ("Proiecte", "INTERREG"):       proiecte_interreg,
+    ("Proiecte", "NONEU"):          proiecte_noneu,
+    ("Proiecte", "SEE"):            proiecte_see,
+    ("Proiecte", "STRUCTURALE"):    proiecte_structurale,
+    ("Evenimente stiintifice", "CONFERINTE"): evenimente_stiintifice,
+    ("Proprietate industriala", "BREVETE"):   proprietate_industriala,
+}
 
 
 # =========================================================
 # CSS global pentru tab-uri și sidebar lățime fixă
 # ADĂUGAT v5.0: secțiunea [data-testid="stSidebar"] fixează
 # lățimea la 320px indiferent de conținut sau etapă.
-# Valoarea min-width și max-width identice forțează lățimea
-# strictă, iar overflow:hidden previne expansiunea accidentală.
 # =========================================================
 _TAB_CSS = """
 <style>
@@ -74,9 +109,6 @@ div.tab-nav [data-testid="stMarkdownContainer"] { display: none; }
 
 
 def porneste_motorul(supabase):
-    # ADĂUGAT v5.0: CSS-ul se injectează primul, înainte de orice
-    # element de interfață, pentru a garanta că lățimea sidebar-ului
-    # este fixată înainte ca Streamlit să randeze conținutul.
     st.markdown(_TAB_CSS, unsafe_allow_html=True)
 
     ui.apply_admin_styles()
@@ -109,6 +141,11 @@ def porneste_motorul(supabase):
         return
 
     base_table = cfg.get_base_table(cat_sel, tip_sel)
+    modul = _MODUL_MAP.get((cat_sel, tip_sel))
+
+    if modul is None:
+        st.warning(f"Modulul pentru «{cat_sel}» / «{tip_sel}» nu a fost găsit.")
+        return
 
     with st.sidebar:
         try:
@@ -164,27 +201,22 @@ def porneste_motorul(supabase):
         date_baza_ex   = _baza_list[0] if _baza_list else {}
         date_fin_ex    = _fetch("com_date_financiare", cod_introdus)
         date_echipa_ex = _fetch("com_echipe_proiect",  cod_introdus)
+        date_teh_ex    = _fetch("com_aspecte_tehnice", cod_introdus)
     else:
         date_baza_ex   = {}
         date_fin_ex    = []
         date_echipa_ex = []
+        date_teh_ex    = []
 
-    rezultate = {}
-
-    if cat_sel == "Contracte" and tip_sel == "CEP":
-        modul = contracte_cep
-    elif cat_sel == "Contracte" and tip_sel == "TERTI":
-        modul = contracte_terti
-    elif cat_sel == "Contracte" and tip_sel == "SPECIALE":
-        modul = contracte_speciale
-    else:
-        st.info(f"Fișele pentru categoria «{cat_sel}» / tipul «{tip_sel}» sunt în curs de configurare.")
-        return
-
-    TAB_LABELS = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"]
-    key_tab = f"tab_activ_{cod_introdus}"
+    rezultate  = {}
+    TAB_LABELS = cfg.get_tabs_for_category(cat_sel, tip_sel)
+    key_tab    = f"tab_activ_{cod_introdus}"
 
     if key_tab not in st.session_state:
+        st.session_state[key_tab] = TAB_LABELS[0]
+
+    # Dacă tab-ul salvat nu mai există în lista curentă, resetăm
+    if st.session_state[key_tab] not in TAB_LABELS:
         st.session_state[key_tab] = TAB_LABELS[0]
 
     st.markdown('<div class="tab-nav">', unsafe_allow_html=True)
@@ -207,6 +239,7 @@ def porneste_motorul(supabase):
 
     key_baza_ss = f"ss_baza_{cod_introdus}"
     key_fin_ss  = f"ss_fin_{cod_introdus}"
+    key_teh_ss  = f"ss_teh_{cod_introdus}"
 
     if tab_activ == "📋 Date de bază":
         rezultat_baza = modul.render_date_de_baza(
@@ -229,22 +262,28 @@ def porneste_motorul(supabase):
             supabase, cod_introdus, is_new, date_echipa_ex
         )
 
+    elif tab_activ == "🧪 Aspecte tehnice":
+        rezultat_teh = modul.render_aspecte_tehnice(
+            supabase, cod_introdus, is_new, date_teh_ex
+        )
+        if rezultat_teh is not None:
+            st.session_state[key_teh_ss] = rezultat_teh
+        rezultate["tehnice"] = rezultat_teh
+
     if btn_save:
         with st.spinner("Se salvează datele..."):
             erori = []
 
+            # Date de bază
             baza_de_salvat = rezultate.get("baza") or st.session_state.get(key_baza_ss)
             if baza_de_salvat:
                 row = {**baza_de_salvat, "cod_identificare": cod_introdus}
                 ok, msg = ops.direct_upsert_single_row(supabase, base_table, row)
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
-            elif not is_new:
-                pass
 
-            fin_de_salvat = rezultate.get("financiar")
-            if fin_de_salvat is None:
-                fin_de_salvat = st.session_state.get(key_fin_ss)
+            # Date financiare
+            fin_de_salvat = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
             if fin_de_salvat is not None:
                 try:
                     supabase.table("com_date_financiare").delete().eq(
@@ -259,6 +298,7 @@ def porneste_motorul(supabase):
                     if not ok:
                         erori.append(f"Date financiare: {msg}")
 
+            # Echipă
             if "echipa" in rezultate:
                 try:
                     supabase.table("com_echipe_proiect").delete().eq(
@@ -272,6 +312,22 @@ def porneste_motorul(supabase):
                         supabase.table("com_echipe_proiect").insert(randuri_echipa).execute()
                     except Exception as e:
                         erori.append(f"Echipă: {e}")
+
+            # Aspecte tehnice
+            teh_de_salvat = rezultate.get("tehnice") or st.session_state.get(key_teh_ss)
+            if teh_de_salvat is not None:
+                try:
+                    supabase.table("com_aspecte_tehnice").delete().eq(
+                        "cod_identificare", cod_introdus
+                    ).execute()
+                except Exception:
+                    pass
+                for row in teh_de_salvat:
+                    ok, msg = ops.direct_upsert_single_row(
+                        supabase, "com_aspecte_tehnice", row, match_col="cod_identificare"
+                    )
+                    if not ok:
+                        erori.append(f"Aspecte tehnice: {msg}")
 
             if erori:
                 st.session_state["admin_msg"] = ("error", " | ".join(erori))
@@ -295,7 +351,7 @@ def porneste_motorul(supabase):
             ]
             ok, msg = ops.direct_delete_all_tables(supabase, cod_introdus, tabele_curatare)
             if ok:
-                for k in [key_baza_ss, key_fin_ss,
+                for k in [key_baza_ss, key_fin_ss, key_teh_ss,
                            f"echipa_data_init_{cod_introdus}",
                            f"echipa_editor_{cod_introdus}",
                            f"tab_activ_{cod_introdus}"]:
