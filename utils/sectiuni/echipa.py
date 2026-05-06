@@ -216,8 +216,8 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
     st.session_state[key_data_init] = rows_curente
 
     if needs_rerun:
-        if key_editor in st.session_state:
-            del st.session_state[key_editor]
+        # Nu ștergem key_editor — Streamlit îl re-inițializează din df_init la rerun.
+        # Ștergerea lui forța o re-inițializare completă care pierdea selecția curentă.
         st.rerun()
 
     # ----------------------------------------------------------
