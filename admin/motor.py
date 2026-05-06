@@ -26,21 +26,24 @@ import streamlit as st
 import admin.config as cfg
 import admin.data_ops as ops
 import admin.ui as ui
-
 # ── Contracte ──────────────────────────────────────────────
-from admin.fise import contracte_cep, contracte_terti, contracte_speciale
+import admin.fise.contracte_cep as contracte_cep
+import admin.fise.contracte_terti as contracte_terti
+import admin.fise.contracte_speciale as contracte_speciale
 
 # ── Proiecte ───────────────────────────────────────────────
-from admin.fise import (
-    proiecte_fdi,
-    proiecte_pncdi,
-    proiecte_pnrr,
-    proiecte_internationale,
-    proiecte_interreg,
-    proiecte_noneu,
-    proiecte_see,
-    proiecte_structurale,
-)
+import admin.fise.proiecte_fdi as proiecte_fdi
+import admin.fise.proiecte_pncdi as proiecte_pncdi
+import admin.fise.proiecte_pnrr as proiecte_pnrr
+import admin.fise.proiecte_internationale as proiecte_internationale
+import admin.fise.proiecte_interreg as proiecte_interreg
+import admin.fise.proiecte_noneu as proiecte_noneu
+import admin.fise.proiecte_see as proiecte_see
+import admin.fise.proiecte_structurale as proiecte_structurale
+
+# ── Evenimente și Proprietate ──────────────────────────────
+import admin.fise.evenimente_stiintifice as evenimente_stiintifice
+import admin.fise.proprietate_industriala as proprietate_industriala
 
 # ── Evenimente și Proprietate ──────────────────────────────
 from admin.fise import evenimente_stiintifice, proprietate_industriala
