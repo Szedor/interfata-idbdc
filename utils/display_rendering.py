@@ -1,70 +1,130 @@
 # =========================================================
 # utils/display_rendering.py
-# v.modul.1.0 - Funcții de randare pe ecran pentru fișa completă
+# VERSIUNE: 2.0
+# STATUS: STABIL
+# DATA: 2026.05.06
+# =========================================================
+# MODIFICĂRI VERSIUNEA 2.0:
+#   - COL_ORDER_GENERALE pentru Calea1: ordinea câmpurilor
+#     identică cu tabela base_proiecte_fdi și Calea2.
+#   - observatii adăugat în COLS_HIDDEN_FISA local pentru
+#     a nu fi niciodată afișat în Calea1.
+#   - COL_ORDER_FINANCIAR completat cu total_buget_proiect_fdi
+#     și cofinantare_upt_fdi pentru a fi afișate în Calea1.
+#   - Domeniu: dacă coloana este cod_domeniu_fdi, se adaugă
+#     și abreviere_domeniu_fdi din nom_domenii_fdi.
+#   - Echipă: folosește câmpul "rol" (nu "functia_specifica")
+#     pentru proiecte — afișare corectă în Calea1.
 # =========================================================
 
 import streamlit as st
 import html as _html
-from utils.display_config import CARD_PRIORITY, _TABELE_CONTRACTE, _COLS_EXCLUDE_CONTRACTE, COLS_HIDDEN_FISA, TEHNIC_COL_ORDER
+from utils.display_config import (
+    CARD_PRIORITY, _TABELE_CONTRACTE, _COLS_EXCLUDE_CONTRACTE,
+    COLS_HIDDEN_FISA, TEHNIC_COL_ORDER
+)
 from utils.display_helpers import col_label, fmt_numeric, get_contact_info, is_persoana_contact
 from utils.supabase_helpers import safe_select_eq
 
-# =========================================================
-# Randare secțiune generică (tabel cu două coloane: câmp | valoare)
-# =========================================================
-def render_sectiune_tabel(section_label: str, rows: list, table: str = None, tabela_baza_ctx: str = None):
-    """
-    Afișează o secțiune (Generale, Financiar, Tehnic) sub formă de tabel vertical.
-    rows: lista de rânduri din tabela respectivă (de obicei un singur rând, dar poate fi mai multe).
-    """
+# Câmpuri niciodată afișate în Calea1 (extindem cu observatii)
+_COLS_HIDDEN_CAL1 = COLS_HIDDEN_FISA | {"observatii"}
+
+# Ordinea câmpurilor pentru tabele de tip proiect (identică cu Calea2 / base_proiecte_fdi)
+_COL_ORDER_PROIECTE = [
+    "denumire_categorie",
+    "acronim_tip_proiecte",
+    "cod_identificare",
+    "titlul_proiect",
+    "acronim_proiect",
+    "data_inceput",
+    "data_sfarsit",
+    "durata",
+    "status_contract_proiect",
+    "program",
+    "cod_domeniu_fdi",
+    "cod_temporar",
+]
+
+# Ordinea câmpurilor generice (contracte, evenimente, proprietate)
+_COL_ORDER_GENERALE = [
+    "denumire_categorie", "acronim_tip_contract", "acronim_tip_proiecte",
+    "cod_identificare",
+    "data_contract", "obiectul_contractului", "denumire_beneficiar",
+    "data_inceput", "data_sfarsit", "durata", "status_contract_proiect",
+    "titlul_proiect", "acronim_proiect", "program", "programul_de_finantare",
+    "schema_de_finantare", "apel_pentru_propuneri", "rol_upt",
+    "parteneri", "coordonator", "director_proiect",
+    "data_depunere", "data_depozit_cerere", "data_apel",
+    "an_referinta", "an_inceput", "an_sfarsit", "durata_luni",
+    "natura_eveniment", "format_eveniment", "loc_desfasurare",
+    "numar_participanti", "institutii_organizare",
+    "acronim_prop_intelect", "nr_cerere", "nr_brevet",
+    "data_acordare", "data_oficiala_acordare", "numar_oficial_acordare",
+    "inventatori", "cuvinte_cheie", "descriere",
+]
+
+# Ordinea câmpurilor financiare — include toate coloanele FDI
+_COL_ORDER_FINANCIAR = [
+    "cod_identificare", "valuta",
+    "valoare_contract_cep_terti_speciale",
+    "valoare_anuala_contract", "valoare_totala_contract",
+    "cofinantare_anuala_contract", "cofinantare_totala_contract",
+    "suma_solicitata_fdi", "suma_aprobata_mec",
+    "cofinantare_upt_fdi", "total_buget_proiect_fdi",
+    "cost_total_proiect", "cost_proiect_upt",
+    "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
+]
+
+_TABELE_PROIECTE = {
+    "base_proiecte_fdi", "base_proiecte_pncdi", "base_proiecte_pnrr",
+    "base_proiecte_internationale", "base_proiecte_interreg",
+    "base_proiecte_noneu", "base_proiecte_see", "base_proiecte_structurale",
+}
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def _get_domeniu_abreviere(_supabase, cod_domeniu: str) -> str:
+    """Returnează abrevierea domeniului FDI din nom_domenii_fdi."""
+    if not cod_domeniu:
+        return ""
+    try:
+        res = _supabase.table("nom_domenii_fdi") \
+            .select("abreviere_domeniu_fdi") \
+            .eq("cod_domeniu_fdi", cod_domeniu).limit(1).execute()
+        if res.data:
+            return str(res.data[0].get("abreviere_domeniu_fdi") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
+                           tabela_baza_ctx: str = None, supabase=None):
     if not rows:
         return
 
     is_contract_ctx = (tabela_baza_ctx or table or "") in _TABELE_CONTRACTE
-    extra_hidden = _COLS_EXCLUDE_CONTRACTE if is_contract_ctx else set()
+    is_proiect_ctx  = (tabela_baza_ctx or table or "") in _TABELE_PROIECTE
+    extra_hidden    = _COLS_EXCLUDE_CONTRACTE if is_contract_ctx else set()
 
-    # Construim lista (label, value) pentru toate câmpurile vizibile din toate rândurile
     all_items = []
     for row in rows:
-        # Determinăm ordinea câmpurilor
+        # ── Selectăm ordinea în funcție de tipul tabelei ──────
         if table == "com_aspecte_tehnice":
-            ordered = [c for c in TEHNIC_COL_ORDER if c in row and row[c] is not None and str(row[c]).strip() not in ("", "None", "nan") and c not in COLS_HIDDEN_FISA and c not in extra_hidden]
-            rest = [c for c in row.keys() if c not in TEHNIC_COL_ORDER and c not in COLS_HIDDEN_FISA and c not in extra_hidden and row[c] is not None and str(row[c]).strip() not in ("", "None", "nan")]
-            visible_cols = ordered + rest
+            ordered_keys = _get_ordered(_COL_ORDER_GENERALE + list(TEHNIC_COL_ORDER), row, extra_hidden)
+            ordered_keys = [c for c in TEHNIC_COL_ORDER if c in row and _is_visible(row, c, extra_hidden)] + \
+                           [c for c in row.keys() if c not in TEHNIC_COL_ORDER and _is_visible(row, c, extra_hidden)]
         elif table == "com_date_financiare":
-            COL_ORDER_FINANCIAR = [
-                "cod_identificare", "valuta",
-                "valoare_contract_cep_terti_speciale",
-                "valoare_anuala_contract", "valoare_totala_contract",
-                "cofinantare_anuala_contract", "cofinantare_totala_contract",
-                "suma_solicitata_fdi", "cofinantare_upt_fdi",
-                "cost_total_proiect", "cost_proiect_upt",
-                "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
-            ]
-            ordered = [c for c in COL_ORDER_FINANCIAR if c in row and row[c] is not None and str(row[c]).strip() not in ("", "None", "nan") and c not in COLS_HIDDEN_FISA and c not in extra_hidden]
-            rest = [c for c in row.keys() if c not in COL_ORDER_FINANCIAR and c not in COLS_HIDDEN_FISA and c not in extra_hidden and row[c] is not None and str(row[c]).strip() not in ("", "None", "nan")]
-            visible_cols = ordered + rest
+            ordered_keys = [c for c in _COL_ORDER_FINANCIAR if c in row and _is_visible(row, c, extra_hidden)] + \
+                           [c for c in row.keys() if c not in _COL_ORDER_FINANCIAR and _is_visible(row, c, extra_hidden)]
+        elif is_proiect_ctx:
+            ordered_keys = [c for c in _COL_ORDER_PROIECTE if c in row and _is_visible(row, c, extra_hidden)] + \
+                           [c for c in row.keys() if c not in _COL_ORDER_PROIECTE and _is_visible(row, c, extra_hidden)]
         else:
-            COL_ORDER_GENERALE = [
-                "denumire_categorie", "acronim_tip_contract", "cod_identificare",
-                "data_contract", "obiectul_contractului", "denumire_beneficiar",
-                "data_inceput", "data_sfarsit", "durata", "status_contract_proiect",
-                "titlul_proiect", "acronim_proiect", "programul_de_finantare",
-                "schema_de_finantare", "apel_pentru_propuneri", "rol_upt",
-                "parteneri", "coordonator", "director_proiect",
-                "data_depunere", "data_depozit_cerere", "data_apel",
-                "an_referinta", "an_inceput", "an_sfarsit", "durata_luni",
-                "natura_eveniment", "format_eveniment", "loc_desfasurare",
-                "numar_participanti", "institutii_organizare",
-                "acronim_prop_intelect", "nr_cerere", "nr_brevet",
-                "data_acordare", "data_oficiala_acordare", "numar_oficial_acordare",
-                "inventatori", "cuvinte_cheie", "descriere", "observatii",
-            ]
-            ordered = [c for c in COL_ORDER_GENERALE if c in row and row[c] is not None and str(row[c]).strip() not in ("", "None", "nan") and c not in COLS_HIDDEN_FISA and c not in extra_hidden]
-            rest = [c for c in row.keys() if c not in COL_ORDER_GENERALE and c not in COLS_HIDDEN_FISA and c not in extra_hidden and row[c] is not None and str(row[c]).strip() not in ("", "None", "nan")]
-            visible_cols = ordered + rest
+            ordered_keys = [c for c in _COL_ORDER_GENERALE if c in row and _is_visible(row, c, extra_hidden)] + \
+                           [c for c in row.keys() if c not in _COL_ORDER_GENERALE and _is_visible(row, c, extra_hidden)]
 
-        for c in visible_cols:
+        for c in ordered_keys:
             raw_val = row[c]
             try:
                 float(str(raw_val).replace(",", ".").strip())
@@ -72,13 +132,19 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None, tab
             except (ValueError, TypeError):
                 is_num = False
             val_str = fmt_numeric(raw_val, c) if is_num else str(raw_val)
-            all_items.append((col_label(c, table), _html.escape(val_str)))
+
+            # ── Domeniu FDI: adăugăm abrevierea ───────────────
+            if c == "cod_domeniu_fdi" and supabase:
+                abrev = _get_domeniu_abreviere(supabase, str(raw_val).strip())
+                if abrev:
+                    val_str = f"{val_str} — {abrev}"
+
+            all_items.append((col_label(c, table or tabela_baza_ctx), _html.escape(val_str)))
 
     if not all_items:
         st.info(f"Nu există câmpuri completate pentru secțiunea {section_label}.")
         return
 
-    # Generare tabel HTML cu două coloane: prima coloană = numele câmpului, a doua = valoarea
     rows_html = ""
     for i, (label, value) in enumerate(all_items):
         sec_cell = ""
@@ -105,18 +171,34 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None, tab
     )
 
 
-# =========================================================
-# Randare secțiune Echipă (compact, cu detalii de contact)
-# =========================================================
+def _is_visible(row: dict, col: str, extra_hidden: set) -> bool:
+    if col in _COLS_HIDDEN_CAL1:
+        return False
+    if col in extra_hidden:
+        return False
+    val = row.get(col)
+    if val is None:
+        return False
+    if str(val).strip() in ("", "None", "nan"):
+        return False
+    return True
+
+
+def _get_ordered(order_list, row, extra_hidden):
+    ordered = [c for c in order_list if c in row and _is_visible(row, c, extra_hidden)]
+    rest    = [c for c in row.keys() if c not in order_list and _is_visible(row, c, extra_hidden)]
+    return ordered + rest
+
+
 def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
-    """Afișează echipa: persoana de contact evidențiată, apoi lista membrilor."""
     if not rows:
         st.info("Nu există echipă înregistrată pentru această fișă.")
         return
 
-    rows_sorted = sorted(rows, key=lambda r: (0 if is_persoana_contact(r) else 1, str(r.get("nume_prenume") or "")))
+    rows_sorted = sorted(rows, key=lambda r: (0 if is_persoana_contact(r) else 1,
+                                               str(r.get("nume_prenume") or "")))
     persoane_cont = [r for r in rows_sorted if is_persoana_contact(r)]
-    membri = [r for r in rows_sorted if not is_persoana_contact(r)]
+    membri        = [r for r in rows_sorted if not is_persoana_contact(r)]
 
     if persoane_cont:
         st.markdown(
@@ -126,8 +208,9 @@ def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
             unsafe_allow_html=True,
         )
         for r in persoane_cont:
-            nume = str(r.get("nume_prenume") or "").strip()
-            rol = str(r.get("functia_specifica") or "").strip()
+            nume    = str(r.get("nume_prenume") or "").strip()
+            # Câmpul ROL poate fi "rol" (proiecte) sau "functia_specifica" (contracte)
+            rol     = str(r.get("rol") or r.get("functia_specifica") or "").strip()
             contact = get_contact_info(supabase, nume)
             titlu_contact = " · ".join(p for p in [nume, rol] if p)
             contact_html = ""
@@ -174,7 +257,7 @@ def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
 
     def _fmt_membru(r):
         nume = str(r.get("nume_prenume") or "").strip()
-        rol = str(r.get("rol") or r.get("functia_specifica") or "").strip()
+        rol  = str(r.get("rol") or r.get("functia_specifica") or "").strip()
         if nume and rol:
             return f"{_html.escape(nume)} ({_html.escape(rol)})"
         return _html.escape(nume or rol)
