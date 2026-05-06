@@ -78,10 +78,7 @@ def render_date_financiare_fdi(supabase, cod_introdus, is_new, date_existente):
     cofin_e    = _safe_float(row["COFINANTARE"])
     total_e    = suma_apr_e + cofin_e
 
-    st.caption(
-        f"📊 Total valoare proiect: {total_e:,.2f} {row['VALUTA']}  "
-        f"— Total valoare proiect se calculează automat după salvarea fișei."
-    )
+    st.caption("Total valoare proiect se calculează automat după salvarea fișei.")
 
     return [{
         "cod_identificare":        cod_introdus,
