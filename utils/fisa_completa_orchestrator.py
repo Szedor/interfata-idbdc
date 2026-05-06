@@ -1,8 +1,13 @@
 # =========================================================
-# IDBDC/utils/fisa_completa_orchestrator.py
-# VERSIUNE: 1.6
-# STATUS: Orchestrator cu autentificare export reala
-# DATA: 2026.04.28
+# utils/fisa_completa_orchestrator.py
+# VERSIUNE: 1.7
+# STATUS: STABIL
+# DATA: 2026.05.06
+# =========================================================
+# MODIFICĂRI VERSIUNEA 1.7:
+#   - render_sectiune_tabel apelat cu supabase=supabase
+#     pentru a permite îmbogățirea domeniului FDI cu
+#     abrevierea din nom_domenii_fdi.
 # =========================================================
 
 import streamlit as st
@@ -127,7 +132,12 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
                 if not rows:
                     st.info(f"Nu există informații pentru secțiunea {sec_label}.")
                 else:
-                    render_sectiune_tabel(sec_label, rows, sec_table, tabela_baza_ctx=tabela_gasita)
+                    # CORECȚIE v1.7: supabase transmis pentru îmbogățire domeniu FDI
+                    render_sectiune_tabel(
+                        sec_label, rows, sec_table,
+                        tabela_baza_ctx=tabela_gasita,
+                        supabase=supabase,
+                    )
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
