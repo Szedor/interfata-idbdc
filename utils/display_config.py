@@ -87,6 +87,7 @@ COLS_HIDDEN_FISA = {
     "data_ultimei_modificari", "validat_idbdc",
     "email", "telefon_mobil", "telefon_fix",
     "observatii",
+    "nr_crt",
 }
 
 # ── Câmpuri prioritare în card ─────────────────────────────────────────
