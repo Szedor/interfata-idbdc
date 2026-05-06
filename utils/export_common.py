@@ -78,6 +78,7 @@ def build_horizontal_export_data(supabase, cod: str, tabela_gasita: str) -> dict
         ("Generale", tabela_gasita),
         ("Financiar", "com_date_financiare"),
         ("Echipa", "com_echipe_proiect"),
+        ("Tehnic", "com_aspecte_tehnice"),
     ]
     for section_name, table_name in sections:
         if table_name == "com_echipe_proiect":
@@ -114,6 +115,7 @@ def build_vertical_export_data(supabase, cod: str, tabela_gasita: str) -> dict:
         ("Generale", tabela_gasita),
         ("Financiar", "com_date_financiare"),
         ("Echipa", "com_echipe_proiect"),
+        ("Tehnic", "com_aspecte_tehnice"),
     ]
     for section_name, table_name in sections:
         section_data = {"name": section_name, "fields": [], "values": []}
