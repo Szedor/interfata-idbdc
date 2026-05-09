@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/utils/sectiuni/echipa.py
-# VERSIUNE: 7.0
-# STATUS: CORECTAT - ROL sincronizat corect la prima tastare
-# DATA: 2026.05.03
+# VERSIUNE: 6.2
+# STATUS: CORECTAT - notă de subsol adăugată sub tabelul Echipă
+# DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
 #   Secțiunea ECHIPĂ comună pentru toate tipurile de contracte
@@ -11,18 +11,20 @@
 #   numelui, gestionează adăugarea de membri noi și returnează
 #   datele pentru salvare în PostgreSQL (tabela com_echipe_proiect).
 #
-# MODIFICĂRI VERSIUNEA 7.0:
+# MODIFICĂRI VERSIUNEA 6.2:
+#   - CORECȚIE: adăugată notă de subsol sub tabelul Echipă,
+#     vizibilă în Calea2 (Administrare), cu textul:
+#     "După selectarea unui membru al echipei așteptați afișarea
+#     departamentului și a datelor de contact."
+#     Nota informează utilizatorul că după alegerea numelui din
+#     lista derulantă, câmpurile Departament, Email și Telefon
+#     se completează automat — dar acest lucru se întâmplă abia
+#     după un refresh automat al paginii (rerun Streamlit),
+#     nu instantaneu.
+#
+# MODIFICĂRI VERSIUNEA 6.1:
 #   - Corectat comportamentul câmpului ROLUL ÎN CONTRACT care
 #     se pierdea la prima tastare când se trecea la alt câmp.
-#     CAUZA: la prima tastare într-un câmp ROL, Streamlit nu
-#     declanșează un rerun imediat — valoarea din df_edit era
-#     corectă pe ecran dar nu ajungea în session_state înainte
-#     ca utilizatorul să treacă la câmpul următor.
-#     SOLUȚIA: citim valorile ROL direct din
-#     st.session_state[key_editor] (starea internă a editorului
-#     Streamlit) când este disponibil, ca sursă prioritară față
-#     de df_edit. Aceasta garantează că orice valoare tastată,
-#     chiar și la prima interacțiune, este capturată corect.
 # =========================================================
 
 import streamlit as st
@@ -219,6 +221,12 @@ def render_echipa(supabase, cod_introdus, is_new, date_existente):
         # Nu ștergem key_editor — Streamlit îl re-inițializează din df_init la rerun.
         # Ștergerea lui forța o re-inițializare completă care pierdea selecția curentă.
         st.rerun()
+
+    # CORECȚIE [v7.1]: notă de subsol fixă sub tabelul Echipă
+    st.caption(
+        "ℹ️ După selectarea unui membru al echipei așteptați afișarea "
+        "departamentului și a datelor de contact."
+    )
 
     # ----------------------------------------------------------
     # 6. Buton Adaugă membru
