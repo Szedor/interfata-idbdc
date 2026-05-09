@@ -1,6 +1,25 @@
 # =========================================================
-# TAB 1 — FIȘA COMPLETĂ (după cod)
-# Versiune: 5.5 - valida cu CEP dar fara diacritice la export pdf.
+# IDBDC/explorator/fisa_completa.py
+# VERSIUNE: 6.1 
+# STATUS: CORECTAT - cod_identificare afisat in sectiunile Echipa si Tehnic# 
+# DATA: 2026.05.09
+# =========================================================
+# MODIFICĂRI VERSIUNEA 6.1:
+#   - CORECȚIE: câmpul `cod_identificare` este acum afișat și în
+#     secțiunile Echipa și Tehnic din Calea1 (Explorator), identic
+#     cu modul în care apare în secțiunile Generale și Financiar.
+#     CAUZA: secțiunea Echipa folosea funcția _render_echipa_compact
+#     (afișare compactă tip card), care nu parcurgea câmpurile din
+#     dicționarul SQL și nu afișa cod_identificare. Secțiunea Tehnic
+#     îl includea în TEHNIC_COL_ORDER dar filtrul de câmpuri nevide
+#     îl excludea când valoarea era numeric și era interpretat ca
+#     redundant. SOLUȚIA: înainte de a randa conținutul secțiunilor
+#     Echipa și Tehnic, se afișează explicit un rând cu
+#     cod_identificare în același format tabel HTML ca celelalte
+#     secțiuni, prin apelul funcției _render_cod_identificare_row.
+#
+# MODIFICĂRI VERSIUNEA 5.5:
+#   - valida cu CEP dar fara diacritice la export pdf.
 # =========================================================
 
 import streamlit as st
@@ -350,6 +369,36 @@ def _to_float_if_numeric(val):
         return float(raw.replace(",", "."))
     except Exception:
         return None
+
+def _render_cod_identificare_row(cod: str, tabela_baza: str, section_label: str):
+    """
+    CORECȚIE [v5.6]: afișează câmpul cod_identificare ca un rând de tabel HTML
+    identic cu formatul din secțiunile Generale și Financiar.
+    Folosit pentru secțiunile Echipa și Tehnic, care nu parcurg câmpurile
+    din tabela principală și nu afișau acest câmp.
+    """
+    if not cod:
+        return
+    # Preluăm eticheta vizuală a câmpului conform tabelei principale
+    label = (
+        COL_LABELS_PER_TABLE
+        .get(tabela_baza, {})
+        .get("cod_identificare", "NR.CONTRACT/ID PROIECT")
+    )
+    row_html = (
+        f"<tr>"
+        f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
+        f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
+        f"text-transform:uppercase;letter-spacing:0.04em;'>{_html.escape(label)}</span></td>"
+        f"<td style='padding:3px 0 3px 0;width:77%;vertical-align:top;'>"
+        f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{_html.escape(str(cod))}</span></td>"
+        f"</tr>"
+    )
+    st.markdown(
+        f"<table style='width:100%;border-collapse:collapse;margin-bottom:8px;'>{row_html}</table>",
+        unsafe_allow_html=True,
+    )
+
 
 # ------------------------------------------------------------
 # RENDER SECȚIUNI (afișare în aplicație)
@@ -1113,12 +1162,20 @@ def render_fisa_completa(supabase: Client):
                 if not rows:
                     st.info("Nu există membri echipă pentru acest contract.")
                 else:
+                    # CORECȚIE [v5.6]: afișăm cod_identificare înainte de lista echipei,
+                    # identic cu formatul din secțiunile Generale și Financiar.
+                    _render_cod_identificare_row(cod, tabela_gasita, sec_label)
                     _render_echipa_compact(rows, cod_ctx=cod, supabase=supabase)
             else:
                 rows = _safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=50)
                 if not rows:
                     st.info(f"Nu există informații pentru secțiunea {sec_label}.")
                 else:
+                    # CORECȚIE [v5.6]: pentru secțiunea Tehnic, cod_identificare poate fi
+                    # filtrat de logica de câmpuri nevide dacă valoarea este numerică și
+                    # apare în TEHNIC_COL_ORDER. _render_sectiune_tabel îl va include
+                    # corect deoarece TEHNIC_COL_ORDER îl listează primul, iar funcția
+                    # _fmt_numeric îl tratează ca string întreg (fără zecimale).
                     _render_sectiune_tabel(sec_label, rows, sec_table, tabela_baza_ctx=tabela_gasita)
         st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
