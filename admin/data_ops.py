@@ -1,7 +1,8 @@
 # =========================================================
 # IDBDC/admin/data_ops.py
-# VERSIUNE: 6.1
-# STATUS: CORECTAT - creat_de/modificat_de populate cu username operator
+# VERSIUNE: 6.2
+# STATUS: CORECTAT - creat_de/modificat_de excluse pentru tabele fără audit;
+#                    username_sistem folosit la salvare
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
@@ -9,28 +10,31 @@
 #   curățare payload, upsert, salvare globală, ștergere,
 #   adăugare observații cu istoric.
 #
-# MODIFICĂRI VERSIUNEA 6.1:
-#   - CORECȚIE: funcția cleanup_payload nu mai elimină câmpurile
-#     `creat_de` și `modificat_de` dacă acestea sunt deja populate.
-#   - CORECȚIE: funcția direct_upsert_single_row completează
-#     automat câmpurile `creat_de` și `modificat_de` cu
-#     username-ul operatorului din st.session_state.operator_username
-#     înainte de trimiterea payload-ului la Supabase.
-#     Logica aplicată:
-#       • `modificat_de` se actualizează la FIECARE salvare.
-#       • `creat_de` se completează DOAR dacă înregistrarea
-#         este nouă (nu există deja în baza de date).
-#     Fără această corecție, Supabase completa aceste câmpuri
-#     cu utilizatorul de conexiune implicit (`anon`), deoarece
-#     aplicația nu trimitea nicio valoare.
+# MODIFICĂRI VERSIUNEA 6.2:
+#   - Definit set TABELE_FARA_AUDIT cu tabelele SQL care nu au
+#     coloanele creat_de/modificat_de (ex: com_date_financiare,
+#     com_aspecte_tehnice, com_echipe_proiect). Pentru acestea,
+#     câmpurile de audit sunt excluse din payload înainte de
+#     trimiterea la Supabase, eliminând eroarea PGRST204.
+#   - Pentru tabelele base_* (care au coloane de audit),
+#     creat_de și modificat_de sunt populate cu
+#     st.session_state.operator_username.
 #
-# MODIFICĂRI VERSIUNEA 1.1:
+# MODIFICĂRI VERSIUNEA ANTERIOARA:
 #   - Corecție critică sintaxă Supabase (upsert corect)
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+
+
+# Tabele SQL care NU au coloanele creat_de / modificat_de
+TABELE_FARA_AUDIT = {
+    "com_date_financiare",
+    "com_aspecte_tehnice",
+    "com_echipe_proiect",
+}
 
 
 def now_iso():
@@ -44,41 +48,25 @@ def normalize_identifier_column(df, column_name="cod_identificare"):
     return df
 
 
-def cleanup_payload(row_dict):
-    """
-    Elimină câmpurile sistem sau nule înainte de trimiterea către bază.
-    CORECȚIE [v1.2]: câmpurile `creat_de` și `modificat_de` NU mai sunt
-    excluse automat — ele vor fi completate de direct_upsert_single_row
-    cu username-ul operatorului autentificat.
-    Sunt excluse în continuare: `id`, `creat_la`, `modificat_la`
-    (acestea sunt gestionate de Supabase prin triggerele SQL).
-    """
-    # CORECȚIE [v1.2]: eliminat creat_de și modificat_de din lista de excludere
+def cleanup_payload(row_dict, table_name=None):
+    """Elimină câmpurile sistem sau nule înainte de trimiterea către bază."""
     to_exclude = {"id", "creat_la", "modificat_la"}
+    if table_name in TABELE_FARA_AUDIT:
+        to_exclude |= {"creat_de", "modificat_de"}
     return {k: v for k, v in row_dict.items() if k not in to_exclude and pd.notnull(v)}
 
 
 def direct_upsert_single_row(supabase, table_name, row_data, match_col="cod_identificare"):
-    """
-    Efectuează insert/update (upsert) corect în Supabase.
-    CORECȚIE [v1.2]: completează creat_de și modificat_de cu
-    username-ul operatorului autentificat din session_state.
-    """
-    payload = cleanup_payload(row_data)
+    """Efectuează insert/update (upsert) corect în Supabase."""
+    payload = cleanup_payload(row_data, table_name=table_name)
     if not payload.get(match_col):
         return False, "Lipsă cod identificare."
 
-    # CORECȚIE [v1.2]: preluăm username-ul operatorului autentificat
-    operator_username = st.session_state.get("operator_username") or "necunoscut"
-
-    # CORECȚIE [v1.2]: completăm modificat_de la fiecare salvare
-    payload["modificat_de"] = operator_username
-
-    # CORECȚIE [v1.2]: completăm creat_de doar dacă nu există deja
-    # (la prima inserare). La update, valoarea existentă se păstrează
-    # prin logica upsert — câmpul este trimis numai dacă nu este deja setat.
-    if not payload.get("creat_de"):
-        payload["creat_de"] = operator_username
+    if table_name not in TABELE_FARA_AUDIT:
+        operator_username = st.session_state.get("operator_username") or "necunoscut"
+        payload["modificat_de"] = operator_username
+        if not payload.get("creat_de"):
+            payload["creat_de"] = operator_username
 
     try:
         supabase.table(table_name).upsert(payload, on_conflict=match_col).execute()
@@ -89,7 +77,6 @@ def direct_upsert_single_row(supabase, table_name, row_data, match_col="cod_iden
 
 def direct_save_all_tables(supabase, cod_id, data_dict, base_table):
     """Salvează centralizat toate tabelele (Bază + Detalii)."""
-    # 1. Salvare Tabel Bază
     if base_table in data_dict:
         df_base = data_dict[base_table]
         if not df_base.empty:
@@ -100,7 +87,6 @@ def direct_save_all_tables(supabase, cod_id, data_dict, base_table):
             if not ok:
                 return False, f"Eroare Bază: {msg}"
 
-    # 2. Salvare Tabele Detaliu
     for t_name, df_det in data_dict.items():
         if t_name == base_table:
             continue
