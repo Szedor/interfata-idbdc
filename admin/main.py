@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/admin/main.py
-# VERSIUNE: 6.1
-# STATUS: CORECTAT - username preluat și salvat în session_state
+# VERSIUNE: 6.2
+# STATUS: CORECTAT - username_sistem preluat la autentificare; sidebar lățime fixă
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
@@ -9,19 +9,17 @@
 #   autentificarea în două etape (parolă modul + cod operator),
 #   afișează header-ul și lansează motorul de administrare.
 #
-    # MODIFICĂRI VERSIUNEA 6.1:
-#   - CORECȚIE: la autentificarea operatorului (Pas 2), interogarea
-#     SQL a fost extinsă pentru a include câmpul `username` din
+# MODIFICĂRI VERSIUNEA 6.2:
+#   - CORECȚIE autentificare: interogarea SQL la Pas 2 a fost
+#     extinsă pentru a include câmpul `username_sistem` din
 #     tabela com_operatori. Valoarea este salvată în
 #     st.session_state.operator_username și va fi folosită de
-#     admin/data_ops.py pentru a completa câmpurile `creat_de`
-#     și `modificat_de` la salvarea oricărei fișe.
-#     Fără această corecție, câmpurile `creat_de`/`modificat_de`
-#     rămâneau goale (aplicația nu le trimitea), iar baza de date
-#     Supabase le completa automat cu utilizatorul de conexiune
-#     implicit — `anon` — în loc de username-ul operatorului real.
+#     admin/data_ops.py pentru câmpurile creat_de/modificat_de.
+#   - CORECȚIE sidebar: adăugat CSS pentru lățime fixă sidebar
+#     (320px) identică la Pas 1 și Pas 2, eliminând lărgirea
+#     automată la Pas 2 cauzată de câmpul text_input mai lung.
 #
-# MODIFICĂRI VERSIUNEA 2.8:
+# MODIFICĂRI VERSIUNEA ANTERIOARA:
 #   - sidebar forțat vizibil permanent
 # =========================================================
 
@@ -68,6 +66,14 @@ def run():
                 border-right: 2px solid rgba(255,255,255,0.20);
                 display: block !important;
                 visibility: visible !important;
+                min-width: 320px !important;
+                max-width: 320px !important;
+                width: 320px !important;
+            }
+            [data-testid="stSidebar"] > div:first-child {
+                min-width: 320px !important;
+                max-width: 320px !important;
+                width: 320px !important;
             }
             .stApp h1, .stApp h2, .stApp h3, .stApp h4,
             .stApp p, .stApp label, .stApp .stMarkdown,
@@ -129,7 +135,6 @@ def run():
     if "operator_rol" not in st.session_state:
         st.session_state.operator_rol = None
 
-    # CORECȚIE [v2.9]: inițializare operator_username în session_state
     if "operator_username" not in st.session_state:
         st.session_state.operator_username = None
 
@@ -171,17 +176,14 @@ def run():
                 res_op = (
                     supabase
                     .table("com_operatori")
-                    # CORECȚIE [v2.9]: adăugat câmpul `username` în interogare
-                    # pentru a putea completa creat_de/modificat_de la salvare.
-                    .select("username, nume_prenume, rol, filtru_categorie, filtru_proiect")
+                    .select("username_sistem, nume_prenume, rol, filtru_categorie, filtru_proiect")
                     .eq("cod_operatori", cod_in)
                     .execute()
                 )
                 if res_op.data:
                     st.session_state.operator_identificat = res_op.data[0].get("nume_prenume")
                     st.session_state.operator_rol = (res_op.data[0].get("rol") or "OPERATOR").strip()
-                    # CORECȚIE [v2.9]: salvăm username-ul în session_state
-                    st.session_state.operator_username = (res_op.data[0].get("username") or "").strip()
+                    st.session_state.operator_username = (res_op.data[0].get("username_sistem") or "").strip()
                     raw_cat = res_op.data[0].get("filtru_categorie") or ""
                     raw_tip = res_op.data[0].get("filtru_proiect") or ""
                     st.session_state.operator_filtru_categorie = [x.strip() for x in raw_cat.split(",") if x.strip()]
