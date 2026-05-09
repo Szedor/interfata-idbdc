@@ -1,29 +1,23 @@
 # =========================================================
 # IDBDC/utils/sectiuni/date_baza.py
-# VERSIUNE: 6.1
-# STATUS: CORECTAT - notă de subsol fixă pentru câmpul Durată
+# VERSIUNE: 6.2
+# STATUS: CORECTAT - notă de subsol fixă pentru Durată
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
 #   Secțiunea DATE DE BAZĂ comună pentru toate tipurile de
-#   contracte (CEP, TERȚI, SPECIALE). Randează tabelul editable
-#   cu datele de bază ale contractului și returnează datele
-#   pentru salvare în PostgreSQL.
+#   contracte, proiecte, evenimente științifice și proprietate
+#   industrială. Randează tabelul editabil cu datele de bază
+#   și returnează datele pentru salvare în PostgreSQL.
 #
-# MODIFICĂRI VERSIUNEA 6.1:
-#   - CORECȚIE: adăugată notă de subsol fixă (obligatorie) sub
-#     tabelul din secțiunea Date de bază, cu referire la câmpul
-#     Durată. Nota explică utilizatorului că sistemul calculează
-#     automat durata sau data lipsă atunci când sunt completate
-#     două din cele trei câmpuri: Data de început, Data de sfârșit,
-#     Durată (luni). Nota apare întotdeauna, indiferent dacă
-#     s-a efectuat sau nu un calcul automat în sesiunea curentă.
-#     Notele condiționate (calcul automat detectat) se afișează
-#     suplimentar față de nota fixă, nu în locul ei.
+# MODIFICĂRI VERSIUNEA 6.2:
+#   - Înlocuite notele condiționate de calcul automat cu o
+#     singură notă de subsol fixă obligatorie:
+#     "Durata se calculează automat după salvarea fișei."
+#     Nota apare întotdeauna, indiferent de tipul de document.
 #
-# MODIFICĂRI VERSIUNEA 3.0:
-#   - Adăugată coloana OBSERVAȚII în tabelul Date de bază,
-#     vizibilă și editabilă exclusiv în Calea2 (Admin).
+# MODIFICĂRI VERSIUNEA ANTERIOARA:
+#   - Adăugată coloana OBSERVAȚII în tabelul Date de bază.
 # =========================================================
 
 import streamlit as st
@@ -34,11 +28,6 @@ from utils.supabase_helpers import safe_select_eq
 
 @st.cache_data(show_spinner=False, ttl=600)
 def _get_status_list(_supabase):
-    """
-    Preia lista de statusuri din nomenclator.
-    Prefixul _ la parametru îi spune lui Streamlit să nu
-    încerce să serializeze obiectul de conexiune pentru cache.
-    """
     try:
         res = _supabase.table("nom_status_proiect").select(
             "status_contract_proiect"
@@ -82,7 +71,6 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
     ds = to_date(date_existente.get("data_sfarsit"))
     dur_ex = date_existente.get("durata")
 
-    # Calcule automate
     if di and ds and (dur_ex is None or dur_ex == 0):
         dur_ex = calc_durata(di, ds)
     elif di and dur_ex and not ds:
@@ -130,12 +118,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         key=f"{tabela_nume}_baza_editor_{cod_introdus}",
     )
 
-    # CORECȚIE [v3.1]: notă de subsol fixă, obligatorie, afișată întotdeauna
-    # sub tabelul Date de bază — identică cu cea de la proiecte_fdi.
-    st.caption(
-        "ℹ️ **Durată:** completați oricare două câmpuri din Data de început / "
-        "Data de sfârșit / Durată (luni) — al treilea va fi calculat automat de sistem."
-    )
+    st.caption("ℹ️ Durata se calculează automat după salvarea fișei.")
 
     row = df_edit.iloc[0]
 
@@ -145,13 +128,10 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
 
     if di_e and ds_e:
         dur_e = calc_durata(di_e, ds_e)
-        st.caption(f"📅 Durată calculată automat: {dur_e} luni")
     elif di_e and dur_e and not ds_e:
         ds_e = add_months(di_e, dur_e)
-        st.caption(f"📅 Data de sfarsit calculată automat: {ds_e}")
     elif ds_e and dur_e and not di_e:
         di_e = sub_months(ds_e, dur_e)
-        st.caption(f"📅 Data de inceput calculată automat: {di_e}")
 
     return {
         "cod_identificare": cod_introdus,
