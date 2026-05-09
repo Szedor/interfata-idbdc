@@ -1,8 +1,13 @@
 # =========================================================
-# IDBDC/utils/app.py
-# VERSIUNE: 2.2
-# STATUS: FUNCTIONAL
-# DATA: 2026.05.03
+# IDBDC/appy.py
+# VERSIUNE: 1.0
+# STATUS: CORECTAT - Calea2 importată din calea2_admin/main.py
+# DATA: 2026.05.09
+# =========================================================
+# MODIFICĂRI IN VERSIUNE:
+#   - Importul Căii2 modificat din `admin.main` în
+#     `calea2_admin.main` pentru noua structură modulară.
+#     O singură linie schimbată — restul neatins.
 # =========================================================
 
 import streamlit as st
@@ -42,7 +47,7 @@ if calea_activa == "explorator":
     from explorator import main as explorator_main
     explorator_main.run()
 elif calea_activa == "admin":
-    from admin import main as admin_main
+    from calea2_admin import main as admin_main
     admin_main.run()
 elif calea_activa == "brainstorming":
     import calea3_brainstorming
