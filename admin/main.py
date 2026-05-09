@@ -1,8 +1,28 @@
 # =========================================================
 # IDBDC/admin/main.py
-# VERSIUNE: 2.8
-# STATUS: CORECTAT - sidebar fortat vizibil permanent
-# DATA: 2026.05.03 
+# VERSIUNE: 6.1
+# STATUS: CORECTAT - username preluat și salvat în session_state
+# DATA: 2026.05.09
+# =========================================================
+# CONȚINUT:
+#   Modulul principal al Căii2 (Administrare). Gestionează
+#   autentificarea în două etape (parolă modul + cod operator),
+#   afișează header-ul și lansează motorul de administrare.
+#
+    # MODIFICĂRI VERSIUNEA 6.1:
+#   - CORECȚIE: la autentificarea operatorului (Pas 2), interogarea
+#     SQL a fost extinsă pentru a include câmpul `username` din
+#     tabela com_operatori. Valoarea este salvată în
+#     st.session_state.operator_username și va fi folosită de
+#     admin/data_ops.py pentru a completa câmpurile `creat_de`
+#     și `modificat_de` la salvarea oricărei fișe.
+#     Fără această corecție, câmpurile `creat_de`/`modificat_de`
+#     rămâneau goale (aplicația nu le trimitea), iar baza de date
+#     Supabase le completa automat cu utilizatorul de conexiune
+#     implicit — `anon` — în loc de username-ul operatorului real.
+#
+# MODIFICĂRI VERSIUNEA 2.8:
+#   - sidebar forțat vizibil permanent
 # =========================================================
 
 import streamlit as st
@@ -109,6 +129,10 @@ def run():
     if "operator_rol" not in st.session_state:
         st.session_state.operator_rol = None
 
+    # CORECȚIE [v2.9]: inițializare operator_username în session_state
+    if "operator_username" not in st.session_state:
+        st.session_state.operator_username = None
+
     if "operator_filtru_categorie" not in st.session_state:
         st.session_state.operator_filtru_categorie = []
 
@@ -147,13 +171,17 @@ def run():
                 res_op = (
                     supabase
                     .table("com_operatori")
-                    .select("nume_prenume, rol, filtru_categorie, filtru_proiect")
+                    # CORECȚIE [v2.9]: adăugat câmpul `username` în interogare
+                    # pentru a putea completa creat_de/modificat_de la salvare.
+                    .select("username, nume_prenume, rol, filtru_categorie, filtru_proiect")
                     .eq("cod_operatori", cod_in)
                     .execute()
                 )
                 if res_op.data:
                     st.session_state.operator_identificat = res_op.data[0].get("nume_prenume")
                     st.session_state.operator_rol = (res_op.data[0].get("rol") or "OPERATOR").strip()
+                    # CORECȚIE [v2.9]: salvăm username-ul în session_state
+                    st.session_state.operator_username = (res_op.data[0].get("username") or "").strip()
                     raw_cat = res_op.data[0].get("filtru_categorie") or ""
                     raw_tip = res_op.data[0].get("filtru_proiect") or ""
                     st.session_state.operator_filtru_categorie = [x.strip() for x in raw_cat.split(",") if x.strip()]
@@ -168,7 +196,6 @@ def run():
 
     st.sidebar.success(f"Operator: {st.session_state.operator_identificat}")
 
-    # Modificare: buton cu use_container_width=True pentru latime deplina
     if st.sidebar.button("Ieșire / Resetare", use_container_width=True):
         st.session_state.clear()
         st.rerun()
