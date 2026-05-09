@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/utils/sectiuni/date_baza.py
-# VERSIUNE: 3.0
-# STATUS: CORECTAT - adăugată coloana OBSERVAȚII (doar Calea2)
-# DATA: 2026.05.03
+# VERSIUNE: 6.1
+# STATUS: CORECTAT - notă de subsol fixă pentru câmpul Durată
+# DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
 #   Secțiunea DATE DE BAZĂ comună pentru toate tipurile de
@@ -10,13 +10,20 @@
 #   cu datele de bază ale contractului și returnează datele
 #   pentru salvare în PostgreSQL.
 #
+# MODIFICĂRI VERSIUNEA 6.1:
+#   - CORECȚIE: adăugată notă de subsol fixă (obligatorie) sub
+#     tabelul din secțiunea Date de bază, cu referire la câmpul
+#     Durată. Nota explică utilizatorului că sistemul calculează
+#     automat durata sau data lipsă atunci când sunt completate
+#     două din cele trei câmpuri: Data de început, Data de sfârșit,
+#     Durată (luni). Nota apare întotdeauna, indiferent dacă
+#     s-a efectuat sau nu un calcul automat în sesiunea curentă.
+#     Notele condiționate (calcul automat detectat) se afișează
+#     suplimentar față de nota fixă, nu în locul ei.
+#
 # MODIFICĂRI VERSIUNEA 3.0:
 #   - Adăugată coloana OBSERVAȚII în tabelul Date de bază,
 #     vizibilă și editabilă exclusiv în Calea2 (Admin).
-#     Coloana citește și salvează câmpul `observatii` din
-#     tabelele base_contracte_* din PostgreSQL.
-#     Coloana NU apare în Calea1 (Explorator) deoarece
-#     render_date_de_baza nu este apelată din acel modul.
 # =========================================================
 
 import streamlit as st
@@ -96,7 +103,6 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "DATA DE SFARSIT": ds,
         "DURATA": int(dur_ex) if dur_ex else 0,
         "STATUS CONTRACT": date_existente.get("status_contract_proiect", ""),
-        # ADĂUGAT v3.0: coloana OBSERVAȚII citită din PostgreSQL
         "OBSERVAȚII": date_existente.get("observatii", ""),
     }
     df = pd.DataFrame([row_init])
@@ -112,7 +118,6 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "DATA DE SFARSIT": st.column_config.DateColumn("📅 DATA DE SFARSIT", format="DD-MM-YYYY"),
         "DURATA": st.column_config.NumberColumn("DURATA (luni)", format="%d", min_value=0),
         "STATUS CONTRACT": st.column_config.SelectboxColumn("🔖 STATUS CONTRACT", options=status_list),
-        # ADĂUGAT v3.0: coloana OBSERVAȚII editabilă în Calea2
         "OBSERVAȚII": st.column_config.TextColumn("📝 OBSERVAȚII", width="large"),
     }
 
@@ -124,6 +129,14 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         num_rows="fixed",
         key=f"{tabela_nume}_baza_editor_{cod_introdus}",
     )
+
+    # CORECȚIE [v3.1]: notă de subsol fixă, obligatorie, afișată întotdeauna
+    # sub tabelul Date de bază — identică cu cea de la proiecte_fdi.
+    st.caption(
+        "ℹ️ **Durată:** completați oricare două câmpuri din Data de început / "
+        "Data de sfârșit / Durată (luni) — al treilea va fi calculat automat de sistem."
+    )
+
     row = df_edit.iloc[0]
 
     di_e = row["DATA DE INCEPUT"]
@@ -151,6 +164,5 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         "data_sfarsit": _fmt_date(ds_e),
         "durata": dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
-        # ADĂUGAT v3.0: returnăm observatii pentru salvare în PostgreSQL
         "observatii": str(row["OBSERVAȚII"]).strip() if row["OBSERVAȚII"] else None,
     }
