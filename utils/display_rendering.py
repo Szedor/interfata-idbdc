@@ -1,5 +1,5 @@
 # =========================================================
-# utils/display_rendering.py
+# utils/display_rendering_work.py
 # VERSIUNE: 2.1
 # STATUS: CORECTAT - câmpuri audit ascunse; cod_identificare în Echipă
 # DATA: 2026.05.09
