@@ -1,9 +1,18 @@
 # =========================================================
 # utils/display_rendering.py
-# VERSIUNE: 2.0
-# STATUS: STABIL
-# DATA: 2026.05.06
+# VERSIUNE: 2.1
+# STATUS: CORECTAT - câmpuri audit ascunse; cod_identificare în Echipă
+# DATA: 2026.05.09
 # =========================================================
+# MODIFICĂRI VERSIUNEA 2.1:
+#   - CORECȚIE: adăugate creat_de, creat_la, modificat_de,
+#     modificat_la în _COLS_HIDDEN_CAL1. Acestea nu erau în
+#     COLS_HIDDEN_FISA din display_config.py și apăreau în
+#     secțiunea Generale din Calea1.
+#   - CORECȚIE: render_echipa_compact afișează acum cod_identificare
+#     ca prim rând, identic cu secțiunile Generale și Financiar.
+#     Preia cod_identificare din primul rând al listei rows.
+#
 # MODIFICĂRI VERSIUNEA 2.0:
 #   - COL_ORDER_GENERALE pentru Calea1: ordinea câmpurilor
 #     identică cu tabela base_proiecte_fdi și Calea2.
@@ -26,8 +35,11 @@ from utils.display_config import (
 from utils.display_helpers import col_label, fmt_numeric, get_contact_info, is_persoana_contact
 from utils.supabase_helpers import safe_select_eq
 
-# Câmpuri niciodată afișate în Calea1 (extindem cu observatii)
-_COLS_HIDDEN_CAL1 = COLS_HIDDEN_FISA | {"observatii"}
+# Câmpuri niciodată afișate în Calea1
+_COLS_HIDDEN_CAL1 = COLS_HIDDEN_FISA | {
+    "observatii",
+    "creat_de", "creat_la", "modificat_de", "modificat_la",
+}
 
 # Ordinea câmpurilor pentru tabele de tip proiect (identică cu Calea2 / base_proiecte_fdi)
 _COL_ORDER_PROIECTE = [
@@ -194,6 +206,25 @@ def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None):
     if not rows:
         st.info("Nu există echipă înregistrată pentru această fișă.")
         return
+
+    # CORECȚIE [v2.1]: afișăm cod_identificare ca prim rând,
+    # identic cu secțiunile Generale și Financiar.
+    cod_id = str(rows[0].get("cod_identificare") or cod_ctx or "").strip()
+    if cod_id:
+        st.markdown(
+            f"<table style='width:100%;border-collapse:collapse;margin-bottom:8px;'>"
+            f"<tr>"
+            f"<td style='padding:3px 12px 3px 0;width:10%;vertical-align:top;'>"
+            f"<span style='color:rgba(255,255,255,0.45);font-size:0.74rem;font-weight:800;"
+            f"text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;'>Echipa</span></td>"
+            f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
+            f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
+            f"text-transform:uppercase;letter-spacing:0.04em;'>NR.CONTRACT/ID PROIECT</span></td>"
+            f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
+            f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{_html.escape(cod_id)}</span></td>"
+            f"</tr></table>",
+            unsafe_allow_html=True,
+        )
 
     rows_sorted = sorted(rows, key=lambda r: (0 if is_persoana_contact(r) else 1,
                                                str(r.get("nume_prenume") or "")))
