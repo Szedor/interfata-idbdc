@@ -1,15 +1,30 @@
 # =========================================================
 # utils/display_helpers.py
-# v.modul.1.0 - Funcții ajutătoare pentru formatare și etichetare
+# VERSIUNE: 2.0
+# STATUS: ACTUALIZAT - câmpuri compuse DEPARTAMENT și TELEFON
+# DATA: 2026.05.09
+# =========================================================
+# MODIFICĂRI VERSIUNEA 2.0:
+#   - get_contact_info returnează acum DEPARTAMENT ca
+#     "acronim - denumire" și TELEFON ca "mobil / fix",
+#     conform mapării definitive contracte_cep.
+#   - col_label folosește COL_LABELS_PER_TABLE cu fallback
+#     la COL_LABELS global.
+#   - COLS_HIDDEN_FISA extins cu câmpurile de audit și
+#     câmpurile componente ale câmpurilor compuse.
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 import html as _html
-from utils.display_config import COL_LABELS, COL_LABELS_PER_TABLE, CARD_PRIORITY, _TABELE_CONTRACTE, _COLS_EXCLUDE_CONTRACTE, COLS_HIDDEN_FISA, TEHNIC_COL_ORDER
-
+from utils.display_config import (
+    COL_LABELS, COL_LABELS_PER_TABLE, CARD_PRIORITY,
+    _TABELE_CONTRACTE, _COLS_EXCLUDE_CONTRACTE,
+    COLS_HIDDEN_FISA, TEHNIC_COL_ORDER,
+)
 from utils.date_helpers import to_date, calc_durata, add_months, sub_months
 from utils.supabase_helpers import safe_select_eq
+
 
 def fmt_numeric(val, col_name: str = "") -> str:
     if val is None:
@@ -38,11 +53,13 @@ def fmt_numeric(val, col_name: str = "") -> str:
         return str(int(f))
     return f"{f:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+
 def col_label(col: str, table: str = None) -> str:
     if table and table in COL_LABELS_PER_TABLE:
         if col in COL_LABELS_PER_TABLE[table]:
             return COL_LABELS_PER_TABLE[table][col]
     return COL_LABELS.get(col, col.replace("_", " ").capitalize())
+
 
 def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = None) -> list:
     is_contract_ctx = (tabela_baza_ctx or table or "") in _TABELE_CONTRACTE
@@ -91,43 +108,61 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         rest = [c for c in visible_cols if c not in COL_ORDER_GENERALE]
         return ordered + rest
 
+
 def get_contact_info(supabase, nume: str) -> list:
+    """
+    Returnează lista de informații de contact pentru un membru al echipei.
+    Câmpuri compuse conform mapării definitive:
+      DEPARTAMENT = acronim_departament + denumire_departament
+      TELEFON     = telefon_mobil + telefon_fix
+    """
     if not supabase or not nume:
         return []
     try:
         res = supabase.table("det_resurse_umane") \
-            .select("email,telefon_mobil,acronim_departament") \
+            .select("email,telefon_mobil,telefon_fix,acronim_departament") \
             .eq("nume_prenume", nume.strip()).limit(1).execute()
         if not res.data:
             res = supabase.table("det_resurse_umane") \
-                .select("email,telefon_mobil,acronim_departament") \
+                .select("email,telefon_mobil,telefon_fix,acronim_departament") \
                 .ilike("nume_prenume", nume.strip()).limit(1).execute()
         if not res.data:
             return []
         d = res.data[0]
         out = []
+
+        # DEPARTAMENT = acronim + denumire
         acronim = str(d.get("acronim_departament") or "").strip()
-        email = str(d.get("email") or "").strip()
-        tel = str(d.get("telefon_mobil") or "").strip()
         if acronim:
             try:
                 dep_res = supabase.table("nom_departament") \
                     .select("denumire_departament") \
                     .eq("acronim_departament", acronim).limit(1).execute()
-                den = ""
-                if dep_res.data:
-                    den = str(dep_res.data[0].get("denumire_departament") or "").strip()
+                den = str(dep_res.data[0].get("denumire_departament") or "").strip() if dep_res.data else ""
                 dept_label = f"{acronim} - {den}" if den else acronim
             except Exception:
                 dept_label = acronim
             out.append(f"Dept: {dept_label}")
+
+        # EMAIL
+        email = str(d.get("email") or "").strip()
         if email:
             out.append(f"Email: {email}")
-        if tel:
-            out.append(f"Mobil: {tel}")
+
+        # TELEFON = mobil / fix
+        mob = str(d.get("telefon_mobil") or "").strip()
+        fix = str(d.get("telefon_fix") or "").strip()
+        if mob and fix:
+            out.append(f"Telefon: {mob} / {fix}")
+        elif mob:
+            out.append(f"Telefon: {mob}")
+        elif fix:
+            out.append(f"Telefon: {fix}")
+
         return out
     except Exception:
         return []
+
 
 def is_persoana_contact(r: dict) -> bool:
     v = r.get("persoana_contact")
