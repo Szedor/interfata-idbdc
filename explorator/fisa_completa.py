@@ -1,22 +1,18 @@
 # =========================================================
 # IDBDC/explorator/fisa_completa.py
 # VERSIUNE: 6.1 
-# STATUS: CORECTAT - cod_identificare afisat in sectiunile Echipa si Tehnic# 
+# STATUS: CORECTAT - creat_de/modificat_de ascunse în Generale; cod_identificare în Echipă
 # DATA: 2026.05.09
 # =========================================================
 # MODIFICĂRI VERSIUNEA 6.1:
-#   - CORECȚIE: câmpul `cod_identificare` este acum afișat și în
-#     secțiunile Echipa și Tehnic din Calea1 (Explorator), identic
-#     cu modul în care apare în secțiunile Generale și Financiar.
-#     CAUZA: secțiunea Echipa folosea funcția _render_echipa_compact
-#     (afișare compactă tip card), care nu parcurgea câmpurile din
-#     dicționarul SQL și nu afișa cod_identificare. Secțiunea Tehnic
-#     îl includea în TEHNIC_COL_ORDER dar filtrul de câmpuri nevide
-#     îl excludea când valoarea era numeric și era interpretat ca
-#     redundant. SOLUȚIA: înainte de a randa conținutul secțiunilor
-#     Echipa și Tehnic, se afișează explicit un rând cu
-#     cod_identificare în același format tabel HTML ca celelalte
-#     secțiuni, prin apelul funcției _render_cod_identificare_row.
+#   - CORECȚIE: câmpurile creat_de, creat_la, modificat_de,
+#     modificat_la nu mai apar în secțiunea Generale.
+#     Filtrul COLS_HIDDEN_FISA a fost înlocuit cu funcția
+#     _is_col_hidden() care normalizează cheia (lowercase+strip)
+#     înainte de comparație, eliminând orice diferență de
+#     majuscule sau spații returnate de Supabase.
+#   - CORECȚIE: câmpul cod_identificare afișat corect în
+#     secțiunea Echipă prin _render_cod_identificare_row.
 #
 # MODIFICĂRI VERSIUNEA 5.5:
 #   - valida cu CEP dar fara diacritice la export pdf.
@@ -166,6 +162,14 @@ COLS_HIDDEN_FISA = {
     "creat_de", "creat_la", "modificat_de", "modificat_la",
     "nr_crt",
 }
+
+# Set derivat cu chei lowercase+strip pentru comparație defensivă
+_COLS_HIDDEN_FISA_NORM = {c.strip().lower() for c in COLS_HIDDEN_FISA}
+
+
+def _is_col_hidden(col: str) -> bool:
+    """Verifică dacă o coloană trebuie ascunsă, inclusiv variante cu spații/majuscule."""
+    return col.strip().lower() in _COLS_HIDDEN_FISA_NORM
 
 CARD_PRIORITY = [
     "titlul_proiect", "titlu_proiect", "titlu", "titlu_eveniment", "titlu_lucrare",
@@ -415,7 +419,7 @@ def _render_sectiune_tabel(section_label: str, rows: list, table: str = None,
     for row in rows:
         visible_cols = [
             c for c in row.keys()
-            if c not in COLS_HIDDEN_FISA
+            if not _is_col_hidden(c)
             and c not in extra_hidden
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
@@ -675,7 +679,7 @@ def _get_section_fields_ordered(section_name: str, rows: list, table: str = None
     for row in rows:
         visible_cols = [
             c for c in row.keys()
-            if c not in COLS_HIDDEN_FISA
+            if not _is_col_hidden(c)
             and c not in extra_hidden
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
@@ -1005,7 +1009,7 @@ def _build_section_export_df(rows: list, table: str = None,
     for row in rows:
         visible_cols = [
             c for c in row.keys()
-            if c not in COLS_HIDDEN_FISA
+            if not _is_col_hidden(c)
             and c not in extra_hidden
             and row[c] is not None
             and str(row[c]).strip() not in ("", "None", "nan")
@@ -1162,8 +1166,6 @@ def render_fisa_completa(supabase: Client):
                 if not rows:
                     st.info("Nu există membri echipă pentru acest contract.")
                 else:
-                    # CORECȚIE [v5.6]: afișăm cod_identificare înainte de lista echipei,
-                    # identic cu formatul din secțiunile Generale și Financiar.
                     _render_cod_identificare_row(cod, tabela_gasita, sec_label)
                     _render_echipa_compact(rows, cod_ctx=cod, supabase=supabase)
             else:
