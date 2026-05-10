@@ -1,9 +1,14 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# VERSIUNE: 1.7
-# STATUS: STABIL
-# DATA: 2026.05.06
+# VERSIUNE: 1.8
+# STATUS: CORECTAT - titlu Echipă eliminat (mutat în render_echipa_compact)
+# DATA: 2026.05.09
 # =========================================================
+# MODIFICĂRI VERSIUNEA 1.8:
+#   - Titlul secțiunii „ECHIPA" eliminat din blocul if sec_key=="echipa"
+#     deoarece render_echipa_compact v2.1 îl afișează acum ca prim
+#     rând de tabel, identic cu Generale și Financiar.
+#
 # MODIFICĂRI VERSIUNEA 1.7:
 #   - render_sectiune_tabel apelat cu supabase=supabase
 #     pentru a permite îmbogățirea domeniului FDI cu
@@ -116,12 +121,6 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
                     unsafe_allow_html=True,
                 )
             if sec_key == "echipa":
-                st.markdown(
-                    f"<div style='color:rgba(255,255,255,0.45);font-size:0.74rem;font-weight:800;"
-                    f"text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;'>"
-                    f"{_html.escape(sec_label)}</div>",
-                    unsafe_allow_html=True,
-                )
                 rows = safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=2000)
                 if not rows:
                     st.info("Nu există membri echipă pentru acest contract.")
