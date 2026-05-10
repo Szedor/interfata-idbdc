@@ -1,6 +1,6 @@
 # =========================================================
-# utils/fisa_completa_orchestrator.py
-# VERSIUNE: 1.8
+# utils/orchestrator_work.py
+# VERSIUNE: 1.0
 # STATUS: CORECTAT - titlu Echipă eliminat (mutat în render_echipa_compact)
 # DATA: 2026.05.09
 # =========================================================
