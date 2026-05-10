@@ -1,18 +1,24 @@
 # =========================================================
 # utils/display_config.py
-# VERSIUNE: 2.0
-# STATUS: STABIL
-# DATA: 2026.05.06
+# VERSIUNE: 3.0
+# STATUS: ACTUALIZAT - mapare contracte_cep conform definitie.py
+# DATA: 2026.05.09
 # =========================================================
+# MODIFICĂRI VERSIUNEA 3.0:
+#   - COL_LABELS_PER_TABLE["base_contracte_cep"] actualizat
+#     conform mapării definitive: NR.CONTRACT, DATA CONTRACTULUI,
+#     OBIECTUL CONTRACTULUI, BENEFICIAR, DATA DE ÎNCEPUT,
+#     DATA DE SFÂRȘIT, DURATA (luni), STATUS CONTRACT.
+#   - COL_LABELS_PER_TABLE["com_date_financiare"] actualizat:
+#     cod_identificare → NR.CONTRACT pentru contextul contractelor.
+#   - COLS_HIDDEN_FISA extins cu creat_de, creat_la,
+#     modificat_de, modificat_la, acronim_departament,
+#     denumire_departament, telefon_mobil, telefon_fix,
+#     persoana_contact (câmpuri niciodată afișate în Calea1).
+#
 # MODIFICĂRI VERSIUNEA 2.0:
-#   - COL_LABELS_PER_TABLE["base_proiecte_fdi"] completat cu
-#     toate câmpurile din Calea2 (denumiri identice cu Calea2):
-#     acronim_tip_proiecte, denumire_categorie, acronim_proiect,
-#     data_inceput, data_sfarsit, durata, program,
-#     cod_domeniu_fdi, cod_temporar, total_buget_proiect_fdi,
-#     suma_aprobata_mec.
-#   - COL_LABELS_PER_TABLE["com_date_financiare"] completat cu
-#     total_buget_proiect_fdi și cofinantare_upt_fdi.
+#   - COL_LABELS_PER_TABLE["base_proiecte_fdi"] completat.
+#   - COL_LABELS_PER_TABLE["com_date_financiare"] completat.
 # =========================================================
 
 # ── Etichete globale (fallback) ────────────────────────────────────────
@@ -26,7 +32,7 @@ COL_LABELS = {
     "an_referinta":                 "AN REFERINTA",
     "an_sfarsit":                   "AN SFARSIT",
     "cod_domeniu_fdi":              "DOMENIU",
-    "cod_identificare":             "COD IDENTIFICARE",
+    "cod_identificare":             "NR.CONTRACT",
     "cod_temporar":                 "COD DEPUNERE",
     "contributie_ue_proiect_upt":   "CONTRIBUTIE UE (UPT)",
     "contributie_ue_total_proiect": "CONTRIBUTIE UE (TOTAL PROIECT)",
@@ -36,7 +42,7 @@ COL_LABELS = {
     "cuvinte_cheie":                "CUVINTE CHEIE",
     "data_acordare":                "DATA ACORDARE",
     "data_apel":                    "DATA APEL",
-    "data_contract":                "DATA CONTRACT",
+    "data_contract":                "DATA CONTRACTULUI",
     "data_depozit_cerere":          "DATA DEPUNERE LA OSIM",
     "data_depunere":                "DATA DEPUNERE",
     "data_inceput":                 "DATA DE INCEPUT",
@@ -46,8 +52,9 @@ COL_LABELS = {
     "denumire_categorie":           "CATEGORIE",
     "descriere":                    "DESCRIERE",
     "director_proiect":             "DIRECTOR PROIECT",
-    "durata":                       "DURATA (nr. luni)",
+    "durata":                       "DURATA (luni)",
     "durata_luni":                  "DURATA",
+    "email":                        "EMAIL",
     "format_eveniment":             "FORMATUL EVENIMENTULUI",
     "functia_specifica":            "FUNCTIA IN CONTRACT",
     "institutii_organizare":        "INSTITUTII ORGANIZARE",
@@ -64,6 +71,7 @@ COL_LABELS = {
     "parteneri":                    "PARTENERI",
     "program":                      "PROGRAM DE FINANTARE",
     "programul_de_finantare":       "PROGRAMUL DE FINANTARE",
+    "rol":                          "ROLUL IN CONTRACT",
     "rol_upt":                      "ROL UPT IN PROIECT",
     "schema_de_finantare":          "SCHEMA DE FINANTARE",
     "status_contract_proiect":      "STATUS CONTRACT/PROIECT",
@@ -72,12 +80,15 @@ COL_LABELS = {
     "cofinantare_upt_fdi":          "COFINANTARE",
     "total_buget_proiect_fdi":      "TOTAL VALOARE PROIECT",
     "titlul_proiect":               "TITLUL PROIECTULUI",
-    "valoare_contract_cep_terti_speciale": "VALOAREA CONTRACTULUI",
+    "valoare_contract_cep_terti_speciale": "VALOARE CONTRACT",
     "valoare_anuala_contract":      "VALOARE ANUALA CONTRACT",
     "valoare_totala_contract":      "VALOARE TOTALA CONTRACT",
     "cofinantare_anuala_contract":  "COFINANTARE ANUALA",
     "cofinantare_totala_contract":  "COFINANTARE TOTALA",
     "valuta":                       "VALUTA",
+    "nume_prenume":                 "NUME SI PRENUME",
+    "departament":                  "DEPARTAMENT",
+    "telefon":                      "TELEFON",
 }
 
 # ── Câmpuri niciodată afișate în Calea1 ────────────────────────────────
@@ -85,9 +96,12 @@ COLS_HIDDEN_FISA = {
     "id", "created_at", "updated_at", "deleted_at", "is_deleted",
     "responsabil_idbdc", "observatii_idbdc", "status_confirmare",
     "data_ultimei_modificari", "validat_idbdc",
-    "email", "telefon_mobil", "telefon_fix",
     "observatii",
     "nr_crt",
+    "creat_de", "creat_la", "modificat_de", "modificat_la",
+    "acronim_departament", "denumire_departament",
+    "telefon_mobil", "telefon_fix",
+    "persoana_contact",
 }
 
 # ── Câmpuri prioritare în card ─────────────────────────────────────────
@@ -115,21 +129,27 @@ TEHNIC_COL_ORDER = [
 # ── Etichete per tabelă (suprascriu COL_LABELS global) ────────────────
 COL_LABELS_PER_TABLE = {
     "base_contracte_cep": {
-        "cod_identificare":        "NR. CONTRACT CEP",
-        "status_contract_proiect": "STATUS CONTRACT",
-        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+        "denumire_categorie":                  "CATEGORIE",
+        "acronim_tip_contract":                "TIPUL DE CONTRACT",
+        "cod_identificare":                    "NR.CONTRACT",
+        "data_contract":                       "DATA CONTRACTULUI",
+        "obiectul_contractului":               "OBIECTUL CONTRACTULUI",
+        "denumire_beneficiar":                 "BENEFICIAR",
+        "data_inceput":                        "DATA DE INCEPUT",
+        "data_sfarsit":                        "DATA DE SFARSIT",
+        "durata":                              "DURATA (luni)",
+        "status_contract_proiect":             "STATUS CONTRACT",
     },
     "base_contracte_terti": {
-        "cod_identificare":        "NR. CONTRACT",
+        "cod_identificare":        "NR.CONTRACT",
         "status_contract_proiect": "STATUS CONTRACT",
-        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+        "obiectul_contractului":   "OBIECTUL CONTRACTULUI",
     },
     "base_contracte_speciale": {
-        "cod_identificare":        "NR. CONTRACT",
+        "cod_identificare":        "NR.CONTRACT",
         "status_contract_proiect": "STATUS CONTRACT",
-        "titlul_proiect":          "OBIECTUL CONTRACTULUI",
+        "obiectul_contractului":   "OBIECTUL CONTRACTULUI",
     },
-    # ── Proiecte FDI — etichete identice cu Calea2 ─────────────────
     "base_proiecte_fdi": {
         "cod_identificare":        "COD FINAL ÎNREGISTRARE",
         "denumire_categorie":      "CATEGORIE",
@@ -204,15 +224,24 @@ COL_LABELS_PER_TABLE = {
         "numar_oficial_acordare": "NR. OFICIAL ACORDARE",
     },
     "com_date_financiare": {
-        "cod_identificare":        "COD IDENTIFICARE",
-        "valuta":                  "VALUTA",
-        "suma_solicitata_fdi":     "SUMA SOLICITATA",
-        "suma_aprobata_mec":       "SUMA APROBATA",
-        "cofinantare_upt_fdi":     "COFINANTARE",
-        "total_buget_proiect_fdi": "TOTAL VALOARE PROIECT",
+        "cod_identificare":                    "NR.CONTRACT",
+        "valuta":                              "VALUTA",
+        "valoare_contract_cep_terti_speciale": "VALOARE CONTRACT",
+        "suma_solicitata_fdi":                 "SUMA SOLICITATA",
+        "suma_aprobata_mec":                   "SUMA APROBATA",
+        "cofinantare_upt_fdi":                 "COFINANTARE",
+        "total_buget_proiect_fdi":             "TOTAL VALOARE PROIECT",
+    },
+    "com_echipe_proiect": {
+        "cod_identificare": "NR.CONTRACT",
+        "nume_prenume":     "NUME SI PRENUME",
+        "rol":              "ROLUL IN CONTRACT",
+        "departament":      "DEPARTAMENT",
+        "email":            "EMAIL",
+        "telefon":          "TELEFON",
     },
     "com_aspecte_tehnice": {
-        "cod_identificare": "COD IDENTIFICARE",
+        "cod_identificare": "NR.CONTRACT",
     },
 }
 
