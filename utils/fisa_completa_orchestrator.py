@@ -1,18 +1,16 @@
 # =========================================================
-# utils/orchestrator_work.py
-# VERSIUNE: 1.0
-# STATUS: CORECTAT - titlu Echipă eliminat (mutat în render_echipa_compact)
+# utils/fisa_completa_orchestrator.py
+# VERSIUNE: 1.9
+# STATUS: CORECTAT - tabela_baza_ctx transmisă la render_echipa_compact
 # DATA: 2026.05.09
 # =========================================================
-# MODIFICĂRI VERSIUNEA 1.8:
-#   - Titlul secțiunii „ECHIPA" eliminat din blocul if sec_key=="echipa"
-#     deoarece render_echipa_compact v2.1 îl afișează acum ca prim
-#     rând de tabel, identic cu Generale și Financiar.
+# MODIFICĂRI VERSIUNEA 1.9:
+#   - tabela_baza_ctx transmisă la render_echipa_compact pentru
+#     a determina eticheta corectă: NR.CONTRACT (contracte)
+#     sau ID PROIECT (proiecte).
 #
-# MODIFICĂRI VERSIUNEA 1.7:
-#   - render_sectiune_tabel apelat cu supabase=supabase
-#     pentru a permite îmbogățirea domeniului FDI cu
-#     abrevierea din nom_domenii_fdi.
+# MODIFICĂRI VERSIUNEA 1.8:
+#   - Titlu secțiune Echipă eliminat (mutat în render_echipa_compact).
 # =========================================================
 
 import streamlit as st
@@ -125,7 +123,8 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
                 if not rows:
                     st.info("Nu există membri echipă pentru acest contract.")
                 else:
-                    render_echipa_compact(rows, cod_ctx=cod, supabase=supabase)
+                    render_echipa_compact(rows, cod_ctx=cod, supabase=supabase,
+                                         tabela_baza_ctx=tabela_gasita)
             else:
                 rows = safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=50)
                 if not rows:
