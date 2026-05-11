@@ -1,15 +1,20 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_echipa.py
-# VERSIUNE: 1.0
-# STATUS: NOU - Echipă comună pentru toate domeniile
+# VERSIUNE: 2.0
+# STATUS: CORECTAT - numele se fixează din prima selecție
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
 #   Randează secțiunea Echipă pentru orice domeniu.
-#   Conținut identic cu utils/contracte_common.py v7.0
-#   (funcția render_echipa), cu adăugarea notei de subsol:
-#   "După selectarea unui membru al echipei așteptați
-#   afișarea departamentului și a datelor de contact."
+#
+# MODIFICĂRI VERSIUNEA 2.0:
+#   - CORECȚIE: la prima selecție a unui nume din lista
+#     derulantă, acesta dispărea când utilizatorul trecea
+#     la alt câmp. Cauza: st.rerun() ștergea key_editor
+#     din session_state înainte ca Streamlit să salveze
+#     valoarea selectată. Soluția: key_editor NU mai este
+#     șters la rerun — Streamlit îl păstrează și
+#     re-inițializează corect editorul din df_init actualizat.
 # =========================================================
 
 import streamlit as st
@@ -121,15 +126,24 @@ def render(supabase, cod_introdus, is_new, date_existente):
 
     st.caption("ℹ️ După selectarea unui membru al echipei așteptați afișarea departamentului și a datelor de contact.")
 
-    rows_curente = st.session_state[key_data_init]
-    needs_rerun  = False
     editor_state = st.session_state.get(key_editor, {})
     edited_rows  = editor_state.get("edited_rows", {}) if isinstance(editor_state, dict) else {}
 
-    for i, row in df_edit.iterrows():
-        if i >= len(rows_curente):
+    rows_curente = st.session_state[key_data_init]
+    needs_rerun  = False
+
+    for i in range(len(rows_curente)):
+        row = df_edit.iloc[i] if i < len(df_edit) else None
+        if row is None:
             break
-        nume_nou   = row.get("NUME ȘI PRENUME", "") or ""
+
+        # Preluăm numele prioritar din edited_rows (starea internă Streamlit)
+        # care conține valoarea chiar și la prima selecție, înainte de rerun.
+        if i in edited_rows and "NUME ȘI PRENUME" in edited_rows[i]:
+            nume_nou = edited_rows[i]["NUME ȘI PRENUME"] or ""
+        else:
+            nume_nou = row.get("NUME ȘI PRENUME", "") or ""
+
         nume_vechi = rows_curente[i].get("NUME ȘI PRENUME", "") or ""
 
         rol_din_editor = edited_rows.get(i, {}).get("ROLUL ÎN CONTRACT") if i in edited_rows else None
@@ -152,23 +166,30 @@ def render(supabase, cod_introdus, is_new, date_existente):
     st.session_state[key_data_init] = rows_curente
 
     if needs_rerun:
+        # NU ștergem key_editor — păstrăm starea editorului
+        # pentru ca Streamlit să re-inițializeze corect din df_init actualizat.
         st.rerun()
 
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         rows_sync = st.session_state[key_data_init]
-        for i, row in df_edit.iterrows():
-            if i < len(rows_sync):
-                rol_din_editor = edited_rows.get(i, {}).get("ROLUL ÎN CONTRACT") if i in edited_rows else None
-                rows_sync[i]["NUME ȘI PRENUME"]     = row.get("NUME ȘI PRENUME", "") or ""
-                rows_sync[i]["ROLUL ÎN CONTRACT"]   = str(rol_din_editor).strip() if rol_din_editor is not None else (row.get("ROLUL ÎN CONTRACT", "") or "")
-                rows_sync[i]["PERSOANĂ DE CONTACT"] = bool(row.get("PERSOANĂ DE CONTACT", False))
-                n = rows_sync[i]["NUME ȘI PRENUME"]
-                if n and n in info_map:
-                    info = info_map[n]
-                    rows_sync[i]["DEPARTAMENT"]   = info["dep"]
-                    rows_sync[i]["EMAIL"]         = info["email"]
-                    rows_sync[i]["TELEFON MOBIL"] = info["mob"]
-                    rows_sync[i]["TELEFON FIX"]   = info["fix"]
+        for i in range(len(rows_sync)):
+            row = df_edit.iloc[i] if i < len(df_edit) else None
+            if row is None:
+                break
+            if i in edited_rows and "NUME ȘI PRENUME" in edited_rows[i]:
+                n = edited_rows[i]["NUME ȘI PRENUME"] or ""
+            else:
+                n = row.get("NUME ȘI PRENUME", "") or ""
+            rol_din_editor = edited_rows.get(i, {}).get("ROLUL ÎN CONTRACT") if i in edited_rows else None
+            rows_sync[i]["NUME ȘI PRENUME"]     = n
+            rows_sync[i]["ROLUL ÎN CONTRACT"]   = str(rol_din_editor).strip() if rol_din_editor is not None else (row.get("ROLUL ÎN CONTRACT", "") or "")
+            rows_sync[i]["PERSOANĂ DE CONTACT"] = bool(row.get("PERSOANĂ DE CONTACT", False))
+            if n and n in info_map:
+                info = info_map[n]
+                rows_sync[i]["DEPARTAMENT"]   = info["dep"]
+                rows_sync[i]["EMAIL"]         = info["email"]
+                rows_sync[i]["TELEFON MOBIL"] = info["mob"]
+                rows_sync[i]["TELEFON FIX"]   = info["fix"]
         rows_sync.append({
             "NUME ȘI PRENUME": "", "ROLUL ÎN CONTRACT": "",
             "PERSOANĂ DE CONTACT": False, "DEPARTAMENT": "",
@@ -180,8 +201,12 @@ def render(supabase, cod_introdus, is_new, date_existente):
         st.rerun()
 
     rezultat = []
-    for i, row in df_edit.iterrows():
-        n = str(row.get("NUME ȘI PRENUME", "") or "").strip()
+    for i in range(len(df_edit)):
+        row = df_edit.iloc[i]
+        if i in edited_rows and "NUME ȘI PRENUME" in edited_rows[i]:
+            n = str(edited_rows[i]["NUME ȘI PRENUME"] or "").strip()
+        else:
+            n = str(row.get("NUME ȘI PRENUME", "") or "").strip()
         if not n:
             continue
         rol_din_editor = edited_rows.get(i, {}).get("ROLUL ÎN CONTRACT") if i in edited_rows else None
