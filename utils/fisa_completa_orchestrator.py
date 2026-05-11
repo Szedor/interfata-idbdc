@@ -1,16 +1,16 @@
 # =========================================================
 # utils/fisa_completa_orchestrator.py
-# VERSIUNE: 1.9
-# STATUS: CORECTAT - tabela_baza_ctx transmisă la render_echipa_compact
+# VERSIUNE: 2.0
+# STATUS: CORECTAT - sectiuni_active transmise la export
 # DATA: 2026.05.09
 # =========================================================
-# MODIFICĂRI VERSIUNEA 1.9:
-#   - tabela_baza_ctx transmisă la render_echipa_compact pentru
-#     a determina eticheta corectă: NR.CONTRACT (contracte)
-#     sau ID PROIECT (proiecte).
+# MODIFICĂRI VERSIUNEA 2.0:
+#   - sectiuni_active transmise la build_horizontal_export_data
+#     și build_vertical_export_data. Exportul și printul
+#     conțin exclusiv secțiunile bifate de explorator.
 #
-# MODIFICĂRI VERSIUNEA 1.8:
-#   - Titlu secțiune Echipă eliminat (mutat în render_echipa_compact).
+# MODIFICĂRI VERSIUNEA 1.9:
+#   - tabela_baza_ctx transmisă la render_echipa_compact.
 # =========================================================
 
 import streamlit as st
@@ -29,7 +29,7 @@ from utils.supabase_helpers import safe_select_eq
 
 def _render_export_auth_tab1(supabase) -> bool:
     auth_key = "export_auth_tab1"
-    pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
+    pattern  = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
 
     if st.session_state.get("auth_ai", False) or st.session_state.get(auth_key, False):
         nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
@@ -67,9 +67,9 @@ def _render_export_auth_tab1(supabase) -> bool:
                     .select("nume_prenume,email").eq("email", email_exp).limit(1).execute()
                 if res.data:
                     user = res.data[0]
-                    st.session_state[auth_key] = True
-                    st.session_state.user_email = email_exp
-                    st.session_state.user_name = (user.get("nume_prenume") or "").strip() or email_exp
+                    st.session_state[auth_key]   = True
+                    st.session_state.user_email  = email_exp
+                    st.session_state.user_name   = (user.get("nume_prenume") or "").strip() or email_exp
                     st.rerun()
                 else:
                     st.error("Emailul nu există în baza de date IDBDC.")
@@ -81,13 +81,13 @@ def _render_export_auth_tab1(supabase) -> bool:
 def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta: str):
     _p1, _p2, _p3, _p4, _lbl = st.columns([0.7, 0.7, 0.7, 0.7, 5.2])
     with _p1:
-        pin_gen = st.checkbox("Generale", key=f"fisa_pin_{cod}_generale")
+        pin_gen = st.checkbox("Generale",  key=f"fisa_pin_{cod}_generale")
     with _p2:
         pin_fin = st.checkbox("Financiar", key=f"fisa_pin_{cod}_financiar")
     with _p3:
-        pin_ech = st.checkbox("Echipă", key=f"fisa_pin_{cod}_echipa")
+        pin_ech = st.checkbox("Echipă",    key=f"fisa_pin_{cod}_echipa")
     with _p4:
-        pin_teh = st.checkbox("Tehnic", key=f"fisa_pin_{cod}_tehnic")
+        pin_teh = st.checkbox("Tehnic",    key=f"fisa_pin_{cod}_tehnic")
     with _lbl:
         st.markdown(
             "<div style='color:rgba(255,255,255,0.45);font-size:0.875rem;padding-top:6px;"
@@ -97,13 +97,13 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
 
     sectiuni_active = []
     if pin_gen:
-        sectiuni_active.append(("Generale", tabela_gasita, "generale"))
+        sectiuni_active.append(("Generale",  tabela_gasita,          "generale"))
     if pin_fin:
-        sectiuni_active.append(("Financiar", "com_date_financiare", "financiar"))
+        sectiuni_active.append(("Financiar", "com_date_financiare",  "financiar"))
     if pin_ech:
-        sectiuni_active.append(("Echipa", "com_echipe_proiect", "echipa"))
+        sectiuni_active.append(("Echipa",    "com_echipe_proiect",   "echipa"))
     if pin_teh:
-        sectiuni_active.append(("Tehnic", "com_aspecte_tehnice", "tehnic"))
+        sectiuni_active.append(("Tehnic",    "com_aspecte_tehnice",  "tehnic"))
 
     if sectiuni_active:
         st.markdown(
@@ -124,13 +124,12 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
                     st.info("Nu există membri echipă pentru acest contract.")
                 else:
                     render_echipa_compact(rows, cod_ctx=cod, supabase=supabase,
-                                         tabela_baza_ctx=tabela_gasita)
+                                          tabela_baza_ctx=tabela_gasita)
             else:
                 rows = safe_select_eq(supabase, sec_table, "cod_identificare", cod, limit=50)
                 if not rows:
                     st.info(f"Nu există informații pentru secțiunea {sec_label}.")
                 else:
-                    # CORECȚIE v1.7: supabase transmis pentru îmbogățire domeniu FDI
                     render_sectiune_tabel(
                         sec_label, rows, sec_table,
                         tabela_baza_ctx=tabela_gasita,
@@ -149,23 +148,31 @@ def render_fisa_completa(supabase, cod: str, tabela_gasita: str, titlu_eticheta:
     if not _render_export_auth_tab1(supabase):
         return
 
-    export_data_horizontal = build_horizontal_export_data(supabase, cod, tabela_gasita)
+    if not sectiuni_active:
+        st.info("Bifați cel puțin o secțiune pentru a exporta.")
+        return
+
+    export_data_horizontal = build_horizontal_export_data(
+        supabase, cod, tabela_gasita, sectiuni_active=sectiuni_active
+    )
     if not export_data_horizontal["headers"]:
-        st.info("Nu există date de exportat pentru acest cod.")
+        st.info("Nu există date de exportat pentru secțiunile selectate.")
         return
 
     csv_bytes   = build_csv_bytes(export_data_horizontal)
     excel_bytes = build_excel_bytes(export_data_horizontal)
 
     pdf_result = generate_pdf_vertical(
-        supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
-        lambda s, c, t: build_vertical_export_data(s, c, t)
+        supabase, cod, tabela_gasita,
+        TABLE_LABELS.get(tabela_gasita, "Fișă"),
+        lambda s, c, t: build_vertical_export_data(s, c, t, sectiuni_active=sectiuni_active),
     )
     pdf_bytes = pdf_result[0] if isinstance(pdf_result, tuple) else pdf_result
 
     print_html = generate_print_html_vertical(
-        supabase, cod, tabela_gasita, TABLE_LABELS.get(tabela_gasita, "Fișă"),
-        lambda s, c, t: build_vertical_export_data(s, c, t)
+        supabase, cod, tabela_gasita,
+        TABLE_LABELS.get(tabela_gasita, "Fișă"),
+        lambda s, c, t: build_vertical_export_data(s, c, t, sectiuni_active=sectiuni_active),
     )
 
     col1, col2, col3, col4 = st.columns(4)
