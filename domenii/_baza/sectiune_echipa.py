@@ -1,26 +1,20 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_echipa.py
-# VERSIUNE: 3.0
-# STATUS: REPROIECTAT - rânduri individuale fără tabel
+# VERSIUNE: 3.1
+# STATUS: ACTUALIZAT - toate elementele pe un singur rând
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
-#   Secțiunea Echipă reproiectată complet.
-#   Fiecare membru are un rând propriu cu:
-#     - Etichetă "Membru N"
-#     - Selectbox NUME ȘI PRENUME
-#     - Text input ROLUL ÎN CONTRACT
-#     - Checkbox PERSOANĂ DE CONTACT
-#   Sub fiecare rând: departament și date de contact
-#   afișate automat după selectarea numelui.
-#   Fără st.data_editor — elimină problema pierderii
-#   datelor la navigarea între câmpuri.
+#   Secțiunea Echipă cu rânduri individuale per membru.
 #
-# MODIFICĂRI VERSIUNEA 3.0:
-#   - Înlocuit st.data_editor cu rânduri individuale
-#     st.selectbox + st.text_input + st.checkbox.
-#   - Datele fiecărui membru stocate independent în
-#     session_state — nu se pierd la interacțiuni.
+# MODIFICĂRI VERSIUNEA 3.1:
+#   - Toate cele 4 elemente (Membru N, NUME ȘI PRENUME,
+#     ROLUL ÎN ECHIPĂ, PERSOANĂ DE CONTACT) afișate
+#     pe un singur rând.
+#   - NUME ȘI PRENUME redus la 2/3, ROLUL ÎN ECHIPĂ
+#     redus la 1/2 față de versiunea anterioară.
+#   - Eticheta corectată: ROLUL ÎN ECHIPĂ (nu CONTRACT).
+#   - Eliminată nota de subsol.
 # =========================================================
 
 import streamlit as st
@@ -79,13 +73,11 @@ def render(supabase, cod_introdus, is_new, date_existente):
     if not persoane_data:
         st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane.")
 
-    # Număr membri
     key_nr = f"echipa_nr_{cod_introdus}"
     if key_nr not in st.session_state:
         nr_init = max(5, len(date_existente) if date_existente else 5)
         st.session_state[key_nr] = nr_init
 
-    # Inițializare date existente în session_state
     if date_existente and not is_new:
         for idx, r in enumerate(date_existente):
             key_n = f"echipa_{cod_introdus}_{idx}_nume"
@@ -105,43 +97,44 @@ def render(supabase, cod_introdus, is_new, date_existente):
         key_r = f"echipa_{cod_introdus}_{idx}_rol"
         key_c = f"echipa_{cod_introdus}_{idx}_contact"
 
-        st.markdown(
-            f"<div style='color:rgba(255,255,255,0.60);font-size:0.78rem;"
-            f"font-weight:700;margin-top:10px;margin-bottom:2px;'>"
-            f"Membru {idx + 1}</div>",
-            unsafe_allow_html=True,
-        )
+        # Toate cele 4 elemente pe un singur rând
+        # Proporții: etichetă(1) | nume(4) | rol(3) | bifa(2)
+        col_lbl, col_nume, col_rol, col_contact = st.columns([1, 4, 3, 2])
 
-        col1, col2, col3 = st.columns([3, 3, 1])
+        with col_lbl:
+            st.markdown(
+                f"<div style='color:rgba(255,255,255,0.60);font-size:0.78rem;"
+                f"font-weight:700;padding-top:32px;'>"
+                f"Membru {idx + 1}</div>",
+                unsafe_allow_html=True,
+            )
 
-        with col1:
-            nume_curent = st.session_state.get(key_n, "")
+        with col_nume:
+            nume_curent  = st.session_state.get(key_n, "")
             idx_selectat = persoane_list.index(nume_curent) if nume_curent in persoane_list else 0
             nume_ales = st.selectbox(
                 "NUME ȘI PRENUME",
                 options=persoane_list,
                 index=idx_selectat,
                 key=key_n,
-                label_visibility="visible",
             )
 
-        with col2:
+        with col_rol:
             st.text_input(
-                "ROLUL ÎN CONTRACT",
+                "ROLUL ÎN ECHIPĂ",
                 key=key_r,
-                label_visibility="visible",
             )
 
-        with col3:
+        with col_contact:
             st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
             st.checkbox(
                 "⭐ PERSOANĂ DE CONTACT",
                 key=key_c,
             )
 
-        # Afișare automată departament și contact sub rând
+        # Departament și contact sub rând
         if nume_ales and nume_ales in info_map:
-            info = info_map[nume_ales]
+            info  = info_map[nume_ales]
             parts = []
             if info["dep"]:
                 parts.append(f"🏢 {info['dep']}")
@@ -170,8 +163,6 @@ def render(supabase, cod_introdus, is_new, date_existente):
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
         st.session_state[key_nr] += 1
         st.rerun()
-
-    st.caption("ℹ️ După selectarea unui membru al echipei departamentul și datele de contact sunt afișate automat.")
 
     # Colectare rezultat pentru salvare
     rezultat = []
