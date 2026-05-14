@@ -1,15 +1,13 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.2
-# STATUS: ACTUALIZAT - adăugat domeniu contracte_terti
+# VERSIUNE: 1.3
+# STATUS: ACTUALIZAT - adăugat domeniu contracte_speciale
 # DATA: 2026.05.09
 # =========================================================
-# CONȚINUT:
-#   Motorul principal al Căii2 (Administrare).
-#
+# MODIFICĂRI VERSIUNEA 1.3:
+#   - Adăugat domeniu contracte_speciale în registru.
 # MODIFICĂRI VERSIUNEA 1.2:
-#   - Adăugat domeniu contracte_terti în registru.
-#
+#   - Adăugat domeniu contracte_terti.
 # MODIFICĂRI VERSIUNEA 1.1:
 #   - Înlocuit import admin.ui cu calea2_admin.ui.
 # =========================================================
@@ -19,14 +17,15 @@ from domenii._baza.upsert import upsert_row, delete_rows, insert_rows
 import calea2_admin.ui as ui
 
 # ── Domenii active ─────────────────────────────────────────
-from domenii.contracte_cep   import admin as cep,   definitie as cep_def
-from domenii.contracte_terti import admin as terti, definitie as terti_def
-
+from domenii.contracte_cep      import admin as cep,      definitie as cep_def
+from domenii.contracte_terti    import admin as terti,    definitie as terti_def
+from domenii.contracte_speciale import admin as speciale, definitie as speciale_def
 
 # ── Registru domenii ───────────────────────────────────────
 _DOMENII = {
-    ("Contracte", "CEP"):   (cep,   cep_def),
-    ("Contracte", "TERTI"): (terti, terti_def),
+    ("Contracte", "CEP"):     (cep,      cep_def),
+    ("Contracte", "TERTI"):   (terti,    terti_def),
+    ("Contracte", "SPECIALE"): (speciale, speciale_def),
 }
 
 _TAB_CSS = """
