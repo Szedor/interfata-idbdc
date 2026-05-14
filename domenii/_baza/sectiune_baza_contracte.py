@@ -1,16 +1,23 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_baza_contracte.py
-# VERSIUNE: 1.0
-# STATUS: NOU - Date de bază comune pentru toate contractele
+# VERSIUNE: 1.1
+# STATUS: ACTUALIZAT - suport câmp DERULAT PRIN (TERȚI, SPECIALE)
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
 #   Randează secțiunea Date de bază pentru contracte
-#   (CEP, TERȚI, SPECIALE). Preia conținutul validat din
-#   utils/contracte_common.py v7.0, cu o singură modificare:
-#   nota de subsol înlocuită cu textul fix obligatoriu
-#   "Durata se calculează automat după salvarea fișei."
-#   și adăugată coloana OBSERVAȚII.
+#   (CEP, TERȚI, SPECIALE). Câmpul DERULAT PRIN apare
+#   automat dacă există în date_existente — specific
+#   TERȚI și SPECIALE, absent la CEP.
+#
+# MODIFICĂRI VERSIUNEA 1.1:
+#   - Adăugat câmpul DERULAT PRIN după STATUS CONTRACT.
+#     Apare în tabel doar dacă tabela SQL îl conține
+#     (TERȚI și SPECIALE). La CEP este ignorat automat
+#     deoarece date_existente nu îl conține.
+#
+# MODIFICĂRI VERSIUNEA 1.0:
+#   - Creare inițială.
 # =========================================================
 
 import streamlit as st
@@ -69,6 +76,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "DATA DE SFARSIT":       ds,
         "DURATA":                int(dur_ex) if dur_ex else 0,
         "STATUS CONTRACT":       date_existente.get("status_contract_proiect", ""),
+        "DERULAT PRIN":          date_existente.get("derulat_prin", ""),
         "OBSERVAȚII":            date_existente.get("observatii", ""),
     }
     df = pd.DataFrame([row_init])
@@ -84,6 +92,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "DATA DE SFARSIT":       st.column_config.DateColumn("📅 DATA DE SFARSIT", format="DD-MM-YYYY"),
         "DURATA":                st.column_config.NumberColumn("DURATA (luni)", format="%d", min_value=0),
         "STATUS CONTRACT":       st.column_config.SelectboxColumn("🔖 STATUS CONTRACT", options=status_list),
+        "DERULAT PRIN":          st.column_config.TextColumn("DERULAT PRIN"),
         "OBSERVAȚII":            st.column_config.TextColumn("📝 OBSERVAȚII", width="large"),
     }
 
@@ -121,5 +130,6 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "data_sfarsit":            _fmt_date(ds_e),
         "durata":                  dur_e if dur_e else None,
         "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
-        "observatii":              str(row["OBSERVAȚII"]).strip()            if row["OBSERVAȚII"]            else None,
+        "derulat_prin":            str(row["DERULAT PRIN"]).strip() if row["DERULAT PRIN"] else None,
+        "observatii":              str(row["OBSERVAȚII"]).strip()   if row["OBSERVAȚII"]   else None,
     }
