@@ -11,8 +11,8 @@
 # =========================================================
 
 CATEGORIE    = "Contracte"
-TIP_LABEL    = "TERȚI"
-TIP_SEL      = "TERȚI"
+TIP_LABEL    = "TERTI"
+TIP_SEL      = "TERTI"
 
 BASE_TABLE   = "base_contracte_terti"
 FIN_TABLE    = "com_date_financiare"
