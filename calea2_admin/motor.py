@@ -1,20 +1,17 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.1
-# STATUS: CORECTAT - import ui din calea2_admin, nu din admin
+# VERSIUNE: 1.2
+# STATUS: ACTUALIZAT - adăugat domeniu contracte_terti
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
 #   Motorul principal al Căii2 (Administrare).
 #
-# MODIFICĂRI VERSIUNEA 1.1:
-#   - CORECȚIE: înlocuit `import admin.ui as ui` cu
-#     `import calea2_admin.ui as ui`. Elimină dependența
-#     periculoasă de folderul admin/ (vechea structură).
-#     Modificările în admin/ui.py nu mai afectează Calea2.
+# MODIFICĂRI VERSIUNEA 1.2:
+#   - Adăugat domeniu contracte_terti în registru.
 #
-# MODIFICĂRI VERSIUNEA 1.0:
-#   - Creare inițială motor Calea2 pentru noua structură.
+# MODIFICĂRI VERSIUNEA 1.1:
+#   - Înlocuit import admin.ui cu calea2_admin.ui.
 # =========================================================
 
 import streamlit as st
@@ -22,15 +19,14 @@ from domenii._baza.upsert import upsert_row, delete_rows, insert_rows
 import calea2_admin.ui as ui
 
 # ── Domenii active ─────────────────────────────────────────
-from domenii.contracte_cep  import admin as cep,  definitie as cep_def
-# La adăugarea unui domeniu nou, se adaugă 2 rânduri de import:
-# from domenii.contracte_terti import admin as terti, definitie as terti_def
+from domenii.contracte_cep   import admin as cep,   definitie as cep_def
+from domenii.contracte_terti import admin as terti, definitie as terti_def
 
 
 # ── Registru domenii ───────────────────────────────────────
-# Cheie: (categorie, tip) → (modul_admin, definitie)
 _DOMENII = {
-    ("Contracte", "CEP"): (cep, cep_def),
+    ("Contracte", "CEP"):   (cep,   cep_def),
+    ("Contracte", "TERTI"): (terti, terti_def),
 }
 
 _TAB_CSS = """
