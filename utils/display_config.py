@@ -1,24 +1,16 @@
 # =========================================================
 # utils/display_config.py
-# VERSIUNE: 3.0
-# STATUS: ACTUALIZAT - mapare contracte_cep conform definitie.py
+# VERSIUNE: 3.1
+# STATUS: ACTUALIZAT - derulat_prin adăugat pentru TERȚI și SPECIALE
 # DATA: 2026.05.09
 # =========================================================
-# MODIFICĂRI VERSIUNEA 3.0:
-#   - COL_LABELS_PER_TABLE["base_contracte_cep"] actualizat
-#     conform mapării definitive: NR.CONTRACT, DATA CONTRACTULUI,
-#     OBIECTUL CONTRACTULUI, BENEFICIAR, DATA DE ÎNCEPUT,
-#     DATA DE SFÂRȘIT, DURATA (luni), STATUS CONTRACT.
-#   - COL_LABELS_PER_TABLE["com_date_financiare"] actualizat:
-#     cod_identificare → NR.CONTRACT pentru contextul contractelor.
-#   - COLS_HIDDEN_FISA extins cu creat_de, creat_la,
-#     modificat_de, modificat_la, acronim_departament,
-#     denumire_departament, telefon_mobil, telefon_fix,
-#     persoana_contact (câmpuri niciodată afișate în Calea1).
+# MODIFICĂRI VERSIUNEA 3.1:
+#   - Adăugat derulat_prin → "DERULAT PRIN" în COL_LABELS.
+#   - Adăugat derulat_prin în COL_LABELS_PER_TABLE pentru
+#     base_contracte_terti și base_contracte_speciale.
 #
-# MODIFICĂRI VERSIUNEA 2.0:
-#   - COL_LABELS_PER_TABLE["base_proiecte_fdi"] completat.
-#   - COL_LABELS_PER_TABLE["com_date_financiare"] completat.
+# MODIFICĂRI VERSIUNEA 3.0:
+#   - Mapare contracte_cep conform definitie.py.
 # =========================================================
 
 # ── Etichete globale (fallback) ────────────────────────────────────────
@@ -50,6 +42,7 @@ COL_LABELS = {
     "data_sfarsit":                 "DATA DE SFARSIT",
     "denumire_beneficiar":          "BENEFICIAR",
     "denumire_categorie":           "CATEGORIE",
+    "derulat_prin":                 "DERULAT PRIN",
     "descriere":                    "DESCRIERE",
     "director_proiect":             "DIRECTOR PROIECT",
     "durata":                       "DURATA (luni)",
@@ -144,11 +137,13 @@ COL_LABELS_PER_TABLE = {
         "cod_identificare":        "NR.CONTRACT",
         "status_contract_proiect": "STATUS CONTRACT",
         "obiectul_contractului":   "OBIECTUL CONTRACTULUI",
+        "derulat_prin":            "DERULAT PRIN",
     },
     "base_contracte_speciale": {
         "cod_identificare":        "NR.CONTRACT",
         "status_contract_proiect": "STATUS CONTRACT",
         "obiectul_contractului":   "OBIECTUL CONTRACTULUI",
+        "derulat_prin":            "DERULAT PRIN",
     },
     "base_proiecte_fdi": {
         "cod_identificare":        "COD FINAL ÎNREGISTRARE",
