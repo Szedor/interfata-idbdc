@@ -1,23 +1,25 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.0
-# STATUS: NOU - motor Calea2 pentru noua structură modulară
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - import ui din calea2_admin, nu din admin
 # DATA: 2026.05.09
 # =========================================================
 # CONȚINUT:
 #   Motorul principal al Căii2 (Administrare).
-#   Gestionează navigarea categorie/tip, afișarea tab-urilor
-#   și salvarea datelor prin domenii/_baza/upsert.py.
-#   Fiecare domeniu este importat direct — o corecție
-#   într-un domeniu nu afectează celelalte.
 #
-#   Pentru această etapă: activ doar contracte_cep.
-#   Celelalte domenii se adaugă progresiv, după validare.
+# MODIFICĂRI VERSIUNEA 1.1:
+#   - CORECȚIE: înlocuit `import admin.ui as ui` cu
+#     `import calea2_admin.ui as ui`. Elimină dependența
+#     periculoasă de folderul admin/ (vechea structură).
+#     Modificările în admin/ui.py nu mai afectează Calea2.
+#
+# MODIFICĂRI VERSIUNEA 1.0:
+#   - Creare inițială motor Calea2 pentru noua structură.
 # =========================================================
 
 import streamlit as st
 from domenii._baza.upsert import upsert_row, delete_rows, insert_rows
-import admin.ui as ui
+import calea2_admin.ui as ui
 
 # ── Domenii active ─────────────────────────────────────────
 from domenii.contracte_cep  import admin as cep,  definitie as cep_def
