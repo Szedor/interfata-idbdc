@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/definitie.py
-# VERSIUNE: 1.0
-# STATUS: NOU - definiție domeniu Proiecte FDI
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - STATUS PROIECT în loc de STATUS CONTRACT
 # DATA: 2026.05.09
 # =========================================================
 
@@ -27,7 +27,7 @@ COL_LABELS = {
     "data_inceput":            "DATA DE INCEPUT",
     "data_sfarsit":            "DATA DE SFARSIT",
     "durata":                  "DURATA (luni)",
-    "status_contract_proiect": "STATUS CONTRACT",
+    "status_contract_proiect": "STATUS PROIECT",
     "program":                 "PROGRAM DE FINANTARE",
     "cod_domeniu_fdi":         "DOMENIU",
     "cod_temporar":            "COD DEPUNERE",
