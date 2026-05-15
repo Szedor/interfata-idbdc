@@ -1,11 +1,13 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.3
-# STATUS: ACTUALIZAT - adăugat domeniu contracte_speciale
+# VERSIUNE: 1.4
+# STATUS: ACTUALIZAT - adăugat domeniu proiecte_fdi
 # DATA: 2026.05.09
 # =========================================================
+# MODIFICĂRI VERSIUNEA 1.4:
+#   - Adăugat domeniu proiecte_fdi în registru.
 # MODIFICĂRI VERSIUNEA 1.3:
-#   - Adăugat domeniu contracte_speciale în registru.
+#   - Adăugat domeniu contracte_speciale.
 # MODIFICĂRI VERSIUNEA 1.2:
 #   - Adăugat domeniu contracte_terti.
 # MODIFICĂRI VERSIUNEA 1.1:
@@ -20,12 +22,14 @@ import calea2_admin.ui as ui
 from domenii.contracte_cep      import admin as cep,      definitie as cep_def
 from domenii.contracte_terti    import admin as terti,    definitie as terti_def
 from domenii.contracte_speciale import admin as speciale, definitie as speciale_def
+from domenii.proiecte_fdi       import admin as fdi,      definitie as fdi_def
 
 # ── Registru domenii ───────────────────────────────────────
 _DOMENII = {
-    ("Contracte", "CEP"):     (cep,      cep_def),
-    ("Contracte", "TERTI"):   (terti,    terti_def),
+    ("Contracte", "CEP"):      (cep,      cep_def),
+    ("Contracte", "TERTI"):    (terti,    terti_def),
     ("Contracte", "SPECIALE"): (speciale, speciale_def),
+    ("Proiecte",  "FDI"):      (fdi,      fdi_def),
 }
 
 _TAB_CSS = """
