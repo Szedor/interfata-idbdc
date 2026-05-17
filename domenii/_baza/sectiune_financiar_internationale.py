@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_financiar_internationale.py
-# VERSIUNE: 1.0
-# STATUS: NOU - Date financiare pentru Proiecte INTERNATIONALE
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - CONTRIBUTIE UE UPT → CONTRIBUTIE UE
 # DATA: 2026.05.09
 # =========================================================
 
@@ -10,7 +10,7 @@ import pandas as pd
 
 
 def render(supabase, cod_introdus, is_new, date_existente):
-    VALUTE = ["LEI", "EUR", "USD"]
+    VALUTE = ["EUR", "LEI", "USD"]
 
     if is_new or not date_existente:
         row_ex = {
@@ -40,7 +40,7 @@ def render(supabase, cod_introdus, is_new, date_existente):
         "VALOARE TOTALA PROIECT":  _safe_float(row_ex.get("cost_total_proiect")),
         "CONTRIBUTIE UE TOTALA":   _safe_float(row_ex.get("contributie_ue_total_proiect")),
         "VALOARE PROIECT UPT":     _safe_float(row_ex.get("cost_proiect_upt")),
-        "CONTRIBUTIE UE UPT":      _safe_float(row_ex.get("contributie_ue_proiect_upt")),
+        "CONTRIBUTIE UE":          _safe_float(row_ex.get("contributie_ue_proiect_upt")),
     }])
 
     col_cfg = {
@@ -48,7 +48,7 @@ def render(supabase, cod_introdus, is_new, date_existente):
         "VALOARE TOTALA PROIECT": st.column_config.NumberColumn("💰 VALOARE TOTALA PROIECT", format="%,.2f", min_value=0.0),
         "CONTRIBUTIE UE TOTALA":  st.column_config.NumberColumn("🇪🇺 CONTRIBUTIE UE TOTALA",  format="%,.2f", min_value=0.0),
         "VALOARE PROIECT UPT":    st.column_config.NumberColumn("🏛️ VALOARE PROIECT UPT",    format="%,.2f", min_value=0.0),
-        "CONTRIBUTIE UE UPT":     st.column_config.NumberColumn("🎓 CONTRIBUTIE UE UPT",     format="%,.2f", min_value=0.0),
+        "CONTRIBUTIE UE":         st.column_config.NumberColumn("🎓 CONTRIBUTIE UE",         format="%,.2f", min_value=0.0),
     }
 
     df_edit = st.data_editor(
@@ -64,5 +64,5 @@ def render(supabase, cod_introdus, is_new, date_existente):
         "cost_total_proiect":           _safe_float(row["VALOARE TOTALA PROIECT"]),
         "contributie_ue_total_proiect": _safe_float(row["CONTRIBUTIE UE TOTALA"]),
         "cost_proiect_upt":             _safe_float(row["VALOARE PROIECT UPT"]),
-        "contributie_ue_proiect_upt":   _safe_float(row["CONTRIBUTIE UE UPT"]),
+        "contributie_ue_proiect_upt":   _safe_float(row["CONTRIBUTIE UE"]),
     }]
