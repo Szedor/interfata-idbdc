@@ -1,0 +1,115 @@
+# =========================================================
+# IDBDC/domenii/proiecte_see/definitie.py
+# VERSIUNE: 1.0
+# STATUS: NOU - definiție domeniu Proiecte SEE
+# DATA: 2026.05.09
+# =========================================================
+
+CATEGORIE    = "Proiecte"
+TIP_LABEL    = "SEE"
+TIP_SEL      = "SEE"
+
+BASE_TABLE   = "base_proiecte_see"
+FIN_TABLE    = "com_date_financiare"
+ECHIPA_TABLE = "com_echipe_proiect"
+TEHNIC_TABLE = "com_aspecte_tehnice"
+
+TAB_LABELS = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă", "🧪 Aspecte tehnice"]
+
+SECTIUNI_SALVARE = [BASE_TABLE, FIN_TABLE, ECHIPA_TABLE, TEHNIC_TABLE]
+
+COL_LABELS = {
+    "denumire_categorie":       "CATEGORIE",
+    "acronim_tip_proiecte":     "TIPUL DE PROIECT",
+    "cod_identificare":         "COD PROIECT",
+    "titlul_proiect":           "TITLUL PROIECTULUI",
+    "acronim_proiect":          "ACRONIMUL PROIECTULUI",
+    "data_inceput":             "DATA DE INCEPUT",
+    "data_sfarsit":             "DATA DE SFARSIT",
+    "durata":                   "DURATA (luni)",
+    "status_contract_proiect":  "STATUS PROIECT",
+    "numar_participanti":       "NR.PARTICIPANTI",
+    "denumire_participanti":    "DENUMIRE PARTICIPANTI",
+    "rol_upt":                  "ROL UPT",
+    "identificare_apel":        "APELUL",
+    "data_inchidere_apel":      "DATA LIMITA DEPUNERE",
+    "mecanism_finantare":       "MECANISM DE FINANTARE",
+    "program_finantare":        "PROGRAMUL DE FINANTARE",
+    "sector_prioritar_specific":"SECTOR PRIORITAR SPECIFIC",
+    "domeniul":                 "DOMENIUL",
+    "website":                  "WEBSITE",
+    "observatii":               "OBSERVATII",
+    "valuta":                   "VALUTA",
+    "cost_total_proiect":       "BUGET TOTAL",
+    "cost_proiect_upt":         "BUGET UPT",
+    "nume_prenume":             "NUME SI PRENUME",
+    "rol":                      "ROLUL IN CONTRACT",
+    "persoana_contact":         "PERSOANA DE CONTACT",
+    "departament":              "DEPARTAMENT",
+    "email":                    "EMAIL",
+    "telefon":                  "TELEFON",
+    "obiectiv_general":         "OBIECTIV GENERAL",
+    "obiective_specifice":      "OBIECTIVE SPECIFICE",
+    "activitati_proiect":       "ACTIVITATI",
+    "rezultate_proiect":        "REZULTATE",
+}
+
+COLS_HIDDEN = {
+    "nr_crt",
+    "creat_de", "creat_la", "modificat_de", "modificat_la",
+    "acronim_departament", "denumire_departament",
+    "telefon_mobil", "telefon_fix",
+    "persoana_contact",
+}
+
+COLS_COMPUSE = {
+    "departament": ["acronim_departament", "denumire_departament"],
+    "telefon":     ["telefon_mobil", "telefon_fix"],
+}
+
+COL_ORDER_GENERALE = [
+    "denumire_categorie",
+    "acronim_tip_proiecte",
+    "cod_identificare",
+    "titlul_proiect",
+    "acronim_proiect",
+    "data_inceput",
+    "data_sfarsit",
+    "durata",
+    "status_contract_proiect",
+    "numar_participanti",
+    "denumire_participanti",
+    "rol_upt",
+    "identificare_apel",
+    "data_inchidere_apel",
+    "mecanism_finantare",
+    "program_finantare",
+    "sector_prioritar_specific",
+    "domeniul",
+    "website",
+]
+
+COL_ORDER_FINANCIAR = [
+    "cod_identificare",
+    "valuta",
+    "cost_total_proiect",
+    "cost_proiect_upt",
+]
+
+COL_ORDER_ECHIPA = [
+    "cod_identificare",
+    "nume_prenume",
+    "rol",
+    "persoana_contact",
+    "departament",
+    "email",
+    "telefon",
+]
+
+COL_ORDER_TEHNIC = [
+    "cod_identificare",
+    "obiectiv_general",
+    "obiective_specifice",
+    "activitati_proiect",
+    "rezultate_proiect",
+]
