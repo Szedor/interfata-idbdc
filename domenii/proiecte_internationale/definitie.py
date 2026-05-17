@@ -1,7 +1,8 @@
 # =========================================================
 # IDBDC/domenii/proiecte_internationale/definitie.py
-# VERSIUNE: 1.0
-# STATUS: NOU - definiție domeniu Proiecte INTERNATIONALE
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - adăugat schema_de_finantare, website;
+#                    CONTRIBUTIE UE UPT → CONTRIBUTIE UE
 # DATA: 2026.05.09
 # =========================================================
 
@@ -32,17 +33,18 @@ COL_LABELS = {
     "numar_participanti":           "NR.PARTICIPANTI",
     "denumire_participanti":        "DENUMIRE PARTICIPANTI",
     "rol_upt":                      "ROL UPT",
-    "schema_de_finantare":          "SCHEMA DE FINANTARE",
     "identificare_apel":            "APELUL",
     "data_inchidere_apel":          "DATA LIMITA DEPUNERE",
     "program_finantare":            "PROGRAM DE FINANTARE",
     "tema_topic":                   "TEMA / TOPIC",
+    "schema_de_finantare":          "SCHEMA DE FINANTARE",
+    "website":                      "WEBSITE",
     "observatii":                   "OBSERVATII",
     "valuta":                       "VALUTA",
     "cost_total_proiect":           "VALOARE TOTALA PROIECT",
     "contributie_ue_total_proiect": "CONTRIBUTIE UE TOTALA",
     "cost_proiect_upt":             "VALOARE PROIECT UPT",
-    "contributie_ue_proiect_upt":   "CONTRIBUTIE UE UPT",
+    "contributie_ue_proiect_upt":   "CONTRIBUTIE UE",
     "nume_prenume":                 "NUME SI PRENUME",
     "rol":                          "ROLUL IN CONTRACT",
     "persoana_contact":             "PERSOANA DE CONTACT",
@@ -82,11 +84,12 @@ COL_ORDER_GENERALE = [
     "numar_participanti",
     "denumire_participanti",
     "rol_upt",
-    "schema_de_finantare",
     "identificare_apel",
     "data_inchidere_apel",
     "program_finantare",
     "tema_topic",
+    "schema_de_finantare",
+    "website",
 ]
 
 COL_ORDER_FINANCIAR = [
