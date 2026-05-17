@@ -1,9 +1,11 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.5
-# STATUS: ACTUALIZAT - adăugat domeniu proiecte_internationale
+# VERSIUNE: 1.6
+# STATUS: ACTUALIZAT - adăugat domeniu proiecte_interreg
 # DATA: 2026.05.09
 # =========================================================
+# MODIFICĂRI VERSIUNEA 1.6:
+#   - Adăugat domeniu proiecte_interreg.
 # MODIFICĂRI VERSIUNEA 1.5:
 #   - Adăugat domeniu proiecte_internationale în registru.
 # MODIFICĂRI VERSIUNEA 1.4:
@@ -26,6 +28,7 @@ from domenii.contracte_terti         import admin as terti,           definitie 
 from domenii.contracte_speciale      import admin as speciale,        definitie as speciale_def
 from domenii.proiecte_fdi            import admin as fdi,             definitie as fdi_def
 from domenii.proiecte_internationale import admin as internationale,  definitie as internationale_def
+from domenii.proiecte_interreg       import admin as interreg,       definitie as interreg_def
 
 # ── Registru domenii ───────────────────────────────────────
 _DOMENII = {
@@ -34,6 +37,7 @@ _DOMENII = {
     ("Contracte", "SPECIALE"):      (speciale,       speciale_def),
     ("Proiecte",  "FDI"):           (fdi,            fdi_def),
     ("Proiecte",  "INTERNATIONALE"): (internationale, internationale_def),
+    ("Proiecte",  "INTERREG"):       (interreg,       interreg_def),
 }
 
 _TAB_CSS = """
