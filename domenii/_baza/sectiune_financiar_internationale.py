@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_financiar_internationale.py
-# VERSIUNE: 1.1
-# STATUS: CORECTAT - CONTRIBUTIE UE UPT → CONTRIBUTIE UE
+# VERSIUNE: 1.2
+# STATUS: ACTUALIZAT - 9 campuri conform mapare finala
 # DATA: 2026.05.09
 # =========================================================
 
@@ -11,58 +11,53 @@ import pandas as pd
 
 def render(supabase, cod_introdus, is_new, date_existente):
     VALUTE = ["EUR", "LEI", "USD"]
+    row_ex = {} if (is_new or not date_existente) else (date_existente[0] if isinstance(date_existente, list) else date_existente)
 
-    if is_new or not date_existente:
-        row_ex = {
-            "valuta":                       "EUR",
-            "cost_total_proiect":           0.0,
-            "contributie_ue_total_proiect": 0.0,
-            "cost_proiect_upt":             0.0,
-            "contributie_ue_proiect_upt":   0.0,
-        }
-    else:
-        row_ex = date_existente[0] if isinstance(date_existente, list) else date_existente
-
-    def _safe_float(val):
-        if val is None or val == "":
-            return 0.0
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            return 0.0
+    def _f(v):
+        try: return float(v) if v else 0.0
+        except: return 0.0
 
     valuta_ex = row_ex.get("valuta") or "EUR"
-    if valuta_ex not in VALUTE:
-        valuta_ex = "EUR"
+    if valuta_ex not in VALUTE: valuta_ex = "EUR"
 
     df = pd.DataFrame([{
-        "VALUTA":                  valuta_ex,
-        "VALOARE TOTALA PROIECT":  _safe_float(row_ex.get("cost_total_proiect")),
-        "CONTRIBUTIE UE TOTALA":   _safe_float(row_ex.get("contributie_ue_total_proiect")),
-        "VALOARE PROIECT UPT":     _safe_float(row_ex.get("cost_proiect_upt")),
-        "CONTRIBUTIE UE":          _safe_float(row_ex.get("contributie_ue_proiect_upt")),
+        "VALUTA":                                    valuta_ex,
+        "VALOARE TOTALA COSTURI PROIECT":            _f(row_ex.get("costuri_totale_proiect")),
+        "CONTRIBUTIE UE TOTAL PROIECT":              _f(row_ex.get("contributie_totala_finantator")),
+        "COSTURI TOTALE UPT":                        _f(row_ex.get("costuri_totale_upt")),
+        "VALOARE CONTRIBUTIE UE PENTRU UPT":         _f(row_ex.get("contributie_finantator")),
+        "VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE": _f(row_ex.get("costuri_eligibile_estimate_total")),
+        "VALOARE TOTALA GRANT SOLICITAT":            _f(row_ex.get("valoare_grant_solicitat_total")),
+        "VALOARE COSTURI ESTIMATE UPT":              _f(row_ex.get("costuri_eligibile_estimate_upt")),
+        "VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT":  _f(row_ex.get("valoare_grant_solicitat_upt")),
     }])
 
     col_cfg = {
-        "VALUTA":                 st.column_config.SelectboxColumn("💱 VALUTA", options=VALUTE, required=True),
-        "VALOARE TOTALA PROIECT": st.column_config.NumberColumn("💰 VALOARE TOTALA PROIECT", format="%,.2f", min_value=0.0),
-        "CONTRIBUTIE UE TOTALA":  st.column_config.NumberColumn("🇪🇺 CONTRIBUTIE UE TOTALA",  format="%,.2f", min_value=0.0),
-        "VALOARE PROIECT UPT":    st.column_config.NumberColumn("🏛️ VALOARE PROIECT UPT",    format="%,.2f", min_value=0.0),
-        "CONTRIBUTIE UE":         st.column_config.NumberColumn("🎓 CONTRIBUTIE UE",         format="%,.2f", min_value=0.0),
+        "VALUTA": st.column_config.SelectboxColumn("💱 VALUTA", options=VALUTE, required=True),
+        "VALOARE TOTALA COSTURI PROIECT":            st.column_config.NumberColumn("💰 VALOARE TOTALA COSTURI PROIECT",            format="%,.2f", min_value=0.0),
+        "CONTRIBUTIE UE TOTAL PROIECT":              st.column_config.NumberColumn("🇪🇺 CONTRIBUTIE UE TOTAL PROIECT",              format="%,.2f", min_value=0.0),
+        "COSTURI TOTALE UPT":                        st.column_config.NumberColumn("🏛️ COSTURI TOTALE UPT",                        format="%,.2f", min_value=0.0),
+        "VALOARE CONTRIBUTIE UE PENTRU UPT":         st.column_config.NumberColumn("🎓 VALOARE CONTRIBUTIE UE PENTRU UPT",         format="%,.2f", min_value=0.0),
+        "VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE": st.column_config.NumberColumn("📋 VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE", format="%,.2f", min_value=0.0),
+        "VALOARE TOTALA GRANT SOLICITAT":            st.column_config.NumberColumn("📋 VALOARE TOTALA GRANT SOLICITAT",            format="%,.2f", min_value=0.0),
+        "VALOARE COSTURI ESTIMATE UPT":              st.column_config.NumberColumn("📋 VALOARE COSTURI ESTIMATE UPT",              format="%,.2f", min_value=0.0),
+        "VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT":  st.column_config.NumberColumn("📋 VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT",  format="%,.2f", min_value=0.0),
     }
 
-    df_edit = st.data_editor(
-        df, column_config=col_cfg, hide_index=True,
-        use_container_width=True, num_rows="fixed",
-        key=f"fin_internationale_editor_{cod_introdus}",
-    )
+    df_edit = st.data_editor(df, column_config=col_cfg, hide_index=True,
+                              use_container_width=True, num_rows="fixed",
+                              key=f"fin_internationale_editor_{cod_introdus}")
     row = df_edit.iloc[0]
 
     return [{
-        "cod_identificare":             cod_introdus,
-        "valuta":                       row["VALUTA"],
-        "cost_total_proiect":           _safe_float(row["VALOARE TOTALA PROIECT"]),
-        "contributie_ue_total_proiect": _safe_float(row["CONTRIBUTIE UE TOTALA"]),
-        "cost_proiect_upt":             _safe_float(row["VALOARE PROIECT UPT"]),
-        "contributie_ue_proiect_upt":   _safe_float(row["CONTRIBUTIE UE"]),
+        "cod_identificare":                  cod_introdus,
+        "valuta":                            row["VALUTA"],
+        "costuri_totale_proiect":            _f(row["VALOARE TOTALA COSTURI PROIECT"]),
+        "contributie_totala_finantator":     _f(row["CONTRIBUTIE UE TOTAL PROIECT"]),
+        "costuri_totale_upt":                _f(row["COSTURI TOTALE UPT"]),
+        "contributie_finantator":            _f(row["VALOARE CONTRIBUTIE UE PENTRU UPT"]),
+        "costuri_eligibile_estimate_total":  _f(row["VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE"]),
+        "valoare_grant_solicitat_total":     _f(row["VALOARE TOTALA GRANT SOLICITAT"]),
+        "costuri_eligibile_estimate_upt":    _f(row["VALOARE COSTURI ESTIMATE UPT"]),
+        "valoare_grant_solicitat_upt":       _f(row["VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT"]),
     }]
