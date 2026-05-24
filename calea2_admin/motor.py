@@ -1,9 +1,13 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.7
-# STATUS: ACTUALIZAT - adăugat domeniu proiecte_see
-# DATA: 2026.05.09
+# VERSIUNE: 1.8
+# STATUS: ACTUALIZAT - adăugate toate domeniile noi
+# DATA: 2026.05.25
 # =========================================================
+# MODIFICĂRI VERSIUNEA 1.8:
+#   - Adăugate domenii: proiecte_nonue, proiecte_structurale,
+#     proiecte_pncdi, proiecte_pnrr,
+#     proprietate_industriala, evenimente_stiintifice.
 # MODIFICĂRI VERSIUNEA 1.7:
 #   - Adăugat domeniu proiecte_see.
 # MODIFICĂRI VERSIUNEA 1.6:
@@ -25,23 +29,35 @@ from domenii._baza.upsert import upsert_row, delete_rows, insert_rows
 import calea2_admin.ui as ui
 
 # ── Domenii active ─────────────────────────────────────────
-from domenii.contracte_cep           import admin as cep,             definitie as cep_def
-from domenii.contracte_terti         import admin as terti,           definitie as terti_def
-from domenii.contracte_speciale      import admin as speciale,        definitie as speciale_def
-from domenii.proiecte_fdi            import admin as fdi,             definitie as fdi_def
-from domenii.proiecte_internationale import admin as internationale,  definitie as internationale_def
+from domenii.contracte_cep           import admin as cep,            definitie as cep_def
+from domenii.contracte_terti         import admin as terti,          definitie as terti_def
+from domenii.contracte_speciale      import admin as speciale,       definitie as speciale_def
+from domenii.proiecte_fdi            import admin as fdi,            definitie as fdi_def
+from domenii.proiecte_internationale import admin as internationale, definitie as internationale_def
 from domenii.proiecte_interreg       import admin as interreg,       definitie as interreg_def
 from domenii.proiecte_see            import admin as see,            definitie as see_def
+from domenii.proiecte_nonue          import admin as nonue,          definitie as nonue_def
+from domenii.proiecte_structurale    import admin as structurale,    definitie as structurale_def
+from domenii.proiecte_pncdi          import admin as pncdi,          definitie as pncdi_def
+from domenii.proiecte_pnrr           import admin as pnrr,           definitie as pnrr_def
+from domenii.proprietate_industriala import admin as prop_ind,       definitie as prop_ind_def
+from domenii.evenimente_stiintifice  import admin as evenimente,     definitie as evenimente_def
 
 # ── Registru domenii ───────────────────────────────────────
 _DOMENII = {
-    ("Contracte", "CEP"):           (cep,            cep_def),
-    ("Contracte", "TERTI"):         (terti,          terti_def),
-    ("Contracte", "SPECIALE"):      (speciale,       speciale_def),
-    ("Proiecte",  "FDI"):           (fdi,            fdi_def),
-    ("Proiecte",  "INTERNATIONALE"): (internationale, internationale_def),
-    ("Proiecte",  "INTERREG"):       (interreg,       interreg_def),
-    ("Proiecte",  "SEE"):            (see,            see_def),
+    ("Contracte",                 "CEP"):            (cep,            cep_def),
+    ("Contracte",                 "TERTI"):          (terti,          terti_def),
+    ("Contracte",                 "SPECIALE"):       (speciale,       speciale_def),
+    ("Proiecte",                  "FDI"):            (fdi,            fdi_def),
+    ("Proiecte",                  "INTERNATIONALE"): (internationale, internationale_def),
+    ("Proiecte",                  "INTERREG"):       (interreg,       interreg_def),
+    ("Proiecte",                  "SEE"):            (see,            see_def),
+    ("Proiecte",                  "NONUE"):          (nonue,          nonue_def),
+    ("Proiecte",                  "STRUCTURALE"):    (structurale,    structurale_def),
+    ("Proiecte",                  "PNCDI"):          (pncdi,          pncdi_def),
+    ("Proiecte",                  "PNRR"):           (pnrr,           pnrr_def),
+    ("Proprietate industriala",   "PROPRIETATE INDUSTRIALĂ"): (prop_ind,  prop_ind_def),
+    ("Evenimente stiintifice",    "EVENIMENTE ȘTIINȚIFICE"):  (evenimente, evenimente_def),
 }
 
 _TAB_CSS = """
@@ -146,14 +162,14 @@ def porneste_motorul(supabase):
 
     if not is_new:
         date_baza_ex   = (_fetch(supabase, defn.BASE_TABLE,   cod_introdus) or [{}])[0]
-        date_fin_ex    = _fetch(supabase, defn.FIN_TABLE,    cod_introdus)
+        date_fin_ex    = _fetch(supabase, defn.FIN_TABLE,    cod_introdus) if hasattr(defn, "FIN_TABLE")    else []
         date_echipa_ex = _fetch(supabase, defn.ECHIPA_TABLE, cod_introdus)
         date_teh_ex    = _fetch(supabase, defn.TEHNIC_TABLE, cod_introdus) if hasattr(defn, "TEHNIC_TABLE") else []
     else:
         date_baza_ex = {}
         date_fin_ex = date_echipa_ex = date_teh_ex = []
 
-    TAB_LABELS = defn.TAB_LABELS
+    TAB_LABELS = defn.TAB_LABELS if hasattr(defn, "TAB_LABELS") else defn.TAB_LABELS_ADMIN
     key_tab    = f"tab_activ_{cod_introdus}"
 
     if key_tab not in st.session_state or st.session_state[key_tab] not in TAB_LABELS:
@@ -183,7 +199,13 @@ def porneste_motorul(supabase):
             st.session_state[key_baza_ss] = r
         rezultate["baza"] = r
 
-    elif tab_activ == "💰 Date financiare":
+    elif tab_activ == "🔒 Date suplimentare" and hasattr(modul, "render_date_suplimentare"):
+        r = modul.render_date_suplimentare(supabase, cod_introdus, is_new, date_baza_ex)
+        if r:
+            st.session_state[key_baza_ss + "_supl"] = r
+        rezultate["suplimentare"] = r
+
+    elif tab_activ == "💰 Date financiare" and hasattr(modul, "render_date_financiare"):
         r = modul.render_date_financiare(supabase, cod_introdus, is_new, date_fin_ex)
         if r is not None:
             st.session_state[key_fin_ss] = r
@@ -208,13 +230,21 @@ def porneste_motorul(supabase):
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
 
-            fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
-            if fin is not None:
-                delete_rows(supabase, defn.FIN_TABLE, cod_introdus)
-                for row in fin:
-                    ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
-                    if not ok:
-                        erori.append(f"Date financiare: {msg}")
+            # Date suplimentare (proprietate industriala) — acelasi tabel ca baza
+            supl = rezultate.get("suplimentare") or st.session_state.get(key_baza_ss + "_supl")
+            if supl:
+                ok, msg = upsert_row(supabase, defn.BASE_TABLE, {**supl, "cod_identificare": cod_introdus})
+                if not ok:
+                    erori.append(f"Date suplimentare: {msg}")
+
+            if hasattr(defn, "FIN_TABLE"):
+                fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
+                if fin is not None:
+                    delete_rows(supabase, defn.FIN_TABLE, cod_introdus)
+                    for row in fin:
+                        ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
+                        if not ok:
+                            erori.append(f"Date financiare: {msg}")
 
             if "echipa" in rezultate:
                 delete_rows(supabase, defn.ECHIPA_TABLE, cod_introdus)
