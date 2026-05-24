@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_baza_proiecte_see.py
-# VERSIUNE: 1.0
-# STATUS: NOU - Date de bază pentru Proiecte SEE
-# DATA: 2026.05.09
+# VERSIUNE: 1.1
+# STATUS: ACTUALIZAT - aliniat cu versiunea 1.1 definitie
+# DATA: 2026.05.23
 # =========================================================
 
 import streamlit as st
@@ -20,32 +20,22 @@ def _get_status_list(_supabase):
 
 
 def _fmt_date(date_val):
-    if date_val is None:
-        return None
-    if pd.isna(date_val):
-        return None
-    if hasattr(date_val, 'strftime'):
-        return date_val.strftime("%Y-%m-%d")
-    if hasattr(date_val, 'isoformat'):
-        return date_val.isoformat()
+    if date_val is None: return None
+    if pd.isna(date_val): return None
+    if hasattr(date_val, 'strftime'): return date_val.strftime("%Y-%m-%d")
+    if hasattr(date_val, 'isoformat'): return date_val.isoformat()
     return str(date_val)
 
 
 def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
     status_list = _get_status_list(supabase)
-
     di     = to_date(date_existente.get("data_inceput"))
     ds     = to_date(date_existente.get("data_sfarsit"))
     dur_ex = date_existente.get("durata")
-
-    if di and ds and (dur_ex is None or dur_ex == 0):
-        dur_ex = calc_durata(di, ds)
-    elif di and dur_ex and not ds:
-        ds = add_months(di, dur_ex)
-    elif ds and dur_ex and not di:
-        di = sub_months(ds, dur_ex)
-    if di and ds:
-        dur_ex = calc_durata(di, ds)
+    if di and ds and (dur_ex is None or dur_ex == 0): dur_ex = calc_durata(di, ds)
+    elif di and dur_ex and not ds: ds = add_months(di, dur_ex)
+    elif ds and dur_ex and not di: di = sub_months(ds, dur_ex)
+    if di and ds: dur_ex = calc_durata(di, ds)
 
     row_init = {
         "CATEGORIE":                  cat_sel,
@@ -94,48 +84,39 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "OBSERVATII":                st.column_config.TextColumn("📝 OBSERVATII", width="large"),
     }
 
-    df_edit = st.data_editor(
-        df, column_config=col_cfg, hide_index=True,
-        use_container_width=True, num_rows="fixed",
-        key=f"{tabela_nume}_baza_editor_{cod_introdus}",
-    )
+    df_edit = st.data_editor(df, column_config=col_cfg, hide_index=True,
+                              use_container_width=True, num_rows="fixed",
+                              key=f"{tabela_nume}_baza_editor_{cod_introdus}")
     row = df_edit.iloc[0]
-
     st.caption("ℹ️ Durata se calculează automat după salvarea fișei.")
 
     di_e  = row["DATA DE INCEPUT"]
     ds_e  = row["DATA DE SFARSIT"]
     dur_e = int(row["DURATA (luni)"]) if row["DURATA (luni)"] else 0
+    if di_e and ds_e: dur_e = calc_durata(di_e, ds_e)
+    elif di_e and dur_e and not ds_e: ds_e = add_months(di_e, dur_e)
+    elif ds_e and dur_e and not di_e: di_e = sub_months(ds_e, dur_e)
 
-    if di_e and ds_e:
-        dur_e = calc_durata(di_e, ds_e)
-    elif di_e and dur_e and not ds_e:
-        ds_e = add_months(di_e, dur_e)
-    elif ds_e and dur_e and not di_e:
-        di_e = sub_months(ds_e, dur_e)
-
-    def _s(val):
-        return str(val).strip() if val else None
-
+    def _s(val): return str(val).strip() if val else None
     return {
-        "cod_identificare":         cod_introdus,
-        "denumire_categorie":       cat_sel,
-        "acronim_tip_proiecte":     tip_label,
-        "titlul_proiect":           _s(row["TITLUL PROIECTULUI"]),
-        "acronim_proiect":          _s(row["ACRONIMUL PROIECTULUI"]),
-        "data_inceput":             _fmt_date(di_e),
-        "data_sfarsit":             _fmt_date(ds_e),
-        "durata":                   dur_e if dur_e else None,
-        "status_contract_proiect":  row["STATUS PROIECT"]           if row["STATUS PROIECT"] else None,
-        "numar_participanti":       _s(row["NR.PARTICIPANTI"]),
-        "denumire_participanti":    _s(row["DENUMIRE PARTICIPANTI"]),
-        "rol_upt":                  _s(row["ROL UPT"]),
-        "identificare_apel":        _s(row["APELUL"]),
-        "data_inchidere_apel":      _fmt_date(row["DATA LIMITA DEPUNERE"]),
-        "mecanism_finantare":       _s(row["MECANISM DE FINANTARE"]),
-        "program_finantare":        _s(row["PROGRAMUL DE FINANTARE"]),
-        "sector_prioritar_specific":_s(row["SECTOR PRIORITAR SPECIFIC"]),
-        "domeniul":                 _s(row["DOMENIUL"]),
-        "website":                  _s(row["WEBSITE"]),
-        "observatii":               _s(row["OBSERVATII"]),
+        "cod_identificare":          cod_introdus,
+        "denumire_categorie":        cat_sel,
+        "acronim_tip_proiecte":      tip_label,
+        "titlul_proiect":            _s(row["TITLUL PROIECTULUI"]),
+        "acronim_proiect":           _s(row["ACRONIMUL PROIECTULUI"]),
+        "data_inceput":              _fmt_date(di_e),
+        "data_sfarsit":              _fmt_date(ds_e),
+        "durata":                    dur_e if dur_e else None,
+        "status_contract_proiect":   row["STATUS PROIECT"] if row["STATUS PROIECT"] else None,
+        "numar_participanti":        _s(row["NR.PARTICIPANTI"]),
+        "denumire_participanti":     _s(row["DENUMIRE PARTICIPANTI"]),
+        "rol_upt":                   _s(row["ROL UPT"]),
+        "identificare_apel":         _s(row["APELUL"]),
+        "data_inchidere_apel":       _fmt_date(row["DATA LIMITA DEPUNERE"]),
+        "mecanism_finantare":        _s(row["MECANISM DE FINANTARE"]),
+        "program_finantare":         _s(row["PROGRAMUL DE FINANTARE"]),
+        "sector_prioritar_specific": _s(row["SECTOR PRIORITAR SPECIFIC"]),
+        "domeniul":                  _s(row["DOMENIUL"]),
+        "website":                   _s(row["WEBSITE"]),
+        "observatii":                _s(row["OBSERVATII"]),
     }
