@@ -1,13 +1,13 @@
 # =========================================================
 # IDBDC/domenii/proiecte_interreg/admin.py
-# VERSIUNE: 1.1
-# STATUS: ACTUALIZAT - foloseste sectiune_financiar_interreg_see
-# DATA: 2026.05.09
+# VERSIUNE: 1.2
+# STATUS: CORECTAT - import sectiune_financiar_interreg (existent)
+# DATA: 2026.05.24
 # =========================================================
 
 from domenii.proiecte_interreg.definitie           import TIP_LABEL, BASE_TABLE
 from domenii._baza.sectiune_baza_proiecte_interreg import render as _baza_render_baza
-from domenii._baza.sectiune_financiar_interreg_see import render as _baza_render_financiar
+from domenii._baza.sectiune_financiar_interreg     import render as _baza_render_financiar
 from domenii._baza.sectiune_echipa                 import render as _baza_render_echipa
 from domenii._baza.sectiune_tehnic                 import render as _baza_render_tehnic
 
