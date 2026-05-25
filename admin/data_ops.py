@@ -38,9 +38,8 @@ def normalize_identifier_column(df, column_name="cod_identificare"):
 
 def cleanup_payload(row_dict, table_name=None):
     """Elimină câmpurile sistem sau nule înainte de trimiterea către bază."""
-    to_exclude = {"id"}
+    to_exclude = {"id", "data_ultimei_modificari"}
     
-    # Pentru tabelele fără audit, excludem toate coloanele de audit și timestamp
     if table_name in TABELE_FARA_AUDIT:
         to_exclude |= {"creat_de", "modificat_de", "creat_la", "modificat_la"}
     
