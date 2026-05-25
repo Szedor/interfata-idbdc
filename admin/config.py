@@ -123,6 +123,5 @@ CONTROL_COLS = [
     "responsabil_idbdc",
     "observatii_idbdc",
     "status_confirmare",
-    "data_ultimei_modificari",
     "validat_idbdc",
 ]
