@@ -1,14 +1,8 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_baza_proiecte_internationale.py
-# VERSIUNE: 1.3
-# STATUS: CORECTAT - eroare StreamlitAPIException + dropdown ROL UPT
+# VERSIUNE: 1.4
+# STATUS: CORECTAT - pastrat DateColumn, dropdown ROL UPT corect
 # DATA: 2026.05.26
-# =========================================================
-# MODIFICARI VERSIUNEA 1.3:
-#   - Eliminat DateColumn din col_cfg pentru a evita eroarea de compatibilitate
-#   - Datele sunt afisate ca text (TextColumn) pentru stabilitate
-#   - Adaugat dropdown pentru ROL UPT cu optiunile specificate
-#   - Pastrat toate functiile de calcul (durata, date) existente
 # =========================================================
 
 import streamlit as st
@@ -20,15 +14,15 @@ from utils.date_helpers import to_date, calc_durata, add_months, sub_months
 # OPTIUNI DROPDOWN PENTRU ROL UPT
 # =========================================================
 ROL_UPT_OPTIONS = [
-    "Coordonator",
-    "Coordonator asociat",
-    "Partener",
-    "Partener principal",
-    "Partener asociat",
-    "Beneficiar",
-    "Beneficiar asociat",
+    "Coordonator (Coordinator)",
+    "Coordonator asociat (Associate Coordinator)",
+    "Partener (Partner)",
+    "Partener principal (Lead Partner)",
+    "Partener asociat (Associate Partner)",
+    "Beneficiar (Beneficiary)",
+    "Beneficiar asociat (Associated Beneficiary)",
     "Subcontractor",
-    "Terț afiliat"
+    "Terț afiliat (Affiliated Third Party)"
 ]
 
 @st.cache_data(show_spinner=False, ttl=600)
@@ -76,7 +70,6 @@ def _safe_int(v):
 
 
 def _safe_str(v):
-    """Returneaza string gol daca None, altfel string."""
     if v is None:
         return ""
     return str(v).strip()
@@ -98,10 +91,9 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     if di and ds:
         dur_ex = calc_durata(di, ds)
 
-    # Valoare initiala pentru ROL UPT dropdown
     rol_upt_initial = _safe_str(date_existente.get("rol_upt"))
     if rol_upt_initial not in ROL_UPT_OPTIONS:
-        rol_upt_initial = ROL_UPT_OPTIONS[0]  # default "Coordonator"
+        rol_upt_initial = ROL_UPT_OPTIONS[0]
 
     row_init = {
         "CATEGORIE":             cat_sel,
@@ -127,17 +119,14 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     }
     df = pd.DataFrame([row_init])
 
-    # =========================================================
-    # CONFIGURARE COLOANE - FARA DateColumn pentru stabilitate
-    # =========================================================
     col_cfg = {
         "CATEGORIE":             st.column_config.TextColumn("CATEGORIE", disabled=True),
         "TIPUL DE PROIECT":      st.column_config.TextColumn("TIPUL DE PROIECT", disabled=True),
         "ID PROIECT":            st.column_config.TextColumn("ID PROIECT", disabled=True),
         "TITLUL PROIECTULUI":    st.column_config.TextColumn("TITLUL PROIECTULUI", width="large"),
         "ACRONIMUL PROIECTULUI": st.column_config.TextColumn("ACRONIMUL PROIECTULUI"),
-        "DATA DE INCEPUT":       st.column_config.TextColumn("📅 DATA DE INCEPUT (AAAA-LL-ZZ)"),
-        "DATA DE SFARSIT":       st.column_config.TextColumn("📅 DATA DE SFARSIT (AAAA-LL-ZZ)"),
+        "DATA DE INCEPUT":       st.column_config.DateColumn("📅 DATA DE INCEPUT", format="YYYY-MM-DD"),
+        "DATA DE SFARSIT":       st.column_config.DateColumn("📅 DATA DE SFARSIT", format="YYYY-MM-DD"),
         "DURATA (luni)":         st.column_config.NumberColumn("DURATA (luni)", format="%d", min_value=0),
         "STATUS PROIECT":        st.column_config.SelectboxColumn("🔖 STATUS PROIECT", options=status_list),
         "SCOR EVALUARE":         st.column_config.TextColumn("SCOR EVALUARE"),
@@ -145,7 +134,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "DENUMIRE PARTICIPANTI": st.column_config.TextColumn("DENUMIRE PARTICIPANTI", width="large"),
         "ROL UPT":               st.column_config.SelectboxColumn("ROL UPT", options=ROL_UPT_OPTIONS),
         "APELUL":                st.column_config.TextColumn("APELUL"),
-        "DATA LIMITA DEPUNERE":  st.column_config.TextColumn("📅 DATA LIMITA DEPUNERE (AAAA-LL-ZZ)"),
+        "DATA LIMITA DEPUNERE":  st.column_config.DateColumn("📅 DATA LIMITA DEPUNERE", format="YYYY-MM-DD"),
         "PROGRAM DE FINANTARE":  st.column_config.TextColumn("PROGRAM DE FINANTARE"),
         "TEMA / TOPIC":          st.column_config.TextColumn("TEMA / TOPIC", width="large"),
         "SCHEMA DE FINANTARE":   st.column_config.TextColumn("SCHEMA DE FINANTARE"),
@@ -161,16 +150,10 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     row = df_edit.iloc[0]
     st.caption("ℹ️ Durata se calculează automat după salvarea fișei.")
 
-    # Preluare valori din editor
-    di_e_str  = _safe_str(row["DATA DE INCEPUT"])
-    ds_e_str  = _safe_str(row["DATA DE SFARSIT"])
-    dur_e     = _safe_int(row["DURATA (luni)"])
+    di_e  = row["DATA DE INCEPUT"]
+    ds_e  = row["DATA DE SFARSIT"]
+    dur_e = _safe_int(row["DURATA (luni)"])
 
-    # Conversie date din string
-    di_e = _safe_date(di_e_str) if di_e_str else None
-    ds_e = _safe_date(ds_e_str) if ds_e_str else None
-
-    # Calcul automat durata / date
     if di_e and ds_e:
         dur_e = calc_durata(di_e, ds_e)
     elif di_e and dur_e and not ds_e:
@@ -196,7 +179,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "denumire_participanti":   _s(row["DENUMIRE PARTICIPANTI"]),
         "rol_upt":                 _s(row["ROL UPT"]),
         "identificare_apel":       _s(row["APELUL"]),
-        "data_inchidere_apel":     _fmt_date(_safe_date(row["DATA LIMITA DEPUNERE"])),
+        "data_inchidere_apel":     _fmt_date(row["DATA LIMITA DEPUNERE"]),
         "program_finantare":       _s(row["PROGRAM DE FINANTARE"]),
         "tema_topic":              _s(row["TEMA / TOPIC"]),
         "schema_de_finantare":     _s(row["SCHEMA DE FINANTARE"]),
