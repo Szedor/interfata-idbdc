@@ -1,27 +1,15 @@
 # =========================================================
 # IDBDC/admin/data_ops.py
-# VERSIUNE: 6.2
-# STATUS: CORECTAT - creat_de/modificat_de excluse pentru tabele fără audit;
-#                    username_sistem folosit la salvare
-# DATA: 2026.05.09
+# VERSIUNE: 6.3
+# STATUS: CORECTAT - completare automata creat_la / modificat_la
+# DATA: 2026.05.26
 # =========================================================
-# CONȚINUT:
-#   Operațiuni asupra datelor pentru Calea2 (Administrare):
-#   curățare payload, upsert, salvare globală, ștergere,
-#   adăugare observații cu istoric.
-#
-# MODIFICĂRI VERSIUNEA 6.2:
-#   - Definit set TABELE_FARA_AUDIT cu tabelele SQL care nu au
-#     coloanele creat_de/modificat_de (ex: com_date_financiare,
-#     com_aspecte_tehnice, com_echipe_proiect). Pentru acestea,
-#     câmpurile de audit sunt excluse din payload înainte de
-#     trimiterea la Supabase, eliminând eroarea PGRST204.
-#   - Pentru tabelele base_* (care au coloane de audit),
-#     creat_de și modificat_de sunt populate cu
-#     st.session_state.operator_username.
-#
-# MODIFICĂRI VERSIUNEA ANTERIOARA:
-#   - Corecție critică sintaxă Supabase (upsert corect)
+# MODIFICARI VERSIUNEA 6.3:
+#   - Eliminat referirea la data_ultimei_modificari (coloana inexistenta)
+#   - Adaugat completare automata pentru creat_la si modificat_la
+#     (folosind now_iso() pentru timestamp)
+#   - Pentru tabelele fara audit (TABELE_FARA_AUDIT) se exclud
+#     atat coloanele de audit cat si cele de timestamp
 # =========================================================
 
 import streamlit as st
@@ -29,7 +17,7 @@ import pandas as pd
 from datetime import datetime
 
 
-# Tabele SQL care NU au coloanele creat_de / modificat_de
+# Tabele SQL care NU au coloanele de audit (creat_de, modificat_de, creat_la, modificat_la)
 TABELE_FARA_AUDIT = {
     "com_date_financiare",
     "com_aspecte_tehnice",
@@ -50,9 +38,12 @@ def normalize_identifier_column(df, column_name="cod_identificare"):
 
 def cleanup_payload(row_dict, table_name=None):
     """Elimină câmpurile sistem sau nule înainte de trimiterea către bază."""
-    to_exclude = {"id", "creat_la", "modificat_la"}
+    to_exclude = {"id"}
+    
+    # Pentru tabelele fără audit, excludem toate coloanele de audit și timestamp
     if table_name in TABELE_FARA_AUDIT:
-        to_exclude |= {"creat_de", "modificat_de"}
+        to_exclude |= {"creat_de", "modificat_de", "creat_la", "modificat_la"}
+    
     return {k: v for k, v in row_dict.items() if k not in to_exclude and pd.notnull(v)}
 
 
@@ -62,11 +53,18 @@ def direct_upsert_single_row(supabase, table_name, row_data, match_col="cod_iden
     if not payload.get(match_col):
         return False, "Lipsă cod identificare."
 
+    # Pentru tabelele care au coloane de audit
     if table_name not in TABELE_FARA_AUDIT:
         operator_username = st.session_state.get("operator_username") or "necunoscut"
+        
+        # Setează modificat_de și modificat_la la fiecare salvare
         payload["modificat_de"] = operator_username
+        payload["modificat_la"] = now_iso()
+        
+        # Dacă este înregistrare nouă (nu există creat_de), setează și creat_de și creat_la
         if not payload.get("creat_de"):
             payload["creat_de"] = operator_username
+            payload["creat_la"] = now_iso()
 
     try:
         supabase.table(table_name).upsert(payload, on_conflict=match_col).execute()
@@ -82,7 +80,7 @@ def direct_save_all_tables(supabase, cod_id, data_dict, base_table):
         if not df_base.empty:
             row = df_base.iloc[0].to_dict()
             row["cod_identificare"] = cod_id
-            row["data_ultimei_modificari"] = now_iso()
+            # Nu mai adăugăm data_ultimei_modificari - folosim modificat_la în direct_upsert_single_row
             ok, msg = direct_upsert_single_row(supabase, base_table, row)
             if not ok:
                 return False, f"Eroare Bază: {msg}"
