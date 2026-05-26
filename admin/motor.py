@@ -1,13 +1,24 @@
 # =========================================================
 # IDBDC/admin/motor.py
-# VERSIUNE: 6.0
-# STATUS: STABIL - Dispatch complet pentru toate categoriile/tipurile
-# DATA: 2026.05.05
+# VERSIUNE: 6.1
+# STATUS: CORECTAT - salvare multi-rând date financiare (PNCDI, PNRR)
+# DATA: 2026.05.26
 # =========================================================
 # CONȚINUT:
 #   Motorul principal al modulului Admin. Gestionează
 #   navigarea între categorii/tipuri, afișarea tab-urilor
 #   și salvarea datelor în PostgreSQL prin Supabase.
+#
+# MODIFICĂRI VERSIUNEA 6.1:
+#   - CORECȚIE: salvarea datelor financiare folosește acum
+#     insert() în loc de upsert() per rând.
+#     upsert() cu on_conflict=cod_identificare suprascria
+#     primul rând la fiecare iterație, rezultând că se salva
+#     doar ultimul rând (problema vizibilă la PNCDI/PNRR
+#     unde există mai multe rânduri per an de referință).
+#     Pattern nou: delete toate rândurile existente, apoi
+#     insert bulk — identic cu pattern-ul deja folosit
+#     pentru echipă.
 #
 # MODIFICĂRI VERSIUNEA 6.0:
 #   - Adăugat import și dispatch pentru toate tipurile de
@@ -294,12 +305,12 @@ def porneste_motorul(supabase):
                     ).execute()
                 except Exception:
                     pass
-                for row in fin_de_salvat:
-                    ok, msg = ops.direct_upsert_single_row(
-                        supabase, "com_date_financiare", row, match_col="cod_identificare"
-                    )
-                    if not ok:
-                        erori.append(f"Date financiare: {msg}")
+                randuri_fin = [r for r in fin_de_salvat if r.get("cod_identificare")]
+                if randuri_fin:
+                    try:
+                        supabase.table("com_date_financiare").insert(randuri_fin).execute()
+                    except Exception as e:
+                        erori.append(f"Date financiare: {e}")
 
             # Echipă
             if "echipa" in rezultate:
