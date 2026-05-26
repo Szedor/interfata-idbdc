@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_financiar_pnrr.py
-# VERSIUNE: 1.0
-# STATUS: NOU
-# DATA: 2026.05.23
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - ANUL DE REFERINTA convertit explicit la string
+# DATA: 2026.05.26
 # =========================================================
 # LOGICA SPECIALA (identica cu PNCDI):
 #   - Financiarul PNRR are mai multe randuri per proiect (cate unul per an).
@@ -37,9 +37,21 @@ def render(supabase, cod_introdus, is_new, date_existente):
     # ── Tabel randuri anuale ──────────────────────────────────────────────────
     st.markdown("#### 📅 Valori pe ani de referință")
 
+    def _an_str(v):
+        """Converteste an_referinta la string curat (ex: 2024.0 → '2024')."""
+        if v is None:
+            return ""
+        s = str(v).strip()
+        if s in ("", "None", "nan"):
+            return ""
+        try:
+            return str(int(float(s)))
+        except (ValueError, TypeError):
+            return s
+
     if rows_ex:
         df_ani = pd.DataFrame([{
-            "ANUL DE REFERINTA":        r.get("an_referinta", ""),
+            "ANUL DE REFERINTA":        _an_str(r.get("an_referinta")),
             "VALOARE AN REFERINTA":     _f(r.get("valoare_contract_an_referinta")),
             "COFINANTARE AN REFERINTA": _f(r.get("cofinantare_contract_an_referinta")),
         } for r in rows_ex])
@@ -49,6 +61,8 @@ def render(supabase, cod_introdus, is_new, date_existente):
             "VALOARE AN REFERINTA":     0.0,
             "COFINANTARE AN REFERINTA": 0.0,
         }])
+    # Asiguram ca tipul coloanei este string (object), nu numeric
+    df_ani["ANUL DE REFERINTA"] = df_ani["ANUL DE REFERINTA"].astype(str).replace("nan", "")
 
     col_cfg_ani = {
         "ANUL DE REFERINTA":        st.column_config.TextColumn("📆 ANUL DE REFERINTA", width="small"),
