@@ -1,13 +1,13 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_financiar_pncdi.py
-# VERSIUNE: 2.0
-# STATUS: CORECTAT - păstrează toți anii la încărcare și salvare
+# VERSIUNE: 2.1
+# STATUS: CORECTAT - eliminat placeholder neacceptat
 # DATA: 2026.05.28
 # =========================================================
+# MODIFICĂRI VERSIUNEA 2.1:
+#   - Eliminat parametrul placeholder de la TextColumn
 # MODIFICĂRI VERSIUNEA 2.0:
-#   - CORECȚIE MAJORĂ: Asigură păstrarea tuturor anilor la încărcare
-#   - Eliminare duplicate la nivel de an_referinta
-#   - Conversie corectă a anului la string
+#   - Păstrare toți anii la încărcare și salvare
 # =========================================================
 
 import streamlit as st
@@ -79,7 +79,7 @@ def render(supabase, cod_introdus, is_new, date_existente):
     df_ani["ANUL DE REFERINTA"] = df_ani["ANUL DE REFERINTA"].astype(str).replace("nan", "").replace("None", "")
 
     col_cfg_ani = {
-        "ANUL DE REFERINTA": st.column_config.TextColumn("📆 ANUL DE REFERINTA", width="small", placeholder="ex: 2024"),
+        "ANUL DE REFERINTA": st.column_config.TextColumn("📆 ANUL DE REFERINTA", width="small"),
         "VALOARE AN REFERINTA": st.column_config.NumberColumn("💰 VALOARE AN REFERINTA", format="%.2f", min_value=0.0, step=1000.0),
         "COFINANTARE AN REFERINTA": st.column_config.NumberColumn("🏛️ COFINANTARE AN REFERINTA", format="%.2f", min_value=0.0, step=1000.0),
     }
