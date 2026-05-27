@@ -29,17 +29,19 @@ def _get_status_list(_supabase):
 
 def _fmt_date(v):
     if v is None: return None
+    if pd.isna(v) if not isinstance(v, str) else False: return None
     if hasattr(v, 'strftime'): return v.strftime("%Y-%m-%d")
     if hasattr(v, 'isoformat'): return v.isoformat()
-    return str(v)
+    s = str(v).strip()
+    return s if s not in ("", "None", "nan", "NaT") else None
 
 
 def _force_date_cols(df, cols):
-    """Forțează coloanele de dată la dtype datetime64 — necesar pentru
-    compatibilitate cu st.column_config.DateColumn în Streamlit nou."""
+    """Forțează coloanele de dată la obiecte datetime.date sau None —
+    necesar pentru compatibilitate cu st.column_config.DateColumn în Streamlit nou."""
     for col in cols:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+            df[col] = df[col].apply(lambda v: to_date(v) if v is not None and str(v).strip() not in ("", "nan", "NaT") else None)
     return df
 
 
