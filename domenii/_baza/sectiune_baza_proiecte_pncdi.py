@@ -1,8 +1,16 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_baza_proiecte_pncdi.py
-# VERSIUNE: 1.0
-# STATUS: NOU
-# DATA: 2026.05.23
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - forțare tip datetime pentru DateColumn
+# DATA: 2026.05.27
+# =========================================================
+# MODIFICĂRI VERSIUNEA 1.1:
+#   - CORECȚIE: după salvare și reîncărcare din Supabase,
+#     coloanele de dată veneau ca string și Streamlit nou
+#     (Python 3.13) arunca StreamlitAPIException la
+#     _check_type_compatibilities. Adăugat _force_date_cols()
+#     care convertește explicit toate coloanele DateColumn
+#     la dtype datetime64 în DataFrame înainte de data_editor.
 # =========================================================
 
 import streamlit as st
@@ -24,6 +32,15 @@ def _fmt_date(v):
     if hasattr(v, 'strftime'): return v.strftime("%Y-%m-%d")
     if hasattr(v, 'isoformat'): return v.isoformat()
     return str(v)
+
+
+def _force_date_cols(df, cols):
+    """Forțează coloanele de dată la dtype datetime64 — necesar pentru
+    compatibilitate cu st.column_config.DateColumn în Streamlit nou."""
+    for col in cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+    return df
 
 
 def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
@@ -60,6 +77,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "OBSERVATII":               date_existente.get("observatii", ""),
     }
     df = pd.DataFrame([row_init])
+    df = _force_date_cols(df, ["DATA CONTRACT", "DATA DE INCEPUT", "DATA DE SFARSIT", "DATA LIMITA DEPUNERE"])
 
     col_cfg = {
         "CATEGORIE":                 st.column_config.TextColumn("CATEGORIE", disabled=True),
