@@ -1,26 +1,22 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 2.4
-# STATUS: CORECTAT - salvare date financiare multi-an prin delete+insert
+# VERSIUNE: 2.5
+# STATUS: CORECTAT - delete verificat explicit inainte de insert financiar
 # DATA: 2026.05.28
 # =========================================================
-# MODIFICĂRI VERSIUNEA 2.4:
-#   - CORECȚIE CRITICĂ: datele financiare cu an_referinta
-#     (PNCDI, PNRR) nu mai folosesc upsert cu cheie compusă,
-#     deoarece constraintul din DB este UNIQUE(cod_identificare)
-#     simplu, fără an_referinta — upsert-ul eșua cu
+# MODIFICĂRI VERSIUNEA 2.5:
+#   - Salvarea datelor financiare multi-an (PNCDI, PNRR):
+#     delete_all_for_project() verificat explicit — dacă
+#     ștergerea eșuează, insert-ul NU se mai execută și
+#     eroarea este raportată clar operatorului.
+#     Anterior: delete eșua silențios → insert eșua cu
 #     "duplicate key value violates unique constraint".
-#     Noua strategie pentru rânduri cu an_referinta:
-#       1. delete_all_for_project (șterge toate rândurile existente)
-#       2. insert_rows (inserează toate rândurile noi dintr-o dată)
-#     Această strategie este identică cu cea folosită deja
-#     pentru echipă și este sigură atomic.
-#   - Rândurile FĂRĂ an_referinta (FDI, contracte, interreg,
-#     see, structurale etc.) continuă să folosească upsert
-#     pe cod_identificare — comportament neschimbat.
+#   - delete_all_for_project() returnează acum (bool, msg)
+#     în loc de bool — adaptat apelurile din motor.py.
 #
-# MODIFICĂRI VERSIUNEA 2.3:
-#   - salvare atomică cu ștergere după validare
+# MODIFICĂRI VERSIUNEA 2.4:
+#   - Strategie delete+insert pentru date financiare multi-an.
+#   - Strategie upsert pentru date financiare cu un singur rând.
 # =========================================================
 
 import streamlit as st
@@ -240,16 +236,11 @@ def porneste_motorul(supabase):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
 
                 if fin is not None and isinstance(fin, list) and fin:
-                    # Deduplicare pe an_referinta (dacă există) sau pe cod
+                    # Deduplicare
                     rows_unice = {}
                     for row in fin:
                         an = row.get("an_referinta")
-                        if an:
-                            # Rânduri cu an_referinta: cheie compusă cod + an
-                            cheie = f"{cod_introdus}__{an}"
-                        else:
-                            # Rânduri fără an_referinta: un singur rând per cod
-                            cheie = cod_introdus
+                        cheie = f"{cod_introdus}__{an}" if an else cod_introdus
                         if cheie not in rows_unice:
                             rows_unice[cheie] = row
                     rows_valide = list(rows_unice.values())
@@ -257,46 +248,71 @@ def porneste_motorul(supabase):
                     are_an_referinta = any(r.get("an_referinta") for r in rows_valide)
 
                     if are_an_referinta:
-                        # STRATEGIE DELETE + INSERT pentru tipuri multi-an (PNCDI, PNRR)
-                        # Motivul: constraintul din DB este UNIQUE(cod_identificare) simplu,
-                        # nu UNIQUE(cod_identificare, an_referinta), deci upsert eșuează
-                        # cu "duplicate key" când există deja rânduri pentru același cod.
-                        delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
-                        ok, msg = insert_rows(supabase, defn.FIN_TABLE, rows_valide)
-                        if not ok:
-                            ani_str = ", ".join(
-                                str(r.get("an_referinta", "?")) for r in rows_valide
+                        # DELETE obligatoriu înaintea INSERT pentru tipuri multi-an.
+                        # Verificăm explicit că ștergerea a reușit — dacă eșuează
+                        # (RLS, permisiuni, etc.) nu continuăm cu insert-ul care
+                        # ar eșua oricum cu "duplicate key".
+                        ok_del, msg_del = delete_all_for_project(
+                            supabase, defn.FIN_TABLE, cod_introdus
+                        )
+                        if not ok_del:
+                            erori.append(
+                                f"Date financiare — ștergere eșuată (insert anulat): {msg_del}"
                             )
-                            erori.append(f"Date financiare (ani: {ani_str}): {msg}")
+                        else:
+                            ok_ins, msg_ins = insert_rows(
+                                supabase, defn.FIN_TABLE, rows_valide
+                            )
+                            if not ok_ins:
+                                ani_str = ", ".join(
+                                    str(r.get("an_referinta", "?")) for r in rows_valide
+                                )
+                                erori.append(
+                                    f"Date financiare (ani: {ani_str}): {msg_ins}"
+                                )
                     else:
-                        # STRATEGIE UPSERT pentru tipuri cu un singur rând (FDI, contracte etc.)
+                        # Un singur rând per proiect — upsert simplu
                         for row in rows_valide:
                             ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
                             if not ok:
                                 erori.append(f"Date financiare: {msg}")
 
                 elif fin == []:
-                    # Listă goală explicită = operatorul a șters toate rândurile
-                    delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
+                    # Listă goală = operatorul a șters toți anii
+                    ok_del, msg_del = delete_all_for_project(
+                        supabase, defn.FIN_TABLE, cod_introdus
+                    )
+                    if not ok_del:
+                        erori.append(f"Date financiare — ștergere eșuată: {msg_del}")
 
             # ── Echipă ────────────────────────────────────────────────
             if "echipa" in rezultate:
-                delete_all_for_project(supabase, defn.ECHIPA_TABLE, cod_introdus)
-                randuri = [r for r in rezultate["echipa"] if r.get("nume_prenume")]
-                if randuri:
-                    ok, msg = insert_rows(supabase, defn.ECHIPA_TABLE, randuri)
-                    if not ok:
-                        erori.append(f"Echipă: {msg}")
+                ok_del, msg_del = delete_all_for_project(
+                    supabase, defn.ECHIPA_TABLE, cod_introdus
+                )
+                if not ok_del:
+                    erori.append(f"Echipă — ștergere eșuată: {msg_del}")
+                else:
+                    randuri = [r for r in rezultate["echipa"] if r.get("nume_prenume")]
+                    if randuri:
+                        ok, msg = insert_rows(supabase, defn.ECHIPA_TABLE, randuri)
+                        if not ok:
+                            erori.append(f"Echipă: {msg}")
 
             # ── Aspecte tehnice ───────────────────────────────────────
             if hasattr(defn, "TEHNIC_TABLE"):
                 teh = rezultate.get("tehnice") or st.session_state.get(key_teh_ss)
                 if teh is not None:
-                    delete_all_for_project(supabase, defn.TEHNIC_TABLE, cod_introdus)
-                    for row in teh:
-                        ok, msg = upsert_row(supabase, defn.TEHNIC_TABLE, row)
-                        if not ok:
-                            erori.append(f"Aspecte tehnice: {msg}")
+                    ok_del, msg_del = delete_all_for_project(
+                        supabase, defn.TEHNIC_TABLE, cod_introdus
+                    )
+                    if not ok_del:
+                        erori.append(f"Aspecte tehnice — ștergere eșuată: {msg_del}")
+                    else:
+                        for row in teh:
+                            ok, msg = upsert_row(supabase, defn.TEHNIC_TABLE, row)
+                            if not ok:
+                                erori.append(f"Aspecte tehnice: {msg}")
 
             st.session_state["admin_msg"] = (
                 ("error", " | ".join(erori)) if erori
