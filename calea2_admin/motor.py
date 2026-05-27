@@ -1,20 +1,14 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 2.0
-# STATUS: CORECTAT - salvare corectă date financiare multi-ani
+# VERSIUNE: 2.1
+# STATUS: CORECTAT - eliminare duplicate înainte de upsert financiar
 # DATA: 2026.05.28
 # =========================================================
+# MODIFICĂRI VERSIUNEA 2.1:
+#   - Eliminare duplicate din lista de înregistrări financiare
+#     înainte de upsert_rows_batch (rezolvă eroarea 21000)
 # MODIFICĂRI VERSIUNEA 2.0:
-#   - CORECȚIE MAJORĂ: Datele financiare se salvează folosind
-#     upsert_rows_batch() cu cheie compusă ["cod_identificare", "an_referinta"]
-#   - Eliminat delete_all_for_project() înainte de upsert
-#   - Adăugat suport pentru salvare simultană a mai multor ani
-# MODIFICĂRI VERSIUNEA 1.9:
-#   - Corectat import upsert
-# MODIFICĂRI VERSIUNEA 1.8:
-#   - Adăugate domenii: proiecte_nonue, proiecte_structurale,
-#     proiecte_pncdi, proiecte_pnrr,
-#     proprietate_industriala, evenimente_stiintifice
+#   - Salvare corectă date financiare multi-ani cu cheie compusă
 # =========================================================
 
 import streamlit as st
@@ -232,7 +226,15 @@ def porneste_motorul(supabase):
             if hasattr(defn, "FIN_TABLE"):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
                 if fin is not None and isinstance(fin, list) and fin:
-                    rows_valide = [row for row in fin if row.get("an_referinta")]
+                    rows_unice = {}
+                    for row in fin:
+                        an = row.get("an_referinta")
+                        if an:
+                            cheie = f"{cod_introdus}_{an}"
+                            if cheie not in rows_unice:
+                                rows_unice[cheie] = row
+                    rows_valide = list(rows_unice.values())
+                    
                     if rows_valide:
                         ok, msg = upsert_rows_batch(
                             supabase, 
