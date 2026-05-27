@@ -1,18 +1,20 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 2.1
-# STATUS: CORECTAT - eliminare duplicate înainte de upsert financiar
+# VERSIUNE: 2.2
+# STATUS: CORECTAT - salvare individuală pe ani pentru date financiare
 # DATA: 2026.05.28
 # =========================================================
+# MODIFICĂRI VERSIUNEA 2.2:
+#   - Salvare individuală (row by row) pentru date financiare
+#   - Eliminare duplicate înainte de salvare
 # MODIFICĂRI VERSIUNEA 2.1:
-#   - Eliminare duplicate din lista de înregistrări financiare
-#     înainte de upsert_rows_batch (rezolvă eroarea 21000)
+#   - Eliminare duplicate din listă
 # MODIFICĂRI VERSIUNEA 2.0:
 #   - Salvare corectă date financiare multi-ani cu cheie compusă
 # =========================================================
 
 import streamlit as st
-from domenii._baza.upsert import upsert_row, upsert_rows_batch, delete_all_for_project, insert_rows
+from domenii._baza.upsert import upsert_row, delete_all_for_project, insert_rows
 import calea2_admin.ui as ui
 
 # ── Domenii active ─────────────────────────────────────────
@@ -236,14 +238,16 @@ def porneste_motorul(supabase):
                     rows_valide = list(rows_unice.values())
                     
                     if rows_valide:
-                        ok, msg = upsert_rows_batch(
-                            supabase, 
-                            defn.FIN_TABLE, 
-                            rows_valide, 
-                            match_col=["cod_identificare", "an_referinta"]
-                        )
-                        if not ok:
-                            erori.append(f"Date financiare: {msg}")
+                        for row in rows_valide:
+                            ok, msg = upsert_row(
+                                supabase, 
+                                defn.FIN_TABLE, 
+                                row, 
+                                match_col=["cod_identificare", "an_referinta"]
+                            )
+                            if not ok:
+                                an = row.get("an_referinta", "?")
+                                erori.append(f"Date financiare (an {an}): {msg}")
                 elif fin == []:
                     delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
 
