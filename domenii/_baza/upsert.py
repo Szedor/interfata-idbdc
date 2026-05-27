@@ -1,16 +1,15 @@
 # =========================================================
 # IDBDC/domenii/_baza/upsert.py
-# VERSIUNE: 1.0
-# STATUS: NOU - salvare Supabase comună tuturor domeniilor
-# DATA: 2026.05.09
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - suport pentru chei primare compuse
+# DATA: 2026.05.27
 # =========================================================
-# CONȚINUT:
-#   Funcții de upsert/delete pentru PostgreSQL prin Supabase.
-#   TABELE_FARA_AUDIT: tabele care nu au coloanele
-#   creat_de/modificat_de — payload-ul este curățat automat
-#   pentru acestea, eliminând eroarea PGRST204.
-#   Toate celelalte tabele (base_*) primesc creat_de și
-#   modificat_de populate cu operator_username din session_state.
+# MODIFICĂRI VERSIUNEA 1.1:
+#   - Adăugat suport pentru chei primare compuse în upsert
+#   - Parametrul on_conflict poate fi string (coloană unică)
+#     sau listă/tuplu (cheie compusă)
+#   - Pentru com_date_financiare: on_conflict = ["cod_identificare", "an_referinta"]
+#   - Adăugat delete_all_for_project() pentru ștergere completă
 # =========================================================
 
 import streamlit as st
@@ -34,10 +33,25 @@ def _cleanup(row_dict: dict, table_name: str) -> dict:
     }
 
 
-def upsert_row(supabase, table_name: str, row_data: dict, match_col: str = "cod_identificare"):
+def upsert_row(supabase, table_name: str, row_data: dict, match_col = "cod_identificare"):
+    """
+    Upsert cu suport pentru chei primare compuse.
+    
+    Args:
+        match_col: poate fi:
+            - string: o singură coloană (ex: "cod_identificare")
+            - list/tuple: cheie compusă (ex: ["cod_identificare", "an_referinta"])
+    """
     payload = _cleanup(row_data, table_name)
-    if not payload.get(match_col):
-        return False, "Lipsă cod identificare."
+    
+    # Verificăm că toate coloanele cheie sunt prezente
+    if isinstance(match_col, (list, tuple)):
+        lipsa = [col for col in match_col if not payload.get(col)]
+        if lipsa:
+            return False, f"Lipsă coloane cheie: {', '.join(lipsa)}"
+    else:
+        if not payload.get(match_col):
+            return False, f"Lipsă {match_col}."
 
     if table_name not in TABELE_FARA_AUDIT:
         username = st.session_state.get("operator_username") or "necunoscut"
@@ -52,7 +66,25 @@ def upsert_row(supabase, table_name: str, row_data: dict, match_col: str = "cod_
         return False, str(e)
 
 
-def delete_rows(supabase, table_name: str, cod: str):
+def delete_rows(supabase, table_name: str, cod: str, extra_condition: dict = None):
+    """
+    Șterge rânduri dintr-un tabel.
+    
+    Args:
+        extra_condition: dicționar cu condiții suplimentare (ex: {"an_referinta": "2024"})
+    """
+    try:
+        query = supabase.table(table_name).delete().eq("cod_identificare", cod)
+        if extra_condition:
+            for col, val in extra_condition.items():
+                query = query.eq(col, val)
+        query.execute()
+    except Exception:
+        pass
+
+
+def delete_all_for_project(supabase, table_name: str, cod: str):
+    """Șterge toate înregistrările unui proiect dintr-un tabel."""
     try:
         supabase.table(table_name).delete().eq("cod_identificare", cod).execute()
     except Exception:
