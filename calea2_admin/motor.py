@@ -1,9 +1,13 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.8
-# STATUS: ACTUALIZAT - adăugate toate domeniile noi
-# DATA: 2026.05.25
+# VERSIUNE: 1.9
+# STATUS: ACTUALIZAT - corectat salvare date financiare multi-ani
+# DATA: 2026.05.27
 # =========================================================
+# MODIFICĂRI VERSIUNEA 1.9:
+#   - Corectat salvare date financiare: folosește cheie compusă
+#     (cod_identificare + an_referinta) pentru upsert
+#   - Importat delete_all_for_project din upsert
 # MODIFICĂRI VERSIUNEA 1.8:
 #   - Adăugate domenii: proiecte_nonue, proiecte_structurale,
 #     proiecte_pncdi, proiecte_pnrr,
@@ -25,7 +29,7 @@
 # =========================================================
 
 import streamlit as st
-from domenii._baza.upsert import upsert_row, delete_rows, insert_rows
+from domenii._baza.upsert import upsert_row, delete_all_for_project, insert_rows
 import calea2_admin.ui as ui
 
 # ── Domenii active ─────────────────────────────────────────
@@ -237,27 +241,39 @@ def porneste_motorul(supabase):
                 if not ok:
                     erori.append(f"Date suplimentare: {msg}")
 
+            # SALVARE DATE FINANCIARE - CU CHEIE COMPUSĂ
             if hasattr(defn, "FIN_TABLE"):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
-                if fin is not None:
-                    delete_rows(supabase, defn.FIN_TABLE, cod_introdus)
+                if fin is not None and isinstance(fin, list):
+                    # Ștergem toate înregistrările vechi ale proiectului
+                    delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
+                    # Inserăm noile înregistrări (câte un rând per an)
                     for row in fin:
-                        ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
+                        # Folosim cheie compusă pentru upsert
+                        ok, msg = upsert_row(
+                            supabase, 
+                            defn.FIN_TABLE, 
+                            row, 
+                            match_col=["cod_identificare", "an_referinta"]
+                        )
                         if not ok:
-                            erori.append(f"Date financiare: {msg}")
+                            an = row.get('an_referinta', '?')
+                            erori.append(f"Date financiare (anul {an}): {msg}")
 
+            # SALVARE ECHIPĂ
             if "echipa" in rezultate:
-                delete_rows(supabase, defn.ECHIPA_TABLE, cod_introdus)
+                delete_all_for_project(supabase, defn.ECHIPA_TABLE, cod_introdus)
                 randuri = [r for r in rezultate["echipa"] if r.get("nume_prenume")]
                 if randuri:
                     ok, msg = insert_rows(supabase, defn.ECHIPA_TABLE, randuri)
                     if not ok:
                         erori.append(f"Echipă: {msg}")
 
+            # SALVARE ASPECTE TEHNICE
             if hasattr(defn, "TEHNIC_TABLE"):
                 teh = rezultate.get("tehnice") or st.session_state.get(key_teh_ss)
                 if teh is not None:
-                    delete_rows(supabase, defn.TEHNIC_TABLE, cod_introdus)
+                    delete_all_for_project(supabase, defn.TEHNIC_TABLE, cod_introdus)
                     for row in teh:
                         ok, msg = upsert_row(supabase, defn.TEHNIC_TABLE, row)
                         if not ok:
@@ -275,7 +291,7 @@ def porneste_motorul(supabase):
         st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
         if st.checkbox("Confirm eliminarea din toate tabelele"):
             for t in defn.SECTIUNI_SALVARE:
-                delete_rows(supabase, t, cod_introdus)
+                delete_all_for_project(supabase, t, cod_introdus)
             for k in [key_baza_ss, key_fin_ss, key_teh_ss,
                       f"echipa_data_init_{cod_introdus}",
                       f"echipa_editor_{cod_introdus}",
