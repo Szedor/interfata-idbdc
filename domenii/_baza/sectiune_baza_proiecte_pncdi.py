@@ -9,7 +9,6 @@
 #     în funcție de dtype-ul real din DataFrame
 #   - NR.PARTICIPANTI: NumberColumn (era int64, dar configurat ca TextColumn)
 #   - Coloanele cu dtype 'O' (object) -> TextColumn
-#   - Eliminat try-except inutil
 # =========================================================
 
 import streamlit as st
@@ -108,7 +107,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     date_cols = ["DATA CONTRACT", "DATA DE INCEPUT", "DATA DE SFARSIT", "DATA LIMITA DEPUNERE"]
     df = _prepare_dataframe(df, date_cols)
     
-    # Configurăm coloanele CU TIPURILE CORECTE în funcție de dtype
+    # Configurăm coloanele CU TIPURILE CORECTE
     col_cfg = {
         "CATEGORIE": st.column_config.TextColumn("CATEGORIE", disabled=True),
         "TIPUL DE PROIECT": st.column_config.TextColumn("TIPUL DE PROIECT", disabled=True),
@@ -121,7 +120,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "DATA DE SFARSIT": st.column_config.DateColumn("📅 DATA DE SFARSIT", format="YYYY-MM-DD"),
         "DURATA (luni)": st.column_config.NumberColumn("DURATA (luni)", format="%d", min_value=0, step=1),
         "STATUS PROIECT": st.column_config.SelectboxColumn("🔖 STATUS PROIECT", options=status_list),
-        "NR.PARTICIPANTI": st.column_config.NumberColumn("NR.PARTICIPANTI", format="%d", min_value=0, step=1),  # FIX: era TextColumn
+        "NR.PARTICIPANTI": st.column_config.NumberColumn("NR.PARTICIPANTI", format="%d", min_value=0, step=1),
         "DENUMIRE PARTICIPANTI": st.column_config.TextColumn("DENUMIRE PARTICIPANTI", width="large"),
         "ROL UPT": st.column_config.TextColumn("ROL UPT"),
         "APELUL": st.column_config.TextColumn("APELUL"),
