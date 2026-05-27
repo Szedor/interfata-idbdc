@@ -1,9 +1,19 @@
 # =========================================================
 # IDBDC/domenii/_baza/upsert.py
-# VERSIUNE: 2.0
-# STATUS: CORECTAT - suport complet pentru chei primare compuse
+# VERSIUNE: 2.1
+# STATUS: CORECTAT - on_conflict convertit la string pentru SDK Supabase
 # DATA: 2026.05.28
 # =========================================================
+# MODIFICĂRI VERSIUNEA 2.1:
+#   - CORECȚIE CRITICĂ: on_conflict accepta lista Python
+#     (ex: ["cod_identificare", "an_referinta"]), dar SDK-ul
+#     Supabase Python necesită string cu virgulă
+#     (ex: "cod_identificare,an_referinta").
+#     Efectul anterior: la salvarea datelor financiare PNCDI/PNRR
+#     cu mai mulți ani de referință, se salva numai primul an.
+#     Fix aplicat în upsert_row() și upsert_rows_batch():
+#     match_col lista → ",".join(match_col) înainte de on_conflict.
+#
 # MODIFICĂRI VERSIUNEA 2.0:
 #   - Adăugat insert_rows_batch() pentru inserare în masă
 #   - Adăugat upsert_rows_batch() pentru upsert în masă cu cheie compusă
@@ -31,17 +41,17 @@ def _cleanup(row_dict: dict, table_name: str) -> dict:
     }
 
 
-def upsert_row(supabase, table_name: str, row_data: dict, match_col = "cod_identificare"):
+def upsert_row(supabase, table_name: str, row_data: dict, match_col="cod_identificare"):
     """
     Upsert cu suport pentru chei primare compuse.
-    
+
     Args:
         match_col: poate fi:
             - string: o singură coloană (ex: "cod_identificare")
             - list/tuple: cheie compusă (ex: ["cod_identificare", "an_referinta"])
     """
     payload = _cleanup(row_data, table_name)
-    
+
     # Verificăm că toate coloanele cheie sunt prezente
     if isinstance(match_col, (list, tuple)):
         lipsa = [col for col in match_col if not payload.get(col)]
@@ -58,26 +68,28 @@ def upsert_row(supabase, table_name: str, row_data: dict, match_col = "cod_ident
             payload["creat_de"] = username
 
     try:
-        supabase.table(table_name).upsert(payload, on_conflict=match_col).execute()
+        # SDK-ul Supabase Python necesită string pentru on_conflict, nu listă
+        on_conflict_str = ",".join(match_col) if isinstance(match_col, (list, tuple)) else match_col
+        supabase.table(table_name).upsert(payload, on_conflict=on_conflict_str).execute()
         return True, "Succes"
     except Exception as e:
         return False, str(e)
 
 
-def upsert_rows_batch(supabase, table_name: str, rows: list, match_col = "cod_identificare"):
+def upsert_rows_batch(supabase, table_name: str, rows: list, match_col="cod_identificare"):
     """
     Upsert pentru mai multe rânduri simultan.
-    
+
     Args:
         rows: lista de dicționare
         match_col: coloana/coloanele pentru conflict detection
     """
     if not rows:
         return True, "Nimic de actualizat."
-    
+
     # Curățăm fiecare rând
     cleaned_rows = [_cleanup(row, table_name) for row in rows]
-    
+
     # Verificăm coloanele cheie
     for row in cleaned_rows:
         if isinstance(match_col, (list, tuple)):
@@ -87,7 +99,7 @@ def upsert_rows_batch(supabase, table_name: str, rows: list, match_col = "cod_id
         else:
             if not row.get(match_col):
                 return False, f"Lipsă {match_col}."
-    
+
     # Adăugăm audit dacă e necesar
     if table_name not in TABELE_FARA_AUDIT:
         username = st.session_state.get("operator_username") or "necunoscut"
@@ -95,9 +107,11 @@ def upsert_rows_batch(supabase, table_name: str, rows: list, match_col = "cod_id
             row["modificat_de"] = username
             if not row.get("creat_de"):
                 row["creat_de"] = username
-    
+
     try:
-        supabase.table(table_name).upsert(cleaned_rows, on_conflict=match_col).execute()
+        # SDK-ul Supabase Python necesită string pentru on_conflict, nu listă
+        on_conflict_str = ",".join(match_col) if isinstance(match_col, (list, tuple)) else match_col
+        supabase.table(table_name).upsert(cleaned_rows, on_conflict=on_conflict_str).execute()
         return True, "Succes"
     except Exception as e:
         return False, str(e)
@@ -106,7 +120,7 @@ def upsert_rows_batch(supabase, table_name: str, rows: list, match_col = "cod_id
 def delete_rows(supabase, table_name: str, cod: str, extra_condition: dict = None):
     """
     Șterge rânduri dintr-un tabel.
-    
+
     Args:
         extra_condition: dicționar cu condiții suplimentare (ex: {"an_referinta": "2024"})
     """
@@ -134,10 +148,10 @@ def insert_rows(supabase, table_name: str, rows: list):
     """Inserează mai multe rânduri simultan."""
     if not rows:
         return True, "Nimic de inserat."
-    
+
     # Curățăm fiecare rând
     cleaned_rows = [_cleanup(row, table_name) for row in rows]
-    
+
     try:
         supabase.table(table_name).insert(cleaned_rows).execute()
         return True, "Succes"
