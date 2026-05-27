@@ -1,23 +1,14 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 2.2
-# STATUS: CORECTAT - salvare individuală pe ani pentru date financiare
+# VERSIUNE: 2.3
+# STATUS: CORECTAT - salvare atomică cu ștergere după validare
 # DATA: 2026.05.28
-# =========================================================
-# MODIFICĂRI VERSIUNEA 2.2:
-#   - Salvare individuală (row by row) pentru date financiare
-#   - Eliminare duplicate înainte de salvare
-# MODIFICĂRI VERSIUNEA 2.1:
-#   - Eliminare duplicate din listă
-# MODIFICĂRI VERSIUNEA 2.0:
-#   - Salvare corectă date financiare multi-ani cu cheie compusă
 # =========================================================
 
 import streamlit as st
 from domenii._baza.upsert import upsert_row, delete_all_for_project, insert_rows
 import calea2_admin.ui as ui
 
-# ── Domenii active ─────────────────────────────────────────
 from domenii.contracte_cep           import admin as cep,            definitie as cep_def
 from domenii.contracte_terti         import admin as terti,          definitie as terti_def
 from domenii.contracte_speciale      import admin as speciale,       definitie as speciale_def
@@ -32,7 +23,6 @@ from domenii.proiecte_pnrr           import admin as pnrr,           definitie a
 from domenii.proprietate_industriala import admin as prop_ind,       definitie as prop_ind_def
 from domenii.evenimente_stiintifice  import admin as evenimente,     definitie as evenimente_def
 
-# ── Registru domenii ───────────────────────────────────────
 _DOMENII = {
     ("Contracte",                 "CEP"):            (cep,            cep_def),
     ("Contracte",                 "TERTI"):          (terti,          terti_def),
@@ -238,6 +228,8 @@ def porneste_motorul(supabase):
                     rows_valide = list(rows_unice.values())
                     
                     if rows_valide:
+                        st.caption(f"📊 Se salvează {len(rows_valide)} ani: {', '.join([r.get('an_referinta', '?') for r in rows_valide])}")
+                        
                         for row in rows_valide:
                             ok, msg = upsert_row(
                                 supabase, 
@@ -248,6 +240,8 @@ def porneste_motorul(supabase):
                             if not ok:
                                 an = row.get("an_referinta", "?")
                                 erori.append(f"Date financiare (an {an}): {msg}")
+                            else:
+                                st.caption(f"✅ An {row.get('an_referinta', '?')} salvat")
                 elif fin == []:
                     delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
 
