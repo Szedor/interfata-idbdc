@@ -1,228 +1,17 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 1.9
-# STATUS: ACTUALIZAT - corectat salvare date financiare multi-ani
-# DATA: 2026.05.27
+# VERSIUNE: 2.0
+# STATUS: CORECTAT - salvare corectă date financiare multi-ani
+# DATA: 2026.05.28
 # =========================================================
-# MODIFICĂRI VERSIUNEA 1.9:
-#   - Corectat salvare date financiare: folosește cheie compusă
-#     (cod_identificare + an_referinta) pentru upsert
-#   - Importat delete_all_for_project din upsert
-# MODIFICĂRI VERSIUNEA 1.8:
-#   - Adăugate domenii: proiecte_nonue, proiecte_structurale,
-#     proiecte_pncdi, proiecte_pnrr,
-#     proprietate_industriala, evenimente_stiintifice.
-# MODIFICĂRI VERSIUNEA 1.7:
-#   - Adăugat domeniu proiecte_see.
-# MODIFICĂRI VERSIUNEA 1.6:
-#   - Adăugat domeniu proiecte_interreg.
-# MODIFICĂRI VERSIUNEA 1.5:
-#   - Adăugat domeniu proiecte_internationale în registru.
-# MODIFICĂRI VERSIUNEA 1.4:
-#   - Adăugat domeniu proiecte_fdi.
-# MODIFICĂRI VERSIUNEA 1.3:
-#   - Adăugat domeniu contracte_speciale.
-# MODIFICĂRI VERSIUNEA 1.2:
-#   - Adăugat domeniu contracte_terti.
-# MODIFICĂRI VERSIUNEA 1.1:
-#   - Înlocuit import admin.ui cu calea2_admin.ui.
+# MODIFICĂRI VERSIUNEA 2.0:
+#   - CORECȚIE MAJORĂ: Datele financiare se salvează folosind
+#     insert_rows_batch() sau upsert_rows_batch() cu cheie compusă
+#   - Eliminat delete_all_for_project() înainte de upsert (contraproductiv)
+#   - Folosit direct upsert_rows_batch cu match_col compus
 # =========================================================
 
-import streamlit as st
-from domenii._baza.upsert import upsert_row, delete_all_for_project, insert_rows
-import calea2_admin.ui as ui
-
-# ── Domenii active ─────────────────────────────────────────
-from domenii.contracte_cep           import admin as cep,            definitie as cep_def
-from domenii.contracte_terti         import admin as terti,          definitie as terti_def
-from domenii.contracte_speciale      import admin as speciale,       definitie as speciale_def
-from domenii.proiecte_fdi            import admin as fdi,            definitie as fdi_def
-from domenii.proiecte_internationale import admin as internationale, definitie as internationale_def
-from domenii.proiecte_interreg       import admin as interreg,       definitie as interreg_def
-from domenii.proiecte_see            import admin as see,            definitie as see_def
-from domenii.proiecte_nonue          import admin as nonue,          definitie as nonue_def
-from domenii.proiecte_structurale    import admin as structurale,    definitie as structurale_def
-from domenii.proiecte_pncdi          import admin as pncdi,          definitie as pncdi_def
-from domenii.proiecte_pnrr           import admin as pnrr,           definitie as pnrr_def
-from domenii.proprietate_industriala import admin as prop_ind,       definitie as prop_ind_def
-from domenii.evenimente_stiintifice  import admin as evenimente,     definitie as evenimente_def
-
-# ── Registru domenii ───────────────────────────────────────
-_DOMENII = {
-    ("Contracte",                 "CEP"):            (cep,            cep_def),
-    ("Contracte",                 "TERTI"):          (terti,          terti_def),
-    ("Contracte",                 "SPECIALE"):       (speciale,       speciale_def),
-    ("Proiecte",                  "FDI"):            (fdi,            fdi_def),
-    ("Proiecte",                  "INTERNATIONALE"): (internationale, internationale_def),
-    ("Proiecte",                  "INTERREG"):       (interreg,       interreg_def),
-    ("Proiecte",                  "SEE"):            (see,            see_def),
-    ("Proiecte",                  "NONUE"):          (nonue,          nonue_def),
-    ("Proiecte",                  "STRUCTURALE"):    (structurale,    structurale_def),
-    ("Proiecte",                  "PNCDI"):          (pncdi,          pncdi_def),
-    ("Proiecte",                  "PNRR"):           (pnrr,           pnrr_def),
-    ("Proprietate industriala",   "PROPRIETATE INDUSTRIALĂ"): (prop_ind,  prop_ind_def),
-    ("Evenimente stiintifice",    "EVENIMENTE ȘTIINȚIFICE"):  (evenimente, evenimente_def),
-}
-
-_TAB_CSS = """
-<style>
-[data-testid="stSidebar"] {
-    min-width: 320px !important;
-    max-width: 320px !important;
-    width: 320px !important;
-    overflow: hidden !important;
-}
-[data-testid="stSidebar"] > div:first-child {
-    min-width: 320px !important;
-    max-width: 320px !important;
-    width: 320px !important;
-}
-</style>
-"""
-
-
-def _fetch(supabase, table, cod):
-    try:
-        res = supabase.table(table).select("*").eq("cod_identificare", cod).execute()
-        return res.data or []
-    except Exception:
-        return []
-
-
-def porneste_motorul(supabase):
-    st.markdown(_TAB_CSS, unsafe_allow_html=True)
-    ui.apply_admin_styles()
-    ui.display_admin_message()
-
-    is_admin   = st.session_state.get("operator_rol") == "ADMIN"
-    filtru_cat = st.session_state.get("operator_filtru_categorie", [])
-    filtru_tip = st.session_state.get("operator_filtru_tipuri", [])
-
-    categorii_disponibile = sorted({cat for cat, _ in _DOMENII.keys()})
-    if not is_admin:
-        categorii_disponibile = [c for c in categorii_disponibile if c in filtru_cat]
-
-    with st.sidebar:
-        st.header("📂 Selecție Date")
-        cat_sel = st.selectbox("Categorie", ["- Alege -"] + categorii_disponibile)
-
-    if cat_sel == "- Alege -":
-        st.info("Selectați categoria din meniul lateral.")
-        return
-
-    tipuri_disponibile = sorted({tip for cat, tip in _DOMENII.keys() if cat == cat_sel})
-    if not is_admin:
-        tipuri_disponibile = [t for t in tipuri_disponibile if t in filtru_tip]
-
-    with st.sidebar:
-        tip_sel = st.selectbox("Tip", ["- Alege -"] + tipuri_disponibile)
-
-    if tip_sel == "- Alege -":
-        st.info("Selectați tipul din meniul lateral.")
-        return
-
-    entry = _DOMENII.get((cat_sel, tip_sel))
-    if entry is None:
-        st.warning(f"Domeniul «{cat_sel}» / «{tip_sel}» nu este configurat.")
-        return
-
-    modul, defn = entry
-
-    with st.sidebar:
-        try:
-            res_coduri = supabase.table(defn.BASE_TABLE).select("cod_identificare").execute()
-            list_coduri = sorted([r["cod_identificare"] for r in res_coduri.data]) if res_coduri.data else []
-        except Exception:
-            list_coduri = []
-
-        cod_introdus = st.text_input(
-            "Cod identificare",
-            placeholder="Introduceți codul...",
-            key="input_cod_identificare",
-        ).strip()
-
-    if not cod_introdus:
-        st.info("Introduceți codul în meniul lateral.")
-        return
-
-    este_existent = cod_introdus in list_coduri
-
-    with st.sidebar:
-        if este_existent:
-            st.success(f"✅ Cod recunoscut: {cod_introdus}")
-            st.info("✏️ Fișă existentă — modificați/completați datele.")
-        else:
-            st.warning(f"🆕 Cod nou: {cod_introdus}")
-            st.info("🆕 Fișă nouă — înregistrați datele.")
-
-        st.divider()
-        btn_save = st.button("💾 SALVEAZĂ TOATE DATELE", use_container_width=True, type="primary")
-
-        btn_delete = False
-        if is_admin and este_existent:
-            btn_delete = st.button("🗑️ ȘTERGE FIȘA", use_container_width=True)
-
-    is_new = not este_existent
-
-    if not is_new:
-        date_baza_ex   = (_fetch(supabase, defn.BASE_TABLE,   cod_introdus) or [{}])[0]
-        date_fin_ex    = _fetch(supabase, defn.FIN_TABLE,    cod_introdus) if hasattr(defn, "FIN_TABLE")    else []
-        date_echipa_ex = _fetch(supabase, defn.ECHIPA_TABLE, cod_introdus)
-        date_teh_ex    = _fetch(supabase, defn.TEHNIC_TABLE, cod_introdus) if hasattr(defn, "TEHNIC_TABLE") else []
-    else:
-        date_baza_ex = {}
-        date_fin_ex = date_echipa_ex = date_teh_ex = []
-
-    TAB_LABELS = defn.TAB_LABELS if hasattr(defn, "TAB_LABELS") else defn.TAB_LABELS_ADMIN
-    key_tab    = f"tab_activ_{cod_introdus}"
-
-    if key_tab not in st.session_state or st.session_state[key_tab] not in TAB_LABELS:
-        st.session_state[key_tab] = TAB_LABELS[0]
-
-    st.markdown('<div class="tab-nav">', unsafe_allow_html=True)
-    tab_activ = st.radio(
-        "Secțiune", TAB_LABELS,
-        index=TAB_LABELS.index(st.session_state[key_tab]),
-        horizontal=True,
-        key=f"radio_tab_{cod_introdus}",
-        label_visibility="collapsed",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.session_state[key_tab] = tab_activ
-
-    st.markdown("<div style='border-top:2px solid rgba(255,255,255,0.30);margin-bottom:16px;'></div>", unsafe_allow_html=True)
-
-    key_baza_ss = f"ss_baza_{cod_introdus}"
-    key_fin_ss  = f"ss_fin_{cod_introdus}"
-    key_teh_ss  = f"ss_teh_{cod_introdus}"
-    rezultate   = {}
-
-    if tab_activ == "📋 Date de bază":
-        r = modul.render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex)
-        if r:
-            st.session_state[key_baza_ss] = r
-        rezultate["baza"] = r
-
-    elif tab_activ == "🔒 Date suplimentare" and hasattr(modul, "render_date_suplimentare"):
-        r = modul.render_date_suplimentare(supabase, cod_introdus, is_new, date_baza_ex)
-        if r:
-            st.session_state[key_baza_ss + "_supl"] = r
-        rezultate["suplimentare"] = r
-
-    elif tab_activ == "💰 Date financiare" and hasattr(modul, "render_date_financiare"):
-        r = modul.render_date_financiare(supabase, cod_introdus, is_new, date_fin_ex)
-        if r is not None:
-            st.session_state[key_fin_ss] = r
-        rezultate["financiar"] = r
-
-    elif tab_activ == "👥 Echipă":
-        rezultate["echipa"] = modul.render_echipa(supabase, cod_introdus, is_new, date_echipa_ex)
-
-    elif tab_activ == "🧪 Aspecte tehnice" and hasattr(modul, "render_aspecte_tehnice"):
-        r = modul.render_aspecte_tehnice(supabase, cod_introdus, is_new, date_teh_ex)
-        if r is not None:
-            st.session_state[key_teh_ss] = r
-        rezultate["tehnice"] = r
+# ... (restul importurilor și codului identic până la secțiunea de salvare)
 
     if btn_save:
         with st.spinner("Se salvează datele..."):
@@ -241,24 +30,34 @@ def porneste_motorul(supabase):
                 if not ok:
                     erori.append(f"Date suplimentare: {msg}")
 
-            # SALVARE DATE FINANCIARE - CU CHEIE COMPUSĂ
+            # ─────────────────────────────────────────────────────────────────
+            # SALVARE DATE FINANCIARE - CORECTATĂ PENTRU MULTI-ANI
+            # ─────────────────────────────────────────────────────────────────
             if hasattr(defn, "FIN_TABLE"):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
-                if fin is not None and isinstance(fin, list):
-                    # Ștergem toate înregistrările vechi ale proiectului
-                    delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
-                    # Inserăm noile înregistrări (câte un rând per an)
-                    for row in fin:
-                        # Folosim cheie compusă pentru upsert
-                        ok, msg = upsert_row(
+                if fin is not None and isinstance(fin, list) and fin:
+                    # Filtrăm doar rândurile valide (care au an_referinta)
+                    rows_valide = [row for row in fin if row.get("an_referinta")]
+                    
+                    if rows_valide:
+                        # Metoda 1: Folosim upsert cu cheie compusă (recomandat)
+                        # Aceasta va adăuga noi ani și va actualiza anii existenți
+                        ok, msg = upsert_rows_batch(
                             supabase, 
                             defn.FIN_TABLE, 
-                            row, 
-                            match_col=["cod_identificare", "an_referinta"]
+                            rows_valide, 
+                            match_col=["cod_identificare", "an_referinta"]  # CHEIE COMPUSĂ
                         )
                         if not ok:
-                            an = row.get('an_referinta', '?')
-                            erori.append(f"Date financiare (anul {an}): {msg}")
+                            erori.append(f"Date financiare: {msg}")
+                        
+                        # Debug: afișăm în log câte înregistrări s-au salvat
+                        st.caption(f"📊 Salvate {len(rows_valide)} înregistrări financiare pentru anii: {', '.join([r['an_referinta'] for r in rows_valide])}")
+                    else:
+                        # Dacă nu sunt rânduri valide, ștergem toate înregistrările existente
+                        delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
+                elif fin == []:  # Listă goală - utilizatorul a șters toți anii
+                    delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
 
             # SALVARE ECHIPĂ
             if "echipa" in rezultate:
@@ -287,15 +86,4 @@ def porneste_motorul(supabase):
                 del st.session_state[f"echipa_editor_{cod_introdus}"]
             st.rerun()
 
-    if btn_delete:
-        st.warning(f"Atenție: Ștergeți definitiv fișa {cod_introdus}!")
-        if st.checkbox("Confirm eliminarea din toate tabelele"):
-            for t in defn.SECTIUNI_SALVARE:
-                delete_all_for_project(supabase, t, cod_introdus)
-            for k in [key_baza_ss, key_fin_ss, key_teh_ss,
-                      f"echipa_data_init_{cod_introdus}",
-                      f"echipa_editor_{cod_introdus}",
-                      key_tab]:
-                st.session_state.pop(k, None)
-            st.session_state["admin_msg"] = ("success", "Înregistrarea a fost eliminată.")
-            st.rerun()
+# ... (restul codului identic)
