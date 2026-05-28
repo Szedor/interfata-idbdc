@@ -1,24 +1,16 @@
 # =========================================================
-# IDBDC/core/auth.py
-# VERSIUNE: 1.0
-# STATUS: NOU - autentificare operator extrasă din admin/main.py
-# DATA: 2026.05.09
-# =========================================================
-# CONȚINUT:
-#   Verificare parolă gate și identificare operator.
-#   Folosit de calea2_admin/main.py.
-#   Câmpurile salvate în session_state:
-#     operator_identificat  : nume_prenume
-#     operator_rol          : rol (ADMIN / OPERATOR)
-#     operator_username     : username_sistem (pentru creat_de/modificat_de)
-#     operator_filtru_categorie : list categorii permise
-#     operator_filtru_tipuri    : list tipuri permise
+# core/auth.py
+# v.modul.1.0 - Autentificare gate și operator
 # =========================================================
 
 import streamlit as st
 
 
 def check_gate_password(supabase, gate: str, password: str) -> bool:
+    """
+    Verifică parola de acces pentru un gate (admin, explorator).
+    Folosește funcția RPC idbdc_check_gate_password din Supabase.
+    """
     try:
         res = supabase.rpc(
             "idbdc_check_gate_password",
@@ -33,6 +25,13 @@ def identify_operator(supabase, cod: str) -> bool:
     """
     Caută operatorul după cod_operatori în tabela com_operatori.
     Dacă îl găsește, populează session_state și returnează True.
+    
+    Populează:
+        operator_identificat  : nume_prenume
+        operator_rol          : ADMIN / OPERATOR
+        operator_username     : username_sistem
+        operator_filtru_categorie : listă categorii permise
+        operator_filtru_tipuri    : listă tipuri permise
     """
     try:
         res = (
