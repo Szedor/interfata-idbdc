@@ -1,12 +1,12 @@
 # =========================================================
 # IDBDC/domenii/contracte_cep/admin.py
-# v.modul.1.0 - Admin Contracte CEP
+# v.modul.1.1 - Import cu cale relativă
 # =========================================================
 
-from domenii._baza.sectiune_baza import render as _baza_render_baza
-from domenii._baza.sectiune_financiar import render as _baza_render_financiar
-from domenii._baza.sectiune_echipa import render as _baza_render_echipa
-from domenii.contracte_cep.definitie import TIP_LABEL, BASE_TABLE, FIELDS_BAZA
+from .._baza.sectiune_baza import render as _baza_render_baza
+from .._baza.sectiune_financiar import render as _baza_render_financiar
+from .._baza.sectiune_echipa import render as _baza_render_echipa
+from .definitie import TIP_LABEL, BASE_TABLE, FIELDS_BAZA
 
 
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex):
