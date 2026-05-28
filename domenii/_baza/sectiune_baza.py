@@ -44,7 +44,7 @@ def _safe_int(v):
     except:
         return 0
 
-def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, fields, is_new, date_existente):
+def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
     status_list = _get_status_list(supabase)
 
     di = _safe_date(date_existente.get("data_inceput"))
@@ -61,40 +61,31 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         dur_ex = calc_durata(di, ds)
 
     row_init = {
-        "cod_identificare": cod_introdus,
-        "data_contract": _safe_date(date_existente.get("data_contract")),
-        "obiectul_contractului": date_existente.get("obiectul_contractului", ""),
-        "denumire_beneficiar": date_existente.get("denumire_beneficiar", ""),
-        "data_inceput": di,
-        "data_sfarsit": ds,
-        "durata": dur_ex,
-        "status_contract_proiect": date_existente.get("status_contract_proiect", ""),
+        "CATEGORIE": cat_sel,
+        "TIPUL DE CONTRACT": tip_label,
+        "NR.CONTRACT": cod_introdus,
+        "DATA CONTRACTULUI": _safe_date(date_existente.get("data_contract")),
+        "OBIECTUL CONTRACTULUI": date_existente.get("obiectul_contractului", ""),
+        "BENEFICIAR": date_existente.get("denumire_beneficiar", ""),
+        "DATA DE INCEPUT": di,
+        "DATA DE SFARSIT": ds,
+        "DURATA": dur_ex,
+        "STATUS CONTRACT": date_existente.get("status_contract_proiect", ""),
     }
+    df = pd.DataFrame([row_init])
 
-    # Construim DataFrame pentru afișare
-    display_row = {
-        fields.get(k, k.replace("_", " ").capitalize()): v 
-        for k, v in row_init.items() if k in fields
+    col_cfg = {
+        "CATEGORIE": st.column_config.TextColumn("CATEGORIE", disabled=True),
+        "TIPUL DE CONTRACT": st.column_config.TextColumn("TIPUL DE CONTRACT", disabled=True),
+        "NR.CONTRACT": st.column_config.TextColumn("NR.CONTRACT", disabled=True),
+        "DATA CONTRACTULUI": st.column_config.DateColumn("📅 DATA CONTRACTULUI", format="YYYY-MM-DD"),
+        "OBIECTUL CONTRACTULUI": st.column_config.TextColumn("📝 OBIECTUL CONTRACTULUI", width="large"),
+        "BENEFICIAR": st.column_config.TextColumn("🏢 BENEFICIAR"),
+        "DATA DE INCEPUT": st.column_config.DateColumn("📅 DATA DE INCEPUT", format="YYYY-MM-DD"),
+        "DATA DE SFARSIT": st.column_config.DateColumn("📅 DATA DE SFARSIT", format="YYYY-MM-DD"),
+        "DURATA": st.column_config.NumberColumn("⏱️ DURATA (luni)", format="%d", min_value=0),
+        "STATUS CONTRACT": st.column_config.SelectboxColumn("🔖 STATUS CONTRACT", options=status_list),
     }
-    df = pd.DataFrame([display_row])
-
-    # Configurare coloane
-    col_cfg = {}
-    for k, label in fields.items():
-        if k == "cod_identificare":
-            col_cfg[label] = st.column_config.TextColumn(label, disabled=True)
-        elif k == "data_contract":
-            col_cfg[label] = st.column_config.DateColumn(label, format="YYYY-MM-DD")
-        elif k == "data_inceput":
-            col_cfg[label] = st.column_config.DateColumn(label, format="YYYY-MM-DD")
-        elif k == "data_sfarsit":
-            col_cfg[label] = st.column_config.DateColumn(label, format="YYYY-MM-DD")
-        elif k == "durata":
-            col_cfg[label] = st.column_config.NumberColumn(label, format="%d", min_value=0)
-        elif k == "status_contract_proiect":
-            col_cfg[label] = st.column_config.SelectboxColumn(label, options=status_list)
-        else:
-            col_cfg[label] = st.column_config.TextColumn(label, width="large")
 
     df_edit = st.data_editor(
         df,
@@ -104,15 +95,11 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
         num_rows="fixed",
         key=f"{tabela_nume}_baza_editor_{cod_introdus}",
     )
-
     row = df_edit.iloc[0]
-    
-    # Extragem valorile
-    di_e = row[fields.get("data_inceput", "DATA DE INCEPUT")] if "data_inceput" in fields else None
-    ds_e = row[fields.get("data_sfarsit", "DATA DE SFARSIT")] if "data_sfarsit" in fields else None
-    dur_e = row[fields.get("durata", "DURATA (luni)")] if "durata" in fields else 0
-    if isinstance(dur_e, str):
-        dur_e = _safe_int(dur_e)
+
+    di_e = row["DATA DE INCEPUT"]
+    ds_e = row["DATA DE SFARSIT"]
+    dur_e = int(row["DURATA"]) if row["DURATA"] else 0
 
     if di_e and ds_e:
         dur_e = calc_durata(di_e, ds_e)
@@ -126,11 +113,11 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_label, tabela_nume,
 
     return {
         "cod_identificare": cod_introdus,
-        "data_contract": _fmt_date(row[fields.get("data_contract", "DATA CONTRACTULUI")]) if "data_contract" in fields else None,
-        "obiectul_contractului": row[fields.get("obiectul_contractului", "OBIECTUL CONTRACTULUI")] if "obiectul_contractului" in fields else "",
-        "denumire_beneficiar": row[fields.get("denumire_beneficiar", "BENEFICIAR")] if "denumire_beneficiar" in fields else "",
+        "data_contract": _fmt_date(row["DATA CONTRACTULUI"]),
+        "obiectul_contractului": row["OBIECTUL CONTRACTULUI"],
+        "denumire_beneficiar": row["BENEFICIAR"],
         "data_inceput": _fmt_date(di_e),
         "data_sfarsit": _fmt_date(ds_e),
         "durata": dur_e if dur_e else None,
-        "status_contract_proiect": row[fields.get("status_contract_proiect", "STATUS CONTRACT")] if "status_contract_proiect" in fields else None,
+        "status_contract_proiect": row["STATUS CONTRACT"] if row["STATUS CONTRACT"] else None,
     }
