@@ -6,7 +6,7 @@
 import streamlit as st
 import pandas as pd
 
-def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
+def render(supabase, cod_introdus, is_new, date_existente):
     VALUTE = ["LEI", "EUR", "USD"]
     
     if is_new or not date_existente:
@@ -42,7 +42,6 @@ def render_date_financiare(supabase, cod_introdus, is_new, date_existente):
     )
     row = df_edit.iloc[0]
     
-    # Eliminăm complet orice referire la an_referinta
     return [{
         "cod_identificare": cod_introdus,
         "valuta": row["💱 VALUTA"],
