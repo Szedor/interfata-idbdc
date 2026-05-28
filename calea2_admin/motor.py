@@ -1,21 +1,20 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# v.modul.2.0 - Motor admin actualizat pentru noua structură modulară
+# v.modul.2.2 - Complet, corect, gata de utilizare
 # =========================================================
 
+import sys
+import os
 import streamlit as st
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from domenii._baza.upsert import upsert_row, delete_all_for_project, insert_rows
 import calea2_admin.ui as ui
-
-# Importuri domenii (se adaugă pe măsură ce sunt create)
 from domenii.contracte_cep import admin as cep, definitie as cep_def
 
 _DOMENII = {
     ("Contracte", "CEP"): (cep, cep_def),
-    # ("Contracte", "TERTI"): (terti, terti_def),  # se adaugă după creare
-    # ("Contracte", "SPECIALE"): (speciale, speciale_def),
-    # ("Proiecte", "FDI"): (fdi, fdi_def),
-    # ... restul se adaugă treptat
 }
 
 _TAB_CSS = """
@@ -175,14 +174,12 @@ def porneste_motorul(supabase):
         with st.spinner("Se salvează datele..."):
             erori = []
 
-            # Date de bază
             baza = rezultate.get("baza") or st.session_state.get(key_baza_ss)
             if baza:
                 ok, msg = upsert_row(supabase, defn.BASE_TABLE, {**baza, "cod_identificare": cod_introdus})
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
 
-            # Date financiare
             if hasattr(defn, "FIN_TABLE"):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
                 if fin is not None and isinstance(fin, list):
@@ -193,7 +190,6 @@ def porneste_motorul(supabase):
                         if not ok:
                             erori.append(f"Date financiare: {msg}")
 
-            # Echipă
             if "echipa" in rezultate:
                 ok_del, msg_del = delete_all_for_project(supabase, defn.ECHIPA_TABLE, cod_introdus)
                 if not ok_del:
@@ -205,7 +201,6 @@ def porneste_motorul(supabase):
                         if not ok:
                             erori.append(f"Echipă: {msg}")
 
-            # Aspecte tehnice
             if hasattr(defn, "TEHNIC_TABLE"):
                 teh = rezultate.get("tehnice") or st.session_state.get(key_teh_ss)
                 if teh is not None:
