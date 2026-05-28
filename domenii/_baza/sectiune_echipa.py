@@ -104,7 +104,6 @@ def render(supabase, cod_introdus, is_new, date_existente):
         key=f"echipa_editor_{cod_introdus}",
     )
 
-    # Actualizare date
     for idx, row in df_edit.iterrows():
         nume = str(row.get("👤 NUME ȘI PRENUME", "")).strip()
         if idx < len(st.session_state[key_rows]):
