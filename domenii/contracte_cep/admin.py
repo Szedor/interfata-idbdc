@@ -1,6 +1,6 @@
 # =========================================================
 # domenii/contracte_cep/admin.py
-# v.modul.1.1 - Importă secțiunea financiară corectă
+# v.modul.1.1 - Import direct, fără __init__.py
 # =========================================================
 
 from domenii._baza.sectiune_baza import render as _baza_render_baza
