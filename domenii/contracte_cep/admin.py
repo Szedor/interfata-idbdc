@@ -1,10 +1,10 @@
 # =========================================================
 # domenii/contracte_cep/admin.py
-# v.modul.1.0 - Admin Contracte CEP
+# v.modul.1.1 - Importă secțiunea financiară corectă
 # =========================================================
 
 from domenii._baza.sectiune_baza import render as _baza_render_baza
-from domenii._baza.sectiune_financiar import render as _baza_render_financiar
+from domenii._baza.sectiune_financiar.contracte_cep import render as _baza_render_financiar
 from domenii._baza.sectiune_echipa import render as _baza_render_echipa
 from domenii.contracte_cep.definitie import TIP_LABEL, BASE_TABLE
 
