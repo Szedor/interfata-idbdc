@@ -1,26 +1,7 @@
 # =========================================================
 # IDBDC/domenii/_baza/upsert.py
-# VERSIUNE: 2.2
-# STATUS: CORECTAT - delete returneaza eroare explicita; insert rand cu rand
+# VERSIUNE: 2.3 - ELIMINARE an_referinta pentru contracte
 # DATA: 2026.05.28
-# =========================================================
-# MODIFICĂRI VERSIUNEA 2.2:
-#   - delete_all_for_project() returneaza acum (True, "Succes")
-#     sau (False, mesaj_eroare) — în loc de True/False fără mesaj.
-#     Motor.py poate verifica explicit dacă ștergerea a reușit
-#     înainte de a continua cu insert.
-#   - insert_rows() inserează rând cu rând (nu batch) pentru a
-#     izola eventualele erori per rând și a evita rollback total.
-#   - insert_rows_one_by_one() — funcție nouă, sinonimă, mai explicită.
-#   - on_conflict convertit la string (fix v2.1 păstrat).
-#
-# MODIFICĂRI VERSIUNEA 2.1:
-#   - on_conflict accepta lista Python → convertit la string CSV
-#     pentru SDK-ul Supabase Python.
-#
-# MODIFICĂRI VERSIUNEA 2.0:
-#   - Adăugat insert_rows_batch(), upsert_rows_batch()
-#   - Corectat delete_all_for_project()
 # =========================================================
 
 import streamlit as st
@@ -36,8 +17,14 @@ TABELE_FARA_AUDIT = {
 
 def _cleanup(row_dict: dict, table_name: str) -> dict:
     exclude = {"id", "creat_la", "modificat_la"}
+    
+    # Pentru tabela com_date_financiare, eliminăm și an_referinta (nu există în toate tabelele)
+    if table_name == "com_date_financiare":
+        exclude.add("an_referinta")
+    
     if table_name in TABELE_FARA_AUDIT:
         exclude |= {"creat_de", "modificat_de"}
+    
     return {
         k: v for k, v in row_dict.items()
         if k not in exclude and v is not None and not (isinstance(v, float) and pd.isna(v))
