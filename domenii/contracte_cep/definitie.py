@@ -14,7 +14,6 @@ TAB_LABELS_EXPLORATOR = ["Generale", "Financiar", "Echipa"]
 
 SECTIUNI_SALVARE = [BASE_TABLE, FIN_TABLE, ECHIPA_TABLE]
 
-# Mapare câmpuri pentru Date de bază
 FIELDS_BAZA = {
     "categorie": "CATEGORIE",
     "tip": "TIPUL DE CONTRACT",
