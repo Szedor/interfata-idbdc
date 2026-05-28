@@ -5,7 +5,7 @@
 
 from domenii._baza.sectiune_baza import render_date_de_baza
 from domenii._baza.sectiune_financiar import render_date_financiare
-from domenii._baza.sectiune_echipa import render_echipa
+from domenii._baza.sectiune_echipa import render as render_echipa
 from domenii.contracte_cep.definitie import TIP_LABEL, BASE_TABLE, get_label
 
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex):
