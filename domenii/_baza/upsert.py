@@ -1,7 +1,6 @@
 # =========================================================
 # IDBDC/domenii/_baza/upsert.py
-# VERSIUNE: 2.3 - ELIMINARE an_referinta pentru contracte
-# DATA: 2026.05.28
+# v.modul.1.0 - Salvare generică (upsert, delete, insert)
 # =========================================================
 
 import streamlit as st
@@ -16,9 +15,10 @@ TABELE_FARA_AUDIT = {
 
 
 def _cleanup(row_dict: dict, table_name: str) -> dict:
+    """Elimină câmpurile sistem sau nule înainte de trimitere."""
     exclude = {"id", "creat_la", "modificat_la"}
     
-    # Pentru tabela com_date_financiare, eliminăm și an_referinta (nu există în toate tabelele)
+    # Pentru tabela com_date_financiare, eliminăm și an_referinta (dacă există)
     if table_name == "com_date_financiare":
         exclude.add("an_referinta")
     
@@ -34,7 +34,7 @@ def _cleanup(row_dict: dict, table_name: str) -> dict:
 def upsert_row(supabase, table_name: str, row_data: dict, match_col="cod_identificare"):
     """
     Upsert cu suport pentru chei primare compuse.
-
+    
     Args:
         match_col: string sau list/tuple cu coloanele cheie.
     """
@@ -62,39 +62,6 @@ def upsert_row(supabase, table_name: str, row_data: dict, match_col="cod_identif
         return False, str(e)
 
 
-def upsert_rows_batch(supabase, table_name: str, rows: list, match_col="cod_identificare"):
-    """
-    Upsert pentru mai multe rânduri simultan.
-    """
-    if not rows:
-        return True, "Nimic de actualizat."
-
-    cleaned_rows = [_cleanup(row, table_name) for row in rows]
-
-    for row in cleaned_rows:
-        if isinstance(match_col, (list, tuple)):
-            lipsa = [col for col in match_col if not row.get(col)]
-            if lipsa:
-                return False, f"Lipsă coloane cheie: {', '.join(lipsa)}"
-        else:
-            if not row.get(match_col):
-                return False, f"Lipsă {match_col}."
-
-    if table_name not in TABELE_FARA_AUDIT:
-        username = st.session_state.get("operator_username") or "necunoscut"
-        for row in cleaned_rows:
-            row["modificat_de"] = username
-            if not row.get("creat_de"):
-                row["creat_de"] = username
-
-    try:
-        on_conflict_str = ",".join(match_col) if isinstance(match_col, (list, tuple)) else match_col
-        supabase.table(table_name).upsert(cleaned_rows, on_conflict=on_conflict_str).execute()
-        return True, "Succes"
-    except Exception as e:
-        return False, str(e)
-
-
 def delete_all_for_project(supabase, table_name: str, cod: str):
     """
     Șterge toate înregistrările unui proiect dintr-un tabel.
@@ -105,21 +72,6 @@ def delete_all_for_project(supabase, table_name: str, cod: str):
         return True, "Succes"
     except Exception as e:
         return False, str(e)
-
-
-def delete_rows(supabase, table_name: str, cod: str, extra_condition: dict = None):
-    """
-    Șterge rânduri cu condiții suplimentare opționale.
-    """
-    try:
-        query = supabase.table(table_name).delete().eq("cod_identificare", cod)
-        if extra_condition:
-            for col, val in extra_condition.items():
-                query = query.eq(col, val)
-        query.execute()
-        return True
-    except Exception:
-        return False
 
 
 def insert_rows(supabase, table_name: str, rows: list):
