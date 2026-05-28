@@ -1,8 +1,16 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_baza_proiecte_internationale.py
-# VERSIUNE: 1.4
-# STATUS: CORECTAT - pastrat DateColumn, dropdown ROL UPT corect
-# DATA: 2026.05.26
+# VERSIUNE: 1.5
+# STATUS: ACTUALIZAT - ROL UPT din nom_rol_upt (BD), eliminat ROL_UPT_OPTIONS hardcodat
+# DATA: 2026.05.28
+# =========================================================
+# MODIFICARI VERSIUNEA 1.5:
+#   - ROL UPT: dropdown alimentat din tabela nom_rol_upt
+#     coloana tehnica rol_upt (in loc de lista hardcodata)
+#   - Eliminat complet ROL_UPT_OPTIONS
+#   - Adaugat _get_rol_upt_list() cu cache 600s
+#   - Logica de fallback: daca valoarea existenta nu e in lista
+#     se pastreaza ca prima optiune (nu se pierde)
 # =========================================================
 
 import streamlit as st
@@ -10,26 +18,21 @@ import pandas as pd
 from datetime import date as _date
 from utils.date_helpers import to_date, calc_durata, add_months, sub_months
 
-# =========================================================
-# OPTIUNI DROPDOWN PENTRU ROL UPT
-# =========================================================
-ROL_UPT_OPTIONS = [
-    "Coordonator (Coordinator)",
-    "Coordonator asociat (Associate Coordinator)",
-    "Partener (Partner)",
-    "Partener principal (Lead Partner)",
-    "Partener asociat (Associate Partner)",
-    "Beneficiar (Beneficiary)",
-    "Beneficiar asociat (Associated Beneficiary)",
-    "Subcontractor",
-    "Terț afiliat (Affiliated Third Party)"
-]
 
 @st.cache_data(show_spinner=False, ttl=600)
 def _get_status_list(_supabase):
     try:
         res = _supabase.table("nom_status_proiect").select("status_contract_proiect").execute()
         return [r["status_contract_proiect"] for r in (res.data or []) if r.get("status_contract_proiect")]
+    except Exception:
+        return []
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def _get_rol_upt_list(_supabase):
+    try:
+        res = _supabase.table("nom_rol_upt").select("rol_upt").order("id").execute()
+        return [r["rol_upt"] for r in (res.data or []) if r.get("rol_upt")]
     except Exception:
         return []
 
@@ -46,20 +49,17 @@ def _fmt_date(v):
 
 
 def _safe_date(v):
-    """Returneaza obiect date Python sau None — niciodata string."""
     if v is None:
         return None
     if isinstance(v, _date):
         return v
     try:
-        result = to_date(v)
-        return result
+        return to_date(v)
     except Exception:
         return None
 
 
 def _safe_int(v):
-    """Conversie robusta la int pentru NumberColumn."""
     if v is None:
         return 0
     try:
@@ -76,7 +76,8 @@ def _safe_str(v):
 
 
 def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
-    status_list = _get_status_list(supabase)
+    status_list   = _get_status_list(supabase)
+    rol_upt_list  = _get_rol_upt_list(supabase)
 
     di     = _safe_date(date_existente.get("data_inceput"))
     ds     = _safe_date(date_existente.get("data_sfarsit"))
@@ -92,8 +93,14 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         dur_ex = calc_durata(di, ds)
 
     rol_upt_initial = _safe_str(date_existente.get("rol_upt"))
-    if rol_upt_initial not in ROL_UPT_OPTIONS:
-        rol_upt_initial = ROL_UPT_OPTIONS[0]
+    # Daca valoarea existenta nu e in lista (ex: date vechi), o adaugam temporar
+    if rol_upt_initial and rol_upt_initial not in rol_upt_list:
+        rol_upt_options = [rol_upt_initial] + rol_upt_list
+    else:
+        rol_upt_options = rol_upt_list if rol_upt_list else [""]
+
+    if not rol_upt_initial or rol_upt_initial not in rol_upt_options:
+        rol_upt_initial = rol_upt_options[0] if rol_upt_options else ""
 
     row_init = {
         "CATEGORIE":             cat_sel,
@@ -132,7 +139,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "SCOR EVALUARE":         st.column_config.TextColumn("SCOR EVALUARE"),
         "NR.PARTICIPANTI":       st.column_config.TextColumn("NR.PARTICIPANTI"),
         "DENUMIRE PARTICIPANTI": st.column_config.TextColumn("DENUMIRE PARTICIPANTI", width="large"),
-        "ROL UPT":               st.column_config.SelectboxColumn("ROL UPT", options=ROL_UPT_OPTIONS),
+        "ROL UPT":               st.column_config.SelectboxColumn("ROL UPT", options=rol_upt_options),
         "APELUL":                st.column_config.TextColumn("APELUL"),
         "DATA LIMITA DEPUNERE":  st.column_config.DateColumn("📅 DATA LIMITA DEPUNERE", format="YYYY-MM-DD"),
         "PROGRAM DE FINANTARE":  st.column_config.TextColumn("PROGRAM DE FINANTARE"),
