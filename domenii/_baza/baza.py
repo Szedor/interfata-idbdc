@@ -1,11 +1,11 @@
 # =========================================================
-# IDBDC/domenii/_baza/sectiune_baza.py
-# v.modul.1.0 - Secțiune Date de bază (generică)
+# IDBDC/domenii/_baza/baza.py
+# v.modul.1.0 - Date de bază (generic)
 # =========================================================
 
 import streamlit as st
 import pandas as pd
-from core.helpers import to_date, calc_durata, add_months, sub_months, fmt_date, safe_select_eq
+from core.helpers import to_date, calc_durata, add_months, sub_months, fmt_date
 
 
 def _get_status_list(supabase):
@@ -20,11 +20,6 @@ def _get_status_list(supabase):
 
 
 def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, fields_map, is_new, date_existente):
-    """
-    Randare Date de bază pentru orice tip de domeniu.
-    
-    fields_map: dict cu maparea {coloana_tehnica: eticheta_vizuala}
-    """
     status_list = _get_status_list(supabase)
 
     di = to_date(date_existente.get("data_inceput"))
@@ -53,16 +48,14 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, fields_map, 
         fields_map.get("status", "STATUS"): date_existente.get("status_contract_proiect", ""),
     }
     
-    # Adaugă observații dacă există în mapare
     if "observatii" in fields_map:
         row_init[fields_map["observatii"]] = date_existente.get("observatii", "")
     
     df = pd.DataFrame([row_init])
 
-    # Construim configurația coloanelor dinamic
     col_cfg = {}
     for tech_col, label in fields_map.items():
-        if tech_col == "categorie" or tech_col == "tip" or tech_col == "cod":
+        if tech_col in ["categorie", "tip", "cod"]:
             col_cfg[label] = st.column_config.TextColumn(label, disabled=True)
         elif tech_col in ["data_contract", "data_inceput", "data_sfarsit"]:
             col_cfg[label] = st.column_config.DateColumn(label, format="YYYY-MM-DD")
@@ -99,7 +92,6 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, fields_map, 
         di_e = sub_months(ds_e, dur_e)
         st.caption(f"📅 Data de inceput calculată automat: {di_e}")
 
-    # Construim rezultatul pentru salvare
     rezultat = {
         "cod_identificare": cod_introdus,
         "denumire_categorie": cat_sel,
