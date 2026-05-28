@@ -1,6 +1,6 @@
 # =========================================================
-# IDBDC/domenii/_baza/sectiune_echipa.py
-# v.modul.1.0 - Secțiune Echipă (generică)
+# IDBDC/domenii/_baza/echipa.py
+# v.modul.1.0 - Echipă (generic)
 # =========================================================
 
 import streamlit as st
@@ -8,9 +8,6 @@ import pandas as pd
 
 
 def render(supabase, cod_introdus, is_new, date_existente):
-    """
-    Randare și salvare echipă pentru orice tip de domeniu.
-    """
     @st.cache_data(show_spinner=False, ttl=600)
     def _fetch_persoane(_sb):
         try:
