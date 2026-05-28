@@ -1,22 +1,8 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 2.5
-# STATUS: CORECTAT - delete verificat explicit inainte de insert financiar
+# VERSIUNE: 2.6
+# STATUS: CORECTAT - eliminare an_referinta pentru contracte
 # DATA: 2026.05.28
-# =========================================================
-# MODIFICĂRI VERSIUNEA 2.5:
-#   - Salvarea datelor financiare multi-an (PNCDI, PNRR):
-#     delete_all_for_project() verificat explicit — dacă
-#     ștergerea eșuează, insert-ul NU se mai execută și
-#     eroarea este raportată clar operatorului.
-#     Anterior: delete eșua silențios → insert eșua cu
-#     "duplicate key value violates unique constraint".
-#   - delete_all_for_project() returnează acum (bool, msg)
-#     în loc de bool — adaptat apelurile din motor.py.
-#
-# MODIFICĂRI VERSIUNEA 2.4:
-#   - Strategie delete+insert pentru date financiare multi-an.
-#   - Strategie upsert pentru date financiare cu un singur rând.
 # =========================================================
 
 import streamlit as st
@@ -235,6 +221,12 @@ def porneste_motorul(supabase):
             if hasattr(defn, "FIN_TABLE"):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
 
+                # Elimină an_referinta pentru contracte (nu au această coloană)
+                if fin is not None and isinstance(fin, list):
+                    for row in fin:
+                        if "an_referinta" in row:
+                            del row["an_referinta"]
+
                 if fin is not None and isinstance(fin, list) and fin:
                     # Deduplicare
                     rows_unice = {}
@@ -248,10 +240,6 @@ def porneste_motorul(supabase):
                     are_an_referinta = any(r.get("an_referinta") for r in rows_valide)
 
                     if are_an_referinta:
-                        # DELETE obligatoriu înaintea INSERT pentru tipuri multi-an.
-                        # Verificăm explicit că ștergerea a reușit — dacă eșuează
-                        # (RLS, permisiuni, etc.) nu continuăm cu insert-ul care
-                        # ar eșua oricum cu "duplicate key".
                         ok_del, msg_del = delete_all_for_project(
                             supabase, defn.FIN_TABLE, cod_introdus
                         )
@@ -271,14 +259,12 @@ def porneste_motorul(supabase):
                                     f"Date financiare (ani: {ani_str}): {msg_ins}"
                                 )
                     else:
-                        # Un singur rând per proiect — upsert simplu
                         for row in rows_valide:
                             ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
                             if not ok:
                                 erori.append(f"Date financiare: {msg}")
 
                 elif fin == []:
-                    # Listă goală = operatorul a șters toți anii
                     ok_del, msg_del = delete_all_for_project(
                         supabase, defn.FIN_TABLE, cod_introdus
                     )
