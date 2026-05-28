@@ -1,5 +1,5 @@
 # =========================================================
-# IDBDC/domenii/contracte_cep/sectiune_financiar.py
+# IDBDC/domenii/contracte_cep/financiar.py
 # v.modul.1.0 - Date financiare pentru Contracte CEP
 # =========================================================
 
@@ -8,10 +8,6 @@ import pandas as pd
 
 
 def render(supabase, cod_introdus, is_new, date_existente):
-    """
-    Randare Date financiare pentru Contracte CEP.
-    Trimite DOAR coloanele existente în com_date_financiare.
-    """
     VALUTE = ["LEI", "EUR", "USD"]
     
     if is_new or not date_existente:
@@ -47,8 +43,6 @@ def render(supabase, cod_introdus, is_new, date_existente):
     )
     row = df_edit.iloc[0]
     
-    # Trimite DOAR aceste două coloane + cod_identificare
-    # FĂRĂ an_referinta
     return [{
         "cod_identificare": cod_introdus,
         "valuta": row["💱 VALUTA"],
