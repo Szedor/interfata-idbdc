@@ -1,12 +1,11 @@
 # =========================================================
 # IDBDC/domenii/contracte_cep/admin.py
-# v.modul.1.2 - Import cu sys.path
+# v.modul.1.3 - Import absolut cu ajustare path
 # =========================================================
 
 import sys
 import os
 
-# Adaugă directorul rădăcină în path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from domenii._baza.sectiune_baza import render as _baza_render_baza
