@@ -1,41 +1,21 @@
-                # =========================================================
+# =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 2.7 - ELIMINARE DEFINITIVA an_referinta
-# DATA: 2026.05.28
+# v.modul.2.0 - Motor admin actualizat pentru noua structură modulară
 # =========================================================
 
 import streamlit as st
 from domenii._baza.upsert import upsert_row, delete_all_for_project, insert_rows
 import calea2_admin.ui as ui
 
-from domenii.contracte_cep           import admin as cep,            definitie as cep_def
-from domenii.contracte_terti         import admin as terti,          definitie as terti_def
-from domenii.contracte_speciale      import admin as speciale,       definitie as speciale_def
-from domenii.proiecte_fdi            import admin as fdi,            definitie as fdi_def
-from domenii.proiecte_internationale import admin as internationale, definitie as internationale_def
-from domenii.proiecte_interreg       import admin as interreg,       definitie as interreg_def
-from domenii.proiecte_see            import admin as see,            definitie as see_def
-from domenii.proiecte_nonue          import admin as nonue,          definitie as nonue_def
-from domenii.proiecte_structurale    import admin as structurale,    definitie as structurale_def
-from domenii.proiecte_pncdi          import admin as pncdi,          definitie as pncdi_def
-from domenii.proiecte_pnrr           import admin as pnrr,           definitie as pnrr_def
-from domenii.proprietate_industriala import admin as prop_ind,       definitie as prop_ind_def
-from domenii.evenimente_stiintifice  import admin as evenimente,     definitie as evenimente_def
+# Importuri domenii (se adaugă pe măsură ce sunt create)
+from domenii.contracte_cep import admin as cep, definitie as cep_def
 
 _DOMENII = {
-    ("Contracte",                 "CEP"):            (cep,            cep_def),
-    ("Contracte",                 "TERTI"):          (terti,          terti_def),
-    ("Contracte",                 "SPECIALE"):       (speciale,       speciale_def),
-    ("Proiecte",                  "FDI"):            (fdi,            fdi_def),
-    ("Proiecte",                  "INTERNATIONALE"): (internationale, internationale_def),
-    ("Proiecte",                  "INTERREG"):       (interreg,       interreg_def),
-    ("Proiecte",                  "SEE"):            (see,            see_def),
-    ("Proiecte",                  "NONUE"):          (nonue,          nonue_def),
-    ("Proiecte",                  "STRUCTURALE"):    (structurale,    structurale_def),
-    ("Proiecte",                  "PNCDI"):          (pncdi,          pncdi_def),
-    ("Proiecte",                  "PNRR"):           (pnrr,           pnrr_def),
-    ("Proprietate industriala",   "PROPRIETATE INDUSTRIALĂ"): (prop_ind,  prop_ind_def),
-    ("Evenimente stiintifice",    "EVENIMENTE ȘTIINȚIFICE"):  (evenimente, evenimente_def),
+    ("Contracte", "CEP"): (cep, cep_def),
+    # ("Contracte", "TERTI"): (terti, terti_def),  # se adaugă după creare
+    # ("Contracte", "SPECIALE"): (speciale, speciale_def),
+    # ("Proiecte", "FDI"): (fdi, fdi_def),
+    # ... restul se adaugă treptat
 }
 
 _TAB_CSS = """
@@ -68,7 +48,7 @@ def porneste_motorul(supabase):
     ui.apply_admin_styles()
     ui.display_admin_message()
 
-    is_admin   = st.session_state.get("operator_rol") == "ADMIN"
+    is_admin = st.session_state.get("operator_rol") == "ADMIN"
     filtru_cat = st.session_state.get("operator_filtru_categorie", [])
     filtru_tip = st.session_state.get("operator_filtru_tipuri", [])
 
@@ -131,7 +111,6 @@ def porneste_motorul(supabase):
 
         st.divider()
         btn_save = st.button("💾 SALVEAZĂ TOATE DATELE", use_container_width=True, type="primary")
-
         btn_delete = False
         if is_admin and este_existent:
             btn_delete = st.button("🗑️ ȘTERGE FIȘA", use_container_width=True)
@@ -139,16 +118,16 @@ def porneste_motorul(supabase):
     is_new = not este_existent
 
     if not is_new:
-        date_baza_ex   = (_fetch(supabase, defn.BASE_TABLE,   cod_introdus) or [{}])[0]
-        date_fin_ex    = _fetch(supabase, defn.FIN_TABLE,    cod_introdus) if hasattr(defn, "FIN_TABLE")    else []
+        date_baza_ex = (_fetch(supabase, defn.BASE_TABLE, cod_introdus) or [{}])[0]
+        date_fin_ex = _fetch(supabase, defn.FIN_TABLE, cod_introdus) if hasattr(defn, "FIN_TABLE") else []
         date_echipa_ex = _fetch(supabase, defn.ECHIPA_TABLE, cod_introdus)
-        date_teh_ex    = _fetch(supabase, defn.TEHNIC_TABLE, cod_introdus) if hasattr(defn, "TEHNIC_TABLE") else []
+        date_teh_ex = _fetch(supabase, defn.TEHNIC_TABLE, cod_introdus) if hasattr(defn, "TEHNIC_TABLE") else []
     else:
         date_baza_ex = {}
         date_fin_ex = date_echipa_ex = date_teh_ex = []
 
-    TAB_LABELS = defn.TAB_LABELS if hasattr(defn, "TAB_LABELS") else defn.TAB_LABELS_ADMIN
-    key_tab    = f"tab_activ_{cod_introdus}"
+    TAB_LABELS = defn.TAB_LABELS_ADMIN
+    key_tab = f"tab_activ_{cod_introdus}"
 
     if key_tab not in st.session_state or st.session_state[key_tab] not in TAB_LABELS:
         st.session_state[key_tab] = TAB_LABELS[0]
@@ -167,21 +146,15 @@ def porneste_motorul(supabase):
     st.markdown("<div style='border-top:2px solid rgba(255,255,255,0.30);margin-bottom:16px;'></div>", unsafe_allow_html=True)
 
     key_baza_ss = f"ss_baza_{cod_introdus}"
-    key_fin_ss  = f"ss_fin_{cod_introdus}"
-    key_teh_ss  = f"ss_teh_{cod_introdus}"
-    rezultate   = {}
+    key_fin_ss = f"ss_fin_{cod_introdus}"
+    key_teh_ss = f"ss_teh_{cod_introdus}"
+    rezultate = {}
 
     if tab_activ == "📋 Date de bază":
         r = modul.render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex)
         if r:
             st.session_state[key_baza_ss] = r
         rezultate["baza"] = r
-
-    elif tab_activ == "🔒 Date suplimentare" and hasattr(modul, "render_date_suplimentare"):
-        r = modul.render_date_suplimentare(supabase, cod_introdus, is_new, date_baza_ex)
-        if r:
-            st.session_state[key_baza_ss + "_supl"] = r
-        rezultate["suplimentare"] = r
 
     elif tab_activ == "💰 Date financiare" and hasattr(modul, "render_date_financiare"):
         r = modul.render_date_financiare(supabase, cod_introdus, is_new, date_fin_ex)
@@ -202,66 +175,27 @@ def porneste_motorul(supabase):
         with st.spinner("Se salvează datele..."):
             erori = []
 
-            # ── Date de bază ──────────────────────────────────────────
+            # Date de bază
             baza = rezultate.get("baza") or st.session_state.get(key_baza_ss)
             if baza:
                 ok, msg = upsert_row(supabase, defn.BASE_TABLE, {**baza, "cod_identificare": cod_introdus})
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
 
-            # ── Date suplimentare ─────────────────────────────────────
-            supl = rezultate.get("suplimentare") or st.session_state.get(key_baza_ss + "_supl")
-            if supl:
-                ok, msg = upsert_row(supabase, defn.BASE_TABLE, {**supl, "cod_identificare": cod_introdus})
-                if not ok:
-                    erori.append(f"Date suplimentare: {msg}")
-
-            # ── Date financiare ───────────────────────────────────────
+            # Date financiare
             if hasattr(defn, "FIN_TABLE"):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
+                if fin is not None and isinstance(fin, list):
+                    for row in fin:
+                        if "an_referinta" in row:
+                            del row["an_referinta"]
+                        ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
+                        if not ok:
+                            erori.append(f"Date financiare: {msg}")
 
-                # 🔥 ELIMINARE DEFINITIVA an_referinta pentru TOATE cazurile
-                if fin is not None:
-                    if isinstance(fin, dict):
-                        fin.pop("an_referinta", None)
-                    elif isinstance(fin, list):
-                        for row in fin:
-                            if isinstance(row, dict):
-                                row.pop("an_referinta", None)
-                    # Dacă fin este o listă goală, nu facem nimic
-
-                if fin is not None and isinstance(fin, list) and fin:
-                    rows_valide = fin
-                    are_an_referinta = any(r.get("an_referinta") for r in rows_valide if isinstance(r, dict))
-
-                    if are_an_referinta:
-                        ok_del, msg_del = delete_all_for_project(
-                            supabase, defn.FIN_TABLE, cod_introdus
-                        )
-                        if not ok_del:
-                            erori.append(f"Date financiare — ștergere eșuată: {msg_del}")
-                        else:
-                            ok_ins, msg_ins = insert_rows(supabase, defn.FIN_TABLE, rows_valide)
-                            if not ok_ins:
-                                erori.append(f"Date financiare: {msg_ins}")
-                    else:
-                        for row in rows_valide:
-                            ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
-                            if not ok:
-                                erori.append(f"Date financiare: {msg}")
-
-                elif fin == []:
-                    ok_del, msg_del = delete_all_for_project(
-                        supabase, defn.FIN_TABLE, cod_introdus
-                    )
-                    if not ok_del:
-                        erori.append(f"Date financiare — ștergere eșuată: {msg_del}")
-
-            # ── Echipă ────────────────────────────────────────────────
+            # Echipă
             if "echipa" in rezultate:
-                ok_del, msg_del = delete_all_for_project(
-                    supabase, defn.ECHIPA_TABLE, cod_introdus
-                )
+                ok_del, msg_del = delete_all_for_project(supabase, defn.ECHIPA_TABLE, cod_introdus)
                 if not ok_del:
                     erori.append(f"Echipă — ștergere eșuată: {msg_del}")
                 else:
@@ -271,13 +205,11 @@ def porneste_motorul(supabase):
                         if not ok:
                             erori.append(f"Echipă: {msg}")
 
-            # ── Aspecte tehnice ───────────────────────────────────────
+            # Aspecte tehnice
             if hasattr(defn, "TEHNIC_TABLE"):
                 teh = rezultate.get("tehnice") or st.session_state.get(key_teh_ss)
                 if teh is not None:
-                    ok_del, msg_del = delete_all_for_project(
-                        supabase, defn.TEHNIC_TABLE, cod_introdus
-                    )
+                    ok_del, msg_del = delete_all_for_project(supabase, defn.TEHNIC_TABLE, cod_introdus)
                     if not ok_del:
                         erori.append(f"Aspecte tehnice — ștergere eșuată: {msg_del}")
                     else:
