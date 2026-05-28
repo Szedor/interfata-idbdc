@@ -6,7 +6,7 @@
 import streamlit as st
 import pandas as pd
 
-def render_echipa(supabase, cod_introdus, is_new, date_existente):
+def render(supabase, cod_introdus, is_new, date_existente):
     try:
         res = supabase.table("det_resurse_umane").select(
             "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
