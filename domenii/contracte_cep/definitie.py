@@ -5,25 +5,11 @@
 
 TIP_LABEL = "CEP"
 BASE_TABLE = "base_contracte_cep"
-TABS = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"]
+FIN_TABLE = "com_date_financiare"
+ECHIPA_TABLE = "com_echipe_proiect"
+TEHNIC_TABLE = None
 
-# Mapare coloane pentru Date de bază
-FIELDS_BAZA = {
-    "cod_identificare": "NR.CONTRACT",
-    "data_contract": "📅 DATA CONTRACTULUI",
-    "obiectul_contractului": "📝 OBIECTUL CONTRACTULUI",
-    "denumire_beneficiar": "🏢 BENEFICIAR",
-    "data_inceput": "📅 DATA DE INCEPUT",
-    "data_sfarsit": "📅 DATA DE SFARSIT",
-    "durata": "⏱️ DURATA (luni)",
-    "status_contract_proiect": "🔖 STATUS CONTRACT",
-}
+TAB_LABELS_ADMIN = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă"]
+TAB_LABELS_EXPLORATOR = ["Generale", "Financiar", "Echipa"]
 
-# Coloane care nu au emoticon (câmpuri de sistem)
-NO_EMOJI_FIELDS = {"cod_identificare", "durata"}
-
-def get_label(field: str) -> str:
-    """Returnează eticheta vizuală pentru un câmp."""
-    if field in FIELDS_BAZA:
-        return FIELDS_BAZA[field]
-    return field.replace("_", " ").capitalize()
+SECTIUNI_SALVARE = [BASE_TABLE, FIN_TABLE, ECHIPA_TABLE]
