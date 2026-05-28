@@ -1,20 +1,15 @@
 # =========================================================
 # IDBDC/domenii/_baza/sectiune_financiar.py
-# v.modul.1.0 - Secțiune Date financiare (generică)
+# v.modul.1.1 - Adăugat an_referinta = None pentru contracte
 # =========================================================
 
 import streamlit as st
 import pandas as pd
-from core.helpers import fmt_numeric
 
 
 def render(supabase, cod_introdus, is_new, date_existente, valoare_coloana="valoare_contract_cep_terti_speciale"):
     """
     Randare Date financiare pentru contracte (o singură valoare).
-    
-    Parametri:
-        valoare_coloana: numele coloanei din tabela com_date_financiare
-                         (ex: "valoare_contract_cep_terti_speciale" pentru contracte)
     """
     VALUTE = ["LEI", "EUR", "USD"]
     
@@ -55,4 +50,5 @@ def render(supabase, cod_introdus, is_new, date_existente, valoare_coloana="valo
         "cod_identificare": cod_introdus,
         "valuta": row["💱 VALUTA"],
         valoare_coloana: float(row["💰 VALOARE"] or 0),
+        "an_referinta": None,  # Adăugat explicit pentru a evita constrângerea NOT NULL
     }]
