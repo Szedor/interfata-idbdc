@@ -1,12 +1,17 @@
 # =========================================================
 # IDBDC/domenii/contracte_cep/explorator.py
-# VERSIUNE: 1.0
-# STATUS: NOU - fațadă Explorator pentru Contracte CEP
-# DATA: 2026.05.09
+# v.modul.1.0 - Fațadă Explorator pentru Contracte CEP
 # =========================================================
 
-from utils.fisa_completa_orchestrator import render_fisa_completa
+from domenii._baza.sectiune_tehnic import render as _baza_render_tehnic
 
 
 def run(supabase, cod, tabela_gasita, eticheta):
+    """
+    Afișează fișa completă pentru un contract CEP.
+    Pentru contracte, secțiunea Tehnic nu se afișează.
+    """
+    # Importul orchestratorului trebuie făcut aici pentru a evita import circular
+    from utils.fisa_completa_orchestrator import render_fisa_completa
+    
     render_fisa_completa(supabase, cod, tabela_gasita, eticheta)
