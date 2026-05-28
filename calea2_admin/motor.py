@@ -1,7 +1,6 @@
-# =========================================================
+                # =========================================================
 # IDBDC/calea2_admin/motor.py
-# VERSIUNE: 2.6
-# STATUS: CORECTAT - eliminare an_referinta pentru contracte
+# VERSIUNE: 2.7 - ELIMINARE DEFINITIVA an_referinta
 # DATA: 2026.05.28
 # =========================================================
 
@@ -221,43 +220,30 @@ def porneste_motorul(supabase):
             if hasattr(defn, "FIN_TABLE"):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
 
-                # Elimină an_referinta pentru contracte (nu au această coloană)
-                if fin is not None and isinstance(fin, list):
-                    for row in fin:
-                        if "an_referinta" in row:
-                            del row["an_referinta"]
+                # 🔥 ELIMINARE DEFINITIVA an_referinta pentru TOATE cazurile
+                if fin is not None:
+                    if isinstance(fin, dict):
+                        fin.pop("an_referinta", None)
+                    elif isinstance(fin, list):
+                        for row in fin:
+                            if isinstance(row, dict):
+                                row.pop("an_referinta", None)
+                    # Dacă fin este o listă goală, nu facem nimic
 
                 if fin is not None and isinstance(fin, list) and fin:
-                    # Deduplicare
-                    rows_unice = {}
-                    for row in fin:
-                        an = row.get("an_referinta")
-                        cheie = f"{cod_introdus}__{an}" if an else cod_introdus
-                        if cheie not in rows_unice:
-                            rows_unice[cheie] = row
-                    rows_valide = list(rows_unice.values())
-
-                    are_an_referinta = any(r.get("an_referinta") for r in rows_valide)
+                    rows_valide = fin
+                    are_an_referinta = any(r.get("an_referinta") for r in rows_valide if isinstance(r, dict))
 
                     if are_an_referinta:
                         ok_del, msg_del = delete_all_for_project(
                             supabase, defn.FIN_TABLE, cod_introdus
                         )
                         if not ok_del:
-                            erori.append(
-                                f"Date financiare — ștergere eșuată (insert anulat): {msg_del}"
-                            )
+                            erori.append(f"Date financiare — ștergere eșuată: {msg_del}")
                         else:
-                            ok_ins, msg_ins = insert_rows(
-                                supabase, defn.FIN_TABLE, rows_valide
-                            )
+                            ok_ins, msg_ins = insert_rows(supabase, defn.FIN_TABLE, rows_valide)
                             if not ok_ins:
-                                ani_str = ", ".join(
-                                    str(r.get("an_referinta", "?")) for r in rows_valide
-                                )
-                                erori.append(
-                                    f"Date financiare (ani: {ani_str}): {msg_ins}"
-                                )
+                                erori.append(f"Date financiare: {msg_ins}")
                     else:
                         for row in rows_valide:
                             ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
