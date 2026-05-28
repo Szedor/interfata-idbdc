@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/contracte_cep/financiar.py
-# v.modul.1.0 - Date financiare pentru Contracte CEP
+# v.modul.1.1 - Adăugat an_referinta = 0 pentru constrângerea NOT NULL
 # =========================================================
 
 import streamlit as st
@@ -47,4 +47,5 @@ def render(supabase, cod_introdus, is_new, date_existente):
         "cod_identificare": cod_introdus,
         "valuta": row["💱 VALUTA"],
         "valoare_contract_cep_terti_speciale": float(row["💰 VALOARE"] or 0),
+        "an_referinta": 0,  # Adăugat pentru a satisface constrângerea NOT NULL
     }]
