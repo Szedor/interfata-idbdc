@@ -42,7 +42,7 @@ def render(supabase, cod_introdus, is_new, date_existente):
     )
     row = df_edit.iloc[0]
     
-    # Contract CEP → fără an_referinta
+    # CONTRACT CEP - absolut fără an_referinta
     return [{
         "cod_identificare": cod_introdus,
         "valuta": row["💱 VALUTA"],
