@@ -13,6 +13,7 @@ _MAINTENANCE_STYLE = """
         .stApp { background: #0b1a2e !important; }
         .stButton > button { background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; -webkit-text-fill-color: #0b1f3a !important; opacity: 1 !important; }
         .stButton > button p { color: #0b1f3a !important; -webkit-text-fill-color: #0b1f3a !important; }
+        .stTextInput input { font-size: 1.2rem !important; }
     </style>
 """
 
@@ -50,13 +51,6 @@ _MAINTENANCE_HTML = """
 
 
 def maintenance_gate(st, pwd_key: str, btn_key: str):
-    """
-    Afișează ecranul de maintenance și blochează accesul până la introducerea parolei.
-    st       — modulul streamlit
-    pwd_key  — cheie unică pentru widget-ul de parolă (ex: '_mw_pwd_c1')
-    btn_key  — cheie unică pentru butonul de acces (ex: '_mw_btn_c1')
-    Cheia de stare este derivată din btn_key pentru a fi unică per cale.
-    """
     _cleared_key = f"_mw_cleared_{btn_key}"
     if st.session_state.get(_cleared_key):
         return
