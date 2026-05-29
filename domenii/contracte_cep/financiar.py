@@ -1,8 +1,3 @@
-# =========================================================
-# IDBDC/domenii/contracte_cep/financiar.py
-# v.modul.1.2 - Corectat indentarea
-# =========================================================
-
 import streamlit as st
 import pandas as pd
 
@@ -16,7 +11,7 @@ def render(supabase, cod_introdus, is_new, date_existente):
     else:
         row_ex = date_existente[0] if isinstance(date_existente, list) else date_existente
         try:
-            val_ex = float(row_ex.get("valoare_contract_cep_terti_speciale") or 0)
+            val_ex = float(row_ex.get("valoare_contract") or 0)
         except:
             val_ex = 0.0
         valuta_ex = row_ex.get("valuta", "LEI")
@@ -25,12 +20,12 @@ def render(supabase, cod_introdus, is_new, date_existente):
 
     df = pd.DataFrame([{
         "💱 VALUTA": valuta_ex,
-        "💰 VALOARE": val_ex,
+        "💰 VALOARE CONTRACT": val_ex,
     }])
 
     col_cfg = {
         "💱 VALUTA": st.column_config.SelectboxColumn("💱 VALUTA", options=VALUTE, required=True),
-        "💰 VALOARE": st.column_config.NumberColumn("💰 VALOARE", format="%.2f", min_value=0.0),
+        "💰 VALOARE CONTRACT": st.column_config.NumberColumn("💰 VALOARE CONTRACT", format="%.2f", min_value=0.0),
     }
 
     df_edit = st.data_editor(
@@ -46,6 +41,5 @@ def render(supabase, cod_introdus, is_new, date_existente):
     return [{
         "cod_identificare": cod_introdus,
         "valuta": row["💱 VALUTA"],
-        "valoare_contract_cep_terti_speciale": float(row["💰 VALOARE"] or 0),
-        "an_referinta": 0,
+        "valoare_contract": float(row["💰 VALOARE CONTRACT"] or 0),
     }]
