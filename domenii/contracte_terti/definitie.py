@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/contracte_terti/definitie.py
-# v.modul.1.0 - Definiție Contracte TERTI
+# v.modul.1.1 - Versiune completă (cu toate câmpurile)
 # =========================================================
 
 TIP_LABEL = "TERTI"
@@ -27,4 +27,35 @@ FIELDS_BAZA = {
     "status": "STATUS CONTRACT",
     "derulat_prin": "DERULAT PRIN",
     "observatii": "OBSERVAȚII",
+}
+
+# Pentru consistență (deși nu sunt folosite direct de baza.py)
+COL_LABELS = {
+    "denumire_categorie": "CATEGORIE",
+    "acronim_tip_contract": "TIPUL DE CONTRACT",
+    "cod_identificare": "NR.CONTRACT",
+    "data_contract": "DATA CONTRACTULUI",
+    "obiectul_contractului": "OBIECTUL CONTRACTULUI",
+    "denumire_beneficiar": "BENEFICIAR",
+    "data_inceput": "DATA DE INCEPUT",
+    "data_sfarsit": "DATA DE SFARSIT",
+    "durata": "DURATA",
+    "status_contract_proiect": "STATUS CONTRACT",
+    "derulat_prin": "DERULAT PRIN",
+    "observatii": "OBSERVAȚII",
+    "valuta": "VALUTA",
+    "valoare_contract": "VALOARE CONTRACT",
+    "nume_prenume": "NUME SI PRENUME",
+    "rol": "ROLUL IN CONTRACT",
+    "persoana_contact": "PERSOANA DE CONTACT",
+}
+
+COLS_HIDDEN = {
+    "nr_crt", "creat_de", "creat_la", "modificat_de", "modificat_la",
+    "acronim_departament", "denumire_departament", "telefon_mobil", "telefon_fix",
+}
+
+COLS_COMPUSE = {
+    "departament": ["acronim_departament", "denumire_departament"],
+    "telefon": ["telefon_mobil", "telefon_fix"],
 }
