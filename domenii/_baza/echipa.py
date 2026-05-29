@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/_baza/echipa.py
-# v.modul.1.0 - Secțiune Echipă (cu tabel)
+# v.modul.1.0 - Secțiune Echipă (versiunea originală cu tabel)
 # =========================================================
 
 import streamlit as st
@@ -75,25 +75,25 @@ def render(supabase, cod_introdus, is_new, date_existente):
 
     df = pd.DataFrame(st.session_state[key_rows])
     df = df.rename(columns={
-        "nume": "👤 NUME ȘI PRENUME",
-        "rol": "📌 ROLUL ÎN CONTRACT",
-        "contact": "⭐ PERSOANĂ DE CONTACT",
-        "departament": "🏛️ DEPARTAMENT",
-        "email": "✉️ EMAIL",
-        "mob": "📱 TELEFON MOBIL",
-        "fix": "☎️ TELEFON FIX",
+        "nume": "NUME ȘI PRENUME",
+        "rol": "ROLUL ÎN CONTRACT",
+        "contact": "PERSOANĂ DE CONTACT",
+        "departament": "DEPARTAMENT",
+        "email": "EMAIL",
+        "mob": "TELEFON MOBIL",
+        "fix": "TELEFON FIX",
     })
 
     col_cfg = {
-        "👤 NUME ȘI PRENUME": st.column_config.SelectboxColumn(
-            "👤 NUME ȘI PRENUME", options=persoane_list, required=False
+        "NUME ȘI PRENUME": st.column_config.SelectboxColumn(
+            "NUME ȘI PRENUME", options=persoane_list, required=False
         ),
-        "📌 ROLUL ÎN CONTRACT": st.column_config.TextColumn("📌 ROLUL ÎN CONTRACT"),
-        "⭐ PERSOANĂ DE CONTACT": st.column_config.CheckboxColumn("⭐ PERSOANĂ DE CONTACT"),
-        "🏛️ DEPARTAMENT": st.column_config.TextColumn("🏛️ DEPARTAMENT", disabled=True),
-        "✉️ EMAIL": st.column_config.TextColumn("✉️ EMAIL", disabled=True),
-        "📱 TELEFON MOBIL": st.column_config.TextColumn("📱 TELEFON MOBIL", disabled=True),
-        "☎️ TELEFON FIX": st.column_config.TextColumn("☎️ TELEFON FIX", disabled=True),
+        "ROLUL ÎN CONTRACT":   st.column_config.TextColumn("ROLUL ÎN CONTRACT"),
+        "PERSOANĂ DE CONTACT": st.column_config.CheckboxColumn("PERSOANĂ DE CONTACT"),
+        "DEPARTAMENT":         st.column_config.TextColumn("DEPARTAMENT", disabled=True),
+        "EMAIL":               st.column_config.TextColumn("EMAIL", disabled=True),
+        "TELEFON MOBIL":       st.column_config.TextColumn("TELEFON MOBIL", disabled=True),
+        "TELEFON FIX":         st.column_config.TextColumn("TELEFON FIX", disabled=True),
     }
 
     df_edit = st.data_editor(
@@ -107,11 +107,11 @@ def render(supabase, cod_introdus, is_new, date_existente):
 
     # Actualizare session_state
     for idx, row in df_edit.iterrows():
-        nume = str(row.get("👤 NUME ȘI PRENUME", "")).strip()
+        nume = str(row.get("NUME ȘI PRENUME", "")).strip()
         if idx < len(st.session_state[key_rows]):
             st.session_state[key_rows][idx]["nume"] = nume
-            st.session_state[key_rows][idx]["rol"] = str(row.get("📌 ROLUL ÎN CONTRACT", "")).strip()
-            st.session_state[key_rows][idx]["contact"] = bool(row.get("⭐ PERSOANĂ DE CONTACT", False))
+            st.session_state[key_rows][idx]["rol"] = str(row.get("ROLUL ÎN CONTRACT", "")).strip()
+            st.session_state[key_rows][idx]["contact"] = bool(row.get("PERSOANĂ DE CONTACT", False))
             
             if nume:
                 info = info_map.get(nume, {})
