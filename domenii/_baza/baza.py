@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/_baza/baza.py
-# v.modul.1.0 - Date de bază (generic)
+# v.modul.1.1 - Suport pentru câmpul derulat_prin
 # =========================================================
 
 import streamlit as st
@@ -48,6 +48,10 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, fields_map, 
         fields_map.get("status", "STATUS"): date_existente.get("status_contract_proiect", ""),
     }
     
+    # Adaugă câmpul derulat_prin dacă există în fields_map
+    if "derulat_prin" in fields_map:
+        row_init[fields_map["derulat_prin"]] = date_existente.get("derulat_prin", "")
+    
     if "observatii" in fields_map:
         row_init[fields_map["observatii"]] = date_existente.get("observatii", "")
     
@@ -63,7 +67,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, fields_map, 
             col_cfg[label] = st.column_config.NumberColumn(label, format="%d", min_value=0)
         elif tech_col == "status":
             col_cfg[label] = st.column_config.SelectboxColumn(label, options=status_list)
-        elif tech_col == "observatii":
+        elif tech_col in ["derulat_prin", "observatii"]:
             col_cfg[label] = st.column_config.TextColumn(label, width="large")
         else:
             col_cfg[label] = st.column_config.TextColumn(label, width="large")
@@ -104,6 +108,9 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, fields_map, 
         "durata": dur_e if dur_e else None,
         "status_contract_proiect": row[fields_map.get("status", "STATUS")] if "status" in fields_map else None,
     }
+    
+    if "derulat_prin" in fields_map:
+        rezultat["derulat_prin"] = row[fields_map["derulat_prin"]] if row[fields_map["derulat_prin"]] else None
     
     if "observatii" in fields_map:
         rezultat["observatii"] = row[fields_map["observatii"]] if row[fields_map["observatii"]] else None
