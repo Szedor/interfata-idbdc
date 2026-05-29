@@ -1,146 +1,182 @@
 # =========================================================
 # IDBDC/domenii/_baza/echipa.py
-# v.modul.1.0 - Secțiune Echipă (versiunea originală cu tabel)
+# VERSIUNE: 3.1
+# STATUS: ACTUALIZAT - toate elementele pe un singur rând
+# DATA: 2026.05.29
+# =========================================================
+# CONȚINUT:
+#   Secțiunea Echipă cu rânduri individuale per membru.
+#
+# MODIFICĂRI VERSIUNEA 3.1:
+#   - Toate cele 4 elemente (Membru N, NUME ȘI PRENUME,
+#     ROLUL ÎN ECHIPĂ, PERSOANĂ DE CONTACT) afișate
+#     pe un singur rând.
+#   - NUME ȘI PRENUME redus la 2/3, ROLUL ÎN ECHIPĂ
+#     redus la 1/2 față de versiunea anterioară.
+#   - Eticheta corectată: ROLUL ÎN ECHIPĂ (nu CONTRACT).
+#   - Eliminată nota de subsol.
 # =========================================================
 
 import streamlit as st
-import pandas as pd
 
 
-def render(supabase, cod_introdus, is_new, date_existente):
+@st.cache_data(show_spinner=False, ttl=600)
+def _fetch_persoane(_supabase):
     try:
-        res = supabase.table("det_resurse_umane").select(
+        res = _supabase.table("det_resurse_umane").select(
             "nume_prenume,email,telefon_mobil,telefon_fix,acronim_departament"
         ).order("nume_prenume").execute()
-        persoane_data = res.data or []
-    except Exception as e:
-        st.error(f"❌ Eroare citire persoane: {e}")
-        persoane_data = []
+        return res.data or []
+    except Exception:
+        return []
 
+
+@st.cache_data(show_spinner=False, ttl=600)
+def _fetch_departamente(_supabase):
     try:
-        res2 = supabase.table("nom_departament").select(
+        res = _supabase.table("nom_departament").select(
             "acronim_departament,denumire_departament"
         ).execute()
-        dep_map = {r["acronim_departament"]: r["denumire_departament"]
-                   for r in (res2.data or []) if r.get("acronim_departament")}
-    except Exception as e:
-        st.error(f"❌ Eroare citire departamente: {e}")
-        dep_map = {}
+        return {
+            r["acronim_departament"]: r["denumire_departament"]
+            for r in (res.data or []) if r.get("acronim_departament")
+        }
+    except Exception:
+        return {}
 
-    if not persoane_data:
-        st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane.")
-    persoane_list = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
 
+def _build_info_map(persoane_data, dep_map):
     info_map = {}
     for p in persoane_data:
         n = p.get("nume_prenume", "")
         if not n:
             continue
         acronim = p.get("acronim_departament", "")
-        den = dep_map.get(acronim, "")
+        den     = dep_map.get(acronim, "")
+        mob     = p.get("telefon_mobil", "") or ""
+        fix     = p.get("telefon_fix", "") or ""
+        telefon = f"{mob} / {fix}" if mob and fix else mob or fix
         info_map[n] = {
-            "dep":   f"{acronim} - {den}" if acronim and den else acronim,
-            "email": p.get("email", ""),
-            "mob":   p.get("telefon_mobil", ""),
-            "fix":   p.get("telefon_fix", ""),
+            "dep":     f"{acronim} - {den}" if acronim and den else acronim,
+            "email":   p.get("email", "") or "",
+            "telefon": telefon,
         }
+    return info_map
 
-    NR_RANDURI_INIT = 5
-    key_rows = f"echipa_rows_{cod_introdus}"
-    
-    if key_rows not in st.session_state:
-        if is_new or not date_existente:
-            st.session_state[key_rows] = [
-                {"nume": "", "rol": "", "contact": False, "departament": "", "email": "", "mob": "", "fix": ""}
-                for _ in range(NR_RANDURI_INIT)
-            ]
-        else:
-            st.session_state[key_rows] = []
-            for r in date_existente:
-                nume = r.get("nume_prenume", "")
-                info = info_map.get(nume, {})
-                st.session_state[key_rows].append({
-                    "nume": nume,
-                    "rol": r.get("rol", ""),
-                    "contact": bool(r.get("persoana_contact", False)),
-                    "departament": info.get("dep", ""),
-                    "email": info.get("email", ""),
-                    "mob": info.get("mob", ""),
-                    "fix": info.get("fix", ""),
-                })
-            while len(st.session_state[key_rows]) < NR_RANDURI_INIT:
-                st.session_state[key_rows].append(
-                    {"nume": "", "rol": "", "contact": False, "departament": "", "email": "", "mob": "", "fix": ""}
+
+def render(supabase, cod_introdus, is_new, date_existente):
+    persoane_data = _fetch_persoane(supabase)
+    dep_map       = _fetch_departamente(supabase)
+    info_map      = _build_info_map(persoane_data, dep_map)
+    persoane_list = [""] + [p["nume_prenume"] for p in persoane_data if p.get("nume_prenume")]
+
+    if not persoane_data:
+        st.warning("⚠️ Nu s-au găsit persoane în tabela det_resurse_umane.")
+
+    key_nr = f"echipa_nr_{cod_introdus}"
+    if key_nr not in st.session_state:
+        nr_init = max(5, len(date_existente) if date_existente else 5)
+        st.session_state[key_nr] = nr_init
+
+    if date_existente and not is_new:
+        for idx, r in enumerate(date_existente):
+            key_n = f"echipa_{cod_introdus}_{idx}_nume"
+            key_r = f"echipa_{cod_introdus}_{idx}_rol"
+            key_c = f"echipa_{cod_introdus}_{idx}_contact"
+            if key_n not in st.session_state:
+                st.session_state[key_n] = r.get("nume_prenume", "") or ""
+            if key_r not in st.session_state:
+                st.session_state[key_r] = r.get("rol", "") or ""
+            if key_c not in st.session_state:
+                st.session_state[key_c] = bool(r.get("persoana_contact", False))
+
+    nr_membri = st.session_state[key_nr]
+
+    for idx in range(nr_membri):
+        key_n = f"echipa_{cod_introdus}_{idx}_nume"
+        key_r = f"echipa_{cod_introdus}_{idx}_rol"
+        key_c = f"echipa_{cod_introdus}_{idx}_contact"
+
+        # Toate cele 4 elemente pe un singur rând
+        # Proporții: etichetă(1) | nume(4) | rol(3) | bifa(2)
+        col_lbl, col_nume, col_rol, col_contact = st.columns([1, 4, 3, 2])
+
+        with col_lbl:
+            st.markdown(
+                f"<div style='color:rgba(255,255,255,0.60);font-size:0.78rem;"
+                f"font-weight:700;padding-top:32px;'>"
+                f"Membru {idx + 1}</div>",
+                unsafe_allow_html=True,
+            )
+
+        with col_nume:
+            nume_curent  = st.session_state.get(key_n, "")
+            idx_selectat = persoane_list.index(nume_curent) if nume_curent in persoane_list else 0
+            nume_ales = st.selectbox(
+                "NUME ȘI PRENUME",
+                options=persoane_list,
+                index=idx_selectat,
+                key=key_n,
+            )
+
+        with col_rol:
+            st.text_input(
+                "ROLUL ÎN ECHIPĂ",
+                key=key_r,
+            )
+
+        with col_contact:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            st.checkbox(
+                "⭐ PERSOANĂ DE CONTACT",
+                key=key_c,
+            )
+
+        # Departament și contact sub rând
+        if nume_ales and nume_ales in info_map:
+            info  = info_map[nume_ales]
+            parts = []
+            if info["dep"]:
+                parts.append(f"🏢 {info['dep']}")
+            if info["email"]:
+                parts.append(f"✉️ {info['email']}")
+            if info["telefon"]:
+                parts.append(f"📞 {info['telefon']}")
+            if parts:
+                st.markdown(
+                    "<div style='background:rgba(255,255,255,0.06);"
+                    "border-radius:6px;padding:5px 12px;margin-top:2px;"
+                    "font-size:0.84rem;color:rgba(255,255,255,0.80);'>" +
+                    "  &nbsp;·&nbsp;  ".join(parts) +
+                    "</div>",
+                    unsafe_allow_html=True,
                 )
 
-    df = pd.DataFrame(st.session_state[key_rows])
-    df = df.rename(columns={
-        "nume": "NUME ȘI PRENUME",
-        "rol": "ROLUL ÎN CONTRACT",
-        "contact": "PERSOANĂ DE CONTACT",
-        "departament": "DEPARTAMENT",
-        "email": "EMAIL",
-        "mob": "TELEFON MOBIL",
-        "fix": "TELEFON FIX",
-    })
+        if idx < nr_membri - 1:
+            st.markdown(
+                "<div style='border-top:1px solid rgba(255,255,255,0.10);"
+                "margin-top:8px;'></div>",
+                unsafe_allow_html=True,
+            )
 
-    col_cfg = {
-        "NUME ȘI PRENUME": st.column_config.SelectboxColumn(
-            "NUME ȘI PRENUME", options=persoane_list, required=False
-        ),
-        "ROLUL ÎN CONTRACT":   st.column_config.TextColumn("ROLUL ÎN CONTRACT"),
-        "PERSOANĂ DE CONTACT": st.column_config.CheckboxColumn("PERSOANĂ DE CONTACT"),
-        "DEPARTAMENT":         st.column_config.TextColumn("DEPARTAMENT", disabled=True),
-        "EMAIL":               st.column_config.TextColumn("EMAIL", disabled=True),
-        "TELEFON MOBIL":       st.column_config.TextColumn("TELEFON MOBIL", disabled=True),
-        "TELEFON FIX":         st.column_config.TextColumn("TELEFON FIX", disabled=True),
-    }
-
-    df_edit = st.data_editor(
-        df,
-        column_config=col_cfg,
-        hide_index=True,
-        use_container_width=True,
-        num_rows="fixed",
-        key=f"echipa_editor_{cod_introdus}",
-    )
-
-    # Actualizare session_state
-    for idx, row in df_edit.iterrows():
-        nume = str(row.get("NUME ȘI PRENUME", "")).strip()
-        if idx < len(st.session_state[key_rows]):
-            st.session_state[key_rows][idx]["nume"] = nume
-            st.session_state[key_rows][idx]["rol"] = str(row.get("ROLUL ÎN CONTRACT", "")).strip()
-            st.session_state[key_rows][idx]["contact"] = bool(row.get("PERSOANĂ DE CONTACT", False))
-            
-            if nume:
-                info = info_map.get(nume, {})
-                st.session_state[key_rows][idx]["departament"] = info.get("dep", "")
-                st.session_state[key_rows][idx]["email"] = info.get("email", "")
-                st.session_state[key_rows][idx]["mob"] = info.get("mob", "")
-                st.session_state[key_rows][idx]["fix"] = info.get("fix", "")
-            else:
-                st.session_state[key_rows][idx]["departament"] = ""
-                st.session_state[key_rows][idx]["email"] = ""
-                st.session_state[key_rows][idx]["mob"] = ""
-                st.session_state[key_rows][idx]["fix"] = ""
-
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     if st.button("➕ Adaugă membru", key=f"add_membru_{cod_introdus}"):
-        st.session_state[key_rows].append(
-            {"nume": "", "rol": "", "contact": False, "departament": "", "email": "", "mob": "", "fix": ""}
-        )
+        st.session_state[key_nr] += 1
         st.rerun()
 
+    # Colectare rezultat pentru salvare
     rezultat = []
-    for item in st.session_state[key_rows]:
-        nume = item.get("nume", "").strip()
-        if not nume:
+    for idx in range(nr_membri):
+        n = str(st.session_state.get(f"echipa_{cod_introdus}_{idx}_nume", "") or "").strip()
+        if not n:
             continue
+        r = str(st.session_state.get(f"echipa_{cod_introdus}_{idx}_rol", "") or "").strip()
+        c = bool(st.session_state.get(f"echipa_{cod_introdus}_{idx}_contact", False))
         rezultat.append({
             "cod_identificare": cod_introdus,
-            "nume_prenume": nume,
-            "rol": item.get("rol", ""),
-            "persoana_contact": item.get("contact", False),
-            "functie_upt": "",
+            "nume_prenume":     n,
+            "rol":              r,
+            "persoana_contact": c,
+            "functie_upt":      "",
         })
     return rezultat
