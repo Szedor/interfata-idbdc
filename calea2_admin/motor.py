@@ -12,9 +12,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from domenii._baza.upsert import upsert_row, delete_all_for_project, insert_rows
 import calea2_admin.ui as ui
 from domenii.contracte_cep import admin as cep, definitie as cep_def
+from domenii.contracte_terti import admin as terti, definitie as terti_def
 
 _DOMENII = {
     ("Contracte", "CEP"): (cep, cep_def),
+    ("Contracte", "TERTI"): (terti, terti_def),
 }
 
 _TAB_CSS = """
