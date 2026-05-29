@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/_baza/upsert.py
-# v.modul.1.0 - Salvare generică (upsert, delete, insert)
+# v.modul.1.1 - Elimină an_referinta pentru com_date_financiare
 # =========================================================
 
 import streamlit as st
@@ -15,7 +15,6 @@ TABELE_FARA_AUDIT = {
 
 
 def _cleanup(row_dict: dict, table_name: str) -> dict:
-    """Elimină câmpurile sistem sau nule înainte de trimitere."""
     exclude = {"id", "creat_la", "modificat_la"}
     
     # Pentru tabela com_date_financiare, eliminăm și an_referinta (dacă există)
@@ -32,12 +31,6 @@ def _cleanup(row_dict: dict, table_name: str) -> dict:
 
 
 def upsert_row(supabase, table_name: str, row_data: dict, match_col="cod_identificare"):
-    """
-    Upsert cu suport pentru chei primare compuse.
-    
-    Args:
-        match_col: string sau list/tuple cu coloanele cheie.
-    """
     payload = _cleanup(row_data, table_name)
 
     if isinstance(match_col, (list, tuple)):
@@ -63,10 +56,6 @@ def upsert_row(supabase, table_name: str, row_data: dict, match_col="cod_identif
 
 
 def delete_all_for_project(supabase, table_name: str, cod: str):
-    """
-    Șterge toate înregistrările unui proiect dintr-un tabel.
-    Returnează (True, "Succes") sau (False, mesaj_eroare).
-    """
     try:
         supabase.table(table_name).delete().eq("cod_identificare", cod).execute()
         return True, "Succes"
@@ -75,10 +64,6 @@ def delete_all_for_project(supabase, table_name: str, cod: str):
 
 
 def insert_rows(supabase, table_name: str, rows: list):
-    """
-    Inserează rândurile unul câte unul pentru a izola erorile.
-    Returnează (True, "Succes") sau (False, mesaj_prima_eroare).
-    """
     if not rows:
         return True, "Nimic de inserat."
 
