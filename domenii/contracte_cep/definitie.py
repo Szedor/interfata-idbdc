@@ -1,8 +1,3 @@
-# =========================================================
-# IDBDC/domenii/contracte_cep/definitie.py
-# v.modul.1.0 - Definiție Contracte CEP
-# =========================================================
-
 TIP_LABEL = "CEP"
 BASE_TABLE = "base_contracte_cep"
 FIN_TABLE = "com_date_financiare"
