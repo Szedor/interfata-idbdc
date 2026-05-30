@@ -1,32 +1,6 @@
 # =========================================================
 # IDBDC/explorator/main.py
-# VERSIUNE: 3.4
-# STATUS: CORECTAT - caret-color alb pentru cursorul vizibil în input
-# DATA: 2026.05.03
-# =========================================================
-# CONȚINUT:
-#   Modulul principal al Căii1 (Explorator). Gestionează
-#   autentificarea cu parolă (gate_control), afișarea header-ului,
-#   și cele trei tab-uri: Fișă completă după cod, Explorare
-#   universală și Raportări. Afișează fișa completă a unui
-#   contract/proiect pe baza codului de identificare introdus.
-#
-# MODIFICĂRI VERSIUNEA 3.3:
-#   (vezi istoric git)
-# MODIFICĂRI VERSIUNEA 3.4:
-#   - Adăugat caret-color: #ffffff la regulile CSS pentru câmpurile
-#     de input (.stTextInput input). Cursorul text era invizibil în
-#     câmpul Cod identificare din Calea1 deoarece culoarea implicită
-#     a cursorului se confunda cu fundalul închis (#1a3a5c).
-#     Acum cursorul apare alb și vizibil pe orice câmp de text.
-#   - Corectat CSS în funcția hide_streamlit_chrome():
-#     regula "header { visibility: hidden; height: 0px; }"
-#     a fost înlocuită cu "[data-testid='stHeader'] { ... }"
-#     (țintire specifică în loc de tag generic).
-#     Regula generică "header" ascundea și cursorul de mouse
-#     în câmpurile de input (inclusiv câmpul Cod identificare)
-#     deoarece Streamlit randează unele componente în elemente
-#     de tip header. Acum cursorul este vizibil și funcțional.
+# VERSIUNE: 3.5 - Acces bazat pe filtre operator
 # =========================================================
 
 import streamlit as st
@@ -115,10 +89,6 @@ def render_header():
         """,
         unsafe_allow_html=True,
     )
-
-
-def _render_export_auth_tab1(supabase):
-    return True
 
 
 def gate_control():
@@ -240,12 +210,16 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
+    # Aplică filtrele operatorului (dacă există) – doar pentru afișare, nu pentru acces
+    # Accesul real este controlat în Calea2, nu în Calea1
     if tabela_gasita == "base_contracte_cep":
         run_fisa_cep(supabase, cod, tabela_gasita, "CEP")
     elif tabela_gasita == "base_contracte_terti":
         run_fisa_terti(supabase, cod, tabela_gasita, "TERȚI")
     elif tabela_gasita == "base_contracte_speciale":
-        run_fisa_speciale(supabase, cod, tabela_gasita, "SPECIALE")
+        # Contractele SPECIALE nu sunt accesibile în Calea1
+        st.error("⚠️ Acest tip de contract nu este disponibil pentru interogare publică.")
+        return
     else:
         render_fisa_generica(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
