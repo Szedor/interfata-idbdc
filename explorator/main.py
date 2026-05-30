@@ -18,7 +18,7 @@ from explorator.fise.contracte_terti import run as run_fisa_terti
 from explorator.fise.contracte_speciale import run as run_fisa_speciale
 
 ACADEMIC_BLUE = "#0b2a52"
-TITLE_LINE_1 = "🔎 Baze de date: Interogare | Cautare | Consultare avansata"
+TITLE_LINE_1 = "🔎 Baze de date:   Interogare | Cautare | Consultare avansata"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare - UPT"
 
 
