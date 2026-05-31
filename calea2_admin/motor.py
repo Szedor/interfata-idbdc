@@ -14,11 +14,13 @@ import calea2_admin.ui as ui
 from domenii.contracte_cep import admin as cep, definitie as cep_def
 from domenii.contracte_terti import admin as terti, definitie as terti_def
 from domenii.contracte_speciale import admin as speciale, definitie as speciale_def
+from domenii.proiecte_fdi import admin as fdi, definitie as fdi_def
 
 _DOMENII = {
     ("Contracte", "CEP"): (cep, cep_def),
     ("Contracte", "TERTI"): (terti, terti_def),
     ("Contracte", "SPECIALE"): (speciale, speciale_def),
+    ("Proiecte", "FDI"): (fdi, fdi_def),
 }
 
 _TAB_CSS = """
