@@ -220,6 +220,9 @@ def render_fisa_completa(supabase: Client):
         # Contractele SPECIALE nu sunt accesibile în Calea1
         st.error("⚠️ Acest tip de contract nu este disponibil pentru interogare publică.")
         return
+    elif tabela_gasita == "base_proiecte_fdi":
+        from explorator.fise.proiecte_fdi import run as run_fisa_fdi
+        run_fisa_fdi(supabase, cod, tabela_gasita, "FDI")
     else:
         render_fisa_generica(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
