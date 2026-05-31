@@ -1,25 +1,27 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/baza.py
-# VERSIUNE: 1.0
-# STATUS: NOU — Date de bază specifice Proiecte FDI
-# DATA: 2026.05.31
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - ordinea câmpurilor identică cu maparea
+# DATA: 2026.06.01
 # =========================================================
-# CONȚINUT:
-#   render_date_de_baza() pentru Proiecte FDI.
-#   Diferențe față de baza.py generic (contracte):
-#     - câmp titlul_proiect (TextColumn large)
-#     - câmp acronim_proiect
-#     - câmp program (TextColumn)
-#     - câmp cod_domeniu_fdi (SelectboxColumn ← din nom_domenii_fdi)
-#     - câmp cod_temporar (cod depunere, text)
-#     - NU există data_contract / beneficiar
-#     - Durată calculată automat după salvare (nota fixă de subsol)
-#
-#   Principiu emoji:
-#     📅 = câmpuri DateColumn (calendar picker)
-#     🔖 = câmpuri SelectboxColumn (dropdown)
-#     🆔 = cod identificare readonly
-#     🏷️ = câmpuri text libere (opționale)
+# MODIFICĂRI VERSIUNEA 1.1:
+#   - Ordinea câmpurilor în row_init și col_cfg respectă
+#     exact ordinea din maparea oficială:
+#     1. CATEGORIE
+#     2. TIPUL DE PROIECT
+#     3. COD FINAL ÎNREGISTRARE
+#     4. TITLUL PROIECTULUI
+#     5. ACRONIMUL PROIECTULUI
+#     6. DATA DE INCEPUT
+#     7. DATA DE SFARSIT
+#     8. DURATA (luni)
+#     9. STATUS CONTRACT
+#    10. PROGRAM DE FINANTARE
+#    11. DOMENIU
+#    12. COD DEPUNERE
+#    13. OBSERVATII
+#   - Corectat câmpul returnat: acronim_tip_proiecte
+#     (nu acronim_tip_contract — greșit pentru proiecte)
 # =========================================================
 
 import streamlit as st
@@ -64,18 +66,7 @@ def _get_domenii_fdi(_supabase):
 def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date_existente):
     """
     Randează și colectează Date de bază pentru Proiecte FDI.
-
-    Parametri:
-        supabase      : clientul Supabase
-        cod_introdus  : codul identificator (ex: "26FDI26")
-        cat_sel       : categoria (ex: "Proiecte")
-        tip_label     : eticheta tipului (ex: "FDI")
-        tabela_nume   : tabela SQL (ex: "base_proiecte_fdi")
-        is_new        : True dacă este înregistrare nouă
-        date_existente: dict cu datele existente (pentru editare)
-
-    Returnează:
-        dict cu valorile pentru salvare în base_proiecte_fdi
+    Ordinea câmpurilor respectă exact maparea oficială.
     """
     status_list  = _get_status_list(supabase)
     domenii_list = _get_domenii_fdi(supabase)
@@ -100,24 +91,38 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         domenii_list = [domeniu_ex] + domenii_list
     domenii_options = [""] + domenii_list
 
-    # ── Construire rând inițial ────────────────────────────────────────
+    # ── Construire rând inițial — ORDINEA EXACTĂ DIN MAPARE ───────────
+    # 1. CATEGORIE
+    # 2. TIPUL DE PROIECT
+    # 3. COD FINAL ÎNREGISTRARE
+    # 4. TITLUL PROIECTULUI
+    # 5. ACRONIMUL PROIECTULUI
+    # 6. DATA DE INCEPUT
+    # 7. DATA DE SFARSIT
+    # 8. DURATA (luni)
+    # 9. STATUS CONTRACT
+    # 10. PROGRAM DE FINANTARE
+    # 11. DOMENIU
+    # 12. COD DEPUNERE
+    # 13. OBSERVATII
     row_init = {
-        "CATEGORIE":               cat_sel,
-        "TIPUL DE PROIECT":        tip_label,
-        "🆔 COD FINAL ÎNREGISTRARE": cod_introdus,
-        "🏷️ COD DEPUNERE":          date_existente.get("cod_temporar", "") or "",
-        "🏷️ TITLUL PROIECTULUI":    date_existente.get("titlul_proiect", "") or "",
-        "🏷️ ACRONIMUL PROIECTULUI": date_existente.get("acronim_proiect", "") or "",
-        "📅 DATA DE INCEPUT":       di,
-        "📅 DATA DE SFARSIT":       ds,
-        "DURATA (nr. luni)":       int(dur_ex) if dur_ex else 0,
-        "🔖 STATUS PROIECT":        date_existente.get("status_contract_proiect", "") or "",
-        "🏷️ PROGRAM DE FINANȚARE":  date_existente.get("program", "") or "",
-        "🔖 DOMENIU FDI":           domeniu_ex,
-        "🏷️ OBSERVAȚII":            date_existente.get("observatii", "") or "",
+        "CATEGORIE":                    cat_sel,
+        "TIPUL DE PROIECT":             tip_label,
+        "🆔 COD FINAL ÎNREGISTRARE":    cod_introdus,
+        "🏷️ TITLUL PROIECTULUI":        date_existente.get("titlul_proiect", "") or "",
+        "🏷️ ACRONIMUL PROIECTULUI":     date_existente.get("acronim_proiect", "") or "",
+        "📅 DATA DE INCEPUT":           di,
+        "📅 DATA DE SFARSIT":           ds,
+        "DURATA (luni)":                int(dur_ex) if dur_ex else 0,
+        "🔖 STATUS PROIECT":            date_existente.get("status_contract_proiect", "") or "",
+        "🏷️ PROGRAM DE FINANȚARE":      date_existente.get("program", "") or "",
+        "🔖 DOMENIU":                   domeniu_ex,
+        "🏷️ COD DEPUNERE":              date_existente.get("cod_temporar", "") or "",
+        "🏷️ OBSERVAȚII":               date_existente.get("observatii", "") or "",
     }
     df = pd.DataFrame([row_init])
 
+    # ── Configurare coloane — ACEEAȘI ORDINE ──────────────────────────
     col_cfg = {
         "CATEGORIE": st.column_config.TextColumn(
             "CATEGORIE", disabled=True
@@ -127,9 +132,6 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         ),
         "🆔 COD FINAL ÎNREGISTRARE": st.column_config.TextColumn(
             "🆔 COD FINAL ÎNREGISTRARE", disabled=True
-        ),
-        "🏷️ COD DEPUNERE": st.column_config.TextColumn(
-            "🏷️ COD DEPUNERE"
         ),
         "🏷️ TITLUL PROIECTULUI": st.column_config.TextColumn(
             "🏷️ TITLUL PROIECTULUI", width="large"
@@ -143,8 +145,8 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "📅 DATA DE SFARSIT": st.column_config.DateColumn(
             "📅 DATA DE SFARSIT", format="YYYY-MM-DD"
         ),
-        "DURATA (nr. luni)": st.column_config.NumberColumn(
-            "DURATA (nr. luni)", format="%d", min_value=0
+        "DURATA (luni)": st.column_config.NumberColumn(
+            "DURATA (luni)", format="%d", min_value=0
         ),
         "🔖 STATUS PROIECT": st.column_config.SelectboxColumn(
             "🔖 STATUS PROIECT", options=status_list
@@ -152,8 +154,11 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "🏷️ PROGRAM DE FINANȚARE": st.column_config.TextColumn(
             "🏷️ PROGRAM DE FINANȚARE"
         ),
-        "🔖 DOMENIU FDI": st.column_config.SelectboxColumn(
-            "🔖 DOMENIU FDI", options=domenii_options, required=False
+        "🔖 DOMENIU": st.column_config.SelectboxColumn(
+            "🔖 DOMENIU", options=domenii_options, required=False
+        ),
+        "🏷️ COD DEPUNERE": st.column_config.TextColumn(
+            "🏷️ COD DEPUNERE"
         ),
         "🏷️ OBSERVAȚII": st.column_config.TextColumn(
             "🏷️ OBSERVAȚII", width="large"
@@ -176,7 +181,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     # ── Recalcul date după editare ─────────────────────────────────────
     di_e  = row["📅 DATA DE INCEPUT"]
     ds_e  = row["📅 DATA DE SFARSIT"]
-    dur_e = int(row["DURATA (nr. luni)"]) if row["DURATA (nr. luni)"] else 0
+    dur_e = int(row["DURATA (luni)"]) if row["DURATA (luni)"] else 0
 
     if di_e and ds_e:
         dur_e = calc_durata(di_e, ds_e)
@@ -193,7 +198,6 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "cod_identificare":        cod_introdus,
         "denumire_categorie":      cat_sel,
         "acronim_tip_proiecte":    tip_label,
-        "cod_temporar":            _str(row["🏷️ COD DEPUNERE"]),
         "titlul_proiect":          _str(row["🏷️ TITLUL PROIECTULUI"]),
         "acronim_proiect":         _str(row["🏷️ ACRONIMUL PROIECTULUI"]),
         "data_inceput":            fmt_date(di_e),
@@ -201,6 +205,7 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         "durata":                  dur_e if dur_e else None,
         "status_contract_proiect": row["🔖 STATUS PROIECT"] if row["🔖 STATUS PROIECT"] else None,
         "program":                 _str(row["🏷️ PROGRAM DE FINANȚARE"]),
-        "cod_domeniu_fdi":         _str(row["🔖 DOMENIU FDI"]),
+        "cod_domeniu_fdi":         _str(row["🔖 DOMENIU"]),
+        "cod_temporar":            _str(row["🏷️ COD DEPUNERE"]),
         "observatii":              _str(row["🏷️ OBSERVAȚII"]),
     }
