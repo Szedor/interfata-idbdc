@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/definitie.py
-# v.modul.1.0 - Definiție Proiecte FDI (conform mapării)
+# v.modul.1.0 - Definiție Proiecte FDI (conform mapării - ordine strictă)
 # =========================================================
 
 TIP_LABEL = "FDI"
@@ -14,6 +14,7 @@ TAB_LABELS_EXPLORATOR = ["Generale", "Financiar", "Echipa", "Tehnic"]
 
 SECTIUNI_SALVARE = [BASE_TABLE, FIN_TABLE, ECHIPA_TABLE, TEHNIC_TABLE]
 
+# ORDINEA EXACTĂ CONFORM MAPĂRII (secțiunea DATE DE BAZĂ)
 FIELDS_BAZA = {
     "categorie": "CATEGORIE",
     "tip": "TIPUL DE PROIECT",
