@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/financiar.py
-# v.modul.1.0 - Date financiare pentru Proiecte FDI (conform mapării)
+# v.modul.1.0 - Date financiare pentru Proiecte FDI
 # =========================================================
 
 import streamlit as st
