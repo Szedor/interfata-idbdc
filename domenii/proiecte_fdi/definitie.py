@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/definitie.py
-# v.modul.1.0 - Definiție Proiecte FDI (conform mapării - ordine strictă)
+# v.modul.1.0 - Definiție Proiecte FDI (conform mapării)
 # =========================================================
 
 TIP_LABEL = "FDI"
@@ -23,7 +23,7 @@ FIELDS_BAZA = {
     "acronim": "ACRONIMUL PROIECTULUI",
     "data_inceput": "DATA DE INCEPUT",
     "data_sfarsit": "DATA DE SFARSIT",
-    "durata": "DURATA",
+    "durata": "DURATA (luni)",
     "status": "STATUS PROIECT",
     "program": "PROGRAM DE FINANTARE",
     "domeniu": "DOMENIU",
