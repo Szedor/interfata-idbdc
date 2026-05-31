@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/financiar.py
-# v.modul.1.0 - Date financiare pentru Proiecte FDI
+# v.modul.1.0 - Date financiare pentru Proiecte FDI (conform mapării)
 # =========================================================
 
 import streamlit as st
@@ -63,7 +63,7 @@ def render(supabase, cod_introdus, is_new, date_existente):
     cofinantare = float(row["🏛️ COFINANTARE"] or 0)
     total = suma_aprobata + cofinantare
 
-    st.caption(f"📊 **Total valoare proiect: {total:,.2f} {row['💱 VALUTA']}** (Suma aprobată + Cofinanțare)")
+    st.caption(f"📊 **TOTAL VALOARE CONTRACT: {total:,.2f} {row['💱 VALUTA']}** (Suma aprobată + Cofinanțare)")
 
     return [{
         "cod_identificare": cod_introdus,
