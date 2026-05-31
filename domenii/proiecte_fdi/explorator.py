@@ -1,8 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/explorator.py
-# VERSIUNE: 1.0
-# STATUS: NOU - fațadă Explorator pentru Proiecte FDI
-# DATA: 2026.05.09
+# v.modul.1.0 - Fațadă Explorator pentru Proiecte FDI
 # =========================================================
 
 from utils.fisa_completa_orchestrator import render_fisa_completa
