@@ -124,9 +124,9 @@ def porneste_motorul(supabase):
 
     if not is_new:
         date_baza_ex = (_fetch(supabase, defn.BASE_TABLE, cod_introdus) or [{}])[0]
-        date_fin_ex = _fetch(supabase, defn.FIN_TABLE, cod_introdus) if hasattr(defn, "FIN_TABLE") else []
+        date_fin_ex = _fetch(supabase, defn.FIN_TABLE, cod_introdus) if getattr(defn, "FIN_TABLE", None) else []
         date_echipa_ex = _fetch(supabase, defn.ECHIPA_TABLE, cod_introdus)
-        date_teh_ex = _fetch(supabase, defn.TEHNIC_TABLE, cod_introdus) if hasattr(defn, "TEHNIC_TABLE") else []
+        date_teh_ex = _fetch(supabase, defn.TEHNIC_TABLE, cod_introdus) if getattr(defn, "TEHNIC_TABLE", None) else []
     else:
         date_baza_ex = {}
         date_fin_ex = date_echipa_ex = date_teh_ex = []
@@ -186,7 +186,7 @@ def porneste_motorul(supabase):
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
 
-            if hasattr(defn, "FIN_TABLE"):
+            if getattr(defn, "FIN_TABLE", None):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
                 if fin is not None and isinstance(fin, list):
                     for row in fin:
@@ -207,7 +207,7 @@ def porneste_motorul(supabase):
                         if not ok:
                             erori.append(f"Echipă: {msg}")
 
-            if hasattr(defn, "TEHNIC_TABLE"):
+            if getattr(defn, "TEHNIC_TABLE", None):
                 teh = rezultate.get("tehnice") or st.session_state.get(key_teh_ss)
                 if teh is not None:
                     ok_del, msg_del = delete_all_for_project(supabase, defn.TEHNIC_TABLE, cod_introdus)
