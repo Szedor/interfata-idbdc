@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/definitie.py
-# v.modul.1.0 - Definiție Proiecte FDI
+# v.modul.1.0 - Definiție Proiecte FDI (conform mapării)
 # =========================================================
 
 TIP_LABEL = "FDI"
@@ -17,7 +17,7 @@ SECTIUNI_SALVARE = [BASE_TABLE, FIN_TABLE, ECHIPA_TABLE, TEHNIC_TABLE]
 FIELDS_BAZA = {
     "categorie": "CATEGORIE",
     "tip": "TIPUL DE PROIECT",
-    "cod": "COD PROIECT",
+    "cod": "COD FINAL INREGISTRARE",
     "titlu": "TITLUL PROIECTULUI",
     "acronim": "ACRONIMUL PROIECTULUI",
     "data_inceput": "DATA DE INCEPUT",
