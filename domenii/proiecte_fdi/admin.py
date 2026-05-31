@@ -1,15 +1,18 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/admin.py
-# VERSIUNE: 1.0
-# STATUS: NOU - ecran administrare Proiecte FDI
-# DATA: 2026.05.09
+# v.modul.1.0 - Admin Proiecte FDI
 # =========================================================
 
-from domenii.proiecte_fdi.definitie              import TIP_LABEL, BASE_TABLE
-from domenii._baza.sectiune_baza_proiecte_fdi    import render as _baza_render_baza
-from domenii._baza.sectiune_financiar_fdi        import render as _baza_render_financiar
-from domenii._baza.sectiune_echipa               import render as _baza_render_echipa
-from domenii._baza.sectiune_tehnic               import render as _baza_render_tehnic
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from domenii._baza.baza import render as _baza_render_baza
+from domenii.proiecte_fdi.financiar import render as _baza_render_financiar
+from domenii._baza.echipa import render as _baza_render_echipa
+from domenii.proiecte_fdi.tehnic import render as _baza_render_tehnic
+from domenii.proiecte_fdi.definitie import TIP_LABEL, BASE_TABLE, FIELDS_BAZA
 
 
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex):
@@ -19,8 +22,9 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_b
         cat_sel=cat_sel,
         tip_label=TIP_LABEL,
         tabela_nume=BASE_TABLE,
+        fields_map=FIELDS_BAZA,
         is_new=is_new,
-        date_existente=date_baza_ex,
+        date_existente=date_baza_ex
     )
 
 
