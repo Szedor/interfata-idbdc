@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proiecte_fdi/tehnic.py
-# v.modul.1.0 - Aspecte tehnice pentru Proiecte FDI (conform mapării)
+# v.modul.1.0 - Aspecte tehnice pentru Proiecte FDI
 # =========================================================
 
 import streamlit as st
