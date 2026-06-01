@@ -34,21 +34,40 @@ _COLS_HIDDEN_CAL1 = COLS_HIDDEN_FISA | {
     "creat_de", "creat_la", "modificat_de", "modificat_la",
 }
 
-# Ordinea câmpurilor pentru tabele de tip proiect (identică cu Calea2 / base_proiecte_fdi)
-_COL_ORDER_PROIECTE = [
-    "denumire_categorie",
-    "acronim_tip_proiecte",
-    "cod_identificare",
-    "titlul_proiect",
-    "acronim_proiect",
-    "data_inceput",
-    "data_sfarsit",
-    "durata",
-    "status_contract_proiect",
-    "program",
-    "cod_domeniu_fdi",
+# Ordinea câmpurilor per tabelă de proiect — câte una specifică fiecărui tip
+_COL_ORDER_FDI = [
+    "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+    "titlul_proiect", "acronim_proiect",
+    "data_inceput", "data_sfarsit", "durata",
+    "status_contract_proiect", "program", "cod_domeniu_fdi", "cod_temporar",
+]
+
+_COL_ORDER_INTERNATIONALE = [
+    "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+    "titlul_proiect", "acronim_proiect",
+    "data_inceput", "data_sfarsit", "durata",
+    "status_contract_proiect", "scor_evaluare",
+    "numar_participanti", "denumire_participanti",
+    "rol_upt", "identificare_apel", "data_inchidere_apel",
+    "program_finantare", "tema_topic", "schema_de_finantare", "website",
+]
+
+# Fallback generic pentru tipurile de proiecte fără ordine specifică
+_COL_ORDER_PROIECTE_GENERIC = [
+    "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+    "titlul_proiect", "acronim_proiect",
+    "data_inceput", "data_sfarsit", "durata",
+    "status_contract_proiect", "program", "programul_de_finantare",
+    "schema_de_finantare", "apel_pentru_propuneri", "rol_upt",
+    "parteneri", "coordonator", "director_proiect",
     "cod_temporar",
 ]
+
+# Mapare tabelă → ordine specifică
+_COL_ORDER_PER_TABLE = {
+    "base_proiecte_fdi":            _COL_ORDER_FDI,
+    "base_proiecte_internationale": _COL_ORDER_INTERNATIONALE,
+}
 
 # Ordinea câmpurilor generice (contracte, evenimente, proprietate)
 _COL_ORDER_GENERALE = [
@@ -68,14 +87,23 @@ _COL_ORDER_GENERALE = [
     "inventatori", "cuvinte_cheie", "descriere",
 ]
 
-# Ordinea câmpurilor financiare — include toate coloanele FDI
+
+# Ordinea câmpurilor financiare — acoperă toate tipurile de proiecte și contracte
 _COL_ORDER_FINANCIAR = [
     "cod_identificare", "valuta",
+    # Contracte
     "valoare_contract_cep_terti_speciale",
     "valoare_anuala_contract", "valoare_totala_contract",
     "cofinantare_anuala_contract", "cofinantare_totala_contract",
+    # FDI
     "suma_solicitata_fdi", "suma_aprobata_mec",
     "cofinantare_upt_fdi", "total_buget_proiect_fdi",
+    # Internationale
+    "costuri_totale_proiect", "contributie_totala_finantator",
+    "costuri_totale_upt", "contributie_finantator",
+    "costuri_eligibile_estimate_total", "valoare_grant_solicitat_total",
+    "costuri_eligibile_estimate_upt", "valoare_grant_solicitat_upt",
+    # Altele
     "cost_total_proiect", "cost_proiect_upt",
     "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
 ]
@@ -123,8 +151,10 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
             ordered_keys = [c for c in _COL_ORDER_FINANCIAR if c in row and _is_visible(row, c, extra_hidden)] + \
                            [c for c in row.keys() if c not in _COL_ORDER_FINANCIAR and _is_visible(row, c, extra_hidden)]
         elif is_proiect_ctx:
-            ordered_keys = [c for c in _COL_ORDER_PROIECTE if c in row and _is_visible(row, c, extra_hidden)] + \
-                           [c for c in row.keys() if c not in _COL_ORDER_PROIECTE and _is_visible(row, c, extra_hidden)]
+            _tbl_key = tabela_baza_ctx or table or ""
+            _col_order = _COL_ORDER_PER_TABLE.get(_tbl_key, _COL_ORDER_PROIECTE_GENERIC)
+            ordered_keys = [c for c in _col_order if c in row and _is_visible(row, c, extra_hidden)] + \
+                           [c for c in row.keys() if c not in _col_order and _is_visible(row, c, extra_hidden)]
         else:
             ordered_keys = [c for c in _COL_ORDER_GENERALE if c in row and _is_visible(row, c, extra_hidden)] + \
                            [c for c in row.keys() if c not in _COL_ORDER_GENERALE and _is_visible(row, c, extra_hidden)]
