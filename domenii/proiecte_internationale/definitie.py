@@ -1,85 +1,28 @@
 # =========================================================
 # IDBDC/domenii/proiecte_internationale/definitie.py
-# VERSIUNE: 1.2
-# STATUS: ACTUALIZAT - financiar restructurat conform mapare finala
-# DATA: 2026.05.09
+# VERSIUNE: 1.0
+# STATUS: NOU
+# DATA: 2026.06.01
 # =========================================================
 
-CATEGORIE    = "Proiecte"
-TIP_LABEL    = "INTERNATIONALE"
-TIP_SEL      = "INTERNATIONALE"
+TIP_LABEL  = "INTERNATIONALE"
+CAT_LABEL  = "Proiecte"
+
 BASE_TABLE   = "base_proiecte_internationale"
 FIN_TABLE    = "com_date_financiare"
 ECHIPA_TABLE = "com_echipe_proiect"
 TEHNIC_TABLE = "com_aspecte_tehnice"
-TAB_LABELS       = ["📋 Date de bază", "💰 Date financiare", "👥 Echipă", "🧪 Aspecte tehnice"]
+
+# ── Tab-uri vizibile în Calea2 (Administrare) ──────────────────────────
+TAB_LABELS_ADMIN = [
+    "📋 Date de bază",
+    "💰 Date financiare",
+    "👥 Echipă",
+    "🧪 Aspecte tehnice",
+]
+
+# ── Tab-uri vizibile în Calea1 (Explorator) ───────────────────────────
+TAB_LABELS_EXPLORATOR = ["Generale", "Financiar", "Echipa", "Tehnic"]
+
+# ── Tabele implicate în ștergere completă ─────────────────────────────
 SECTIUNI_SALVARE = [BASE_TABLE, FIN_TABLE, ECHIPA_TABLE, TEHNIC_TABLE]
-
-COL_LABELS = {
-    "denumire_categorie":               "CATEGORIE",
-    "acronim_tip_proiecte":             "TIPUL DE PROIECT",
-    "cod_identificare":                 "ID PROIECT",
-    "titlul_proiect":                   "TITLUL PROIECTULUI",
-    "acronim_proiect":                  "ACRONIMUL PROIECTULUI",
-    "data_inceput":                     "DATA DE INCEPUT",
-    "data_sfarsit":                     "DATA DE SFARSIT",
-    "durata":                           "DURATA (luni)",
-    "status_contract_proiect":          "STATUS PROIECT",
-    "scor_evaluare":                    "SCOR EVALUARE",
-    "numar_participanti":               "NR.PARTICIPANTI",
-    "denumire_participanti":            "DENUMIRE PARTICIPANTI",
-    "rol_upt":                          "ROL UPT",
-    "identificare_apel":                "APELUL",
-    "data_inchidere_apel":              "DATA LIMITA DEPUNERE",
-    "program_finantare":                "PROGRAM DE FINANTARE",
-    "tema_topic":                       "TEMA / TOPIC",
-    "schema_de_finantare":              "SCHEMA DE FINANTARE",
-    "website":                          "WEBSITE",
-    "observatii":                       "OBSERVATII",
-    "valuta":                           "VALUTA",
-    "costuri_totale_proiect":           "VALOARE TOTALA COSTURI PROIECT",
-    "contributie_totala_finantator":    "CONTRIBUTIE UE TOTAL PROIECT",
-    "costuri_totale_upt":               "COSTURI TOTALE UPT",
-    "contributie_finantator":           "VALOARE CONTRIBUTIE UE PENTRU UPT",
-    "costuri_eligibile_estimate_total": "VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE",
-    "valoare_grant_solicitat_total":    "VALOARE TOTALA GRANT SOLICITAT",
-    "costuri_eligibile_estimate_upt":   "VALOARE COSTURI ESTIMATE UPT",
-    "valoare_grant_solicitat_upt":      "VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT",
-    "nume_prenume":                     "NUME SI PRENUME",
-    "rol":                              "ROLUL IN CONTRACT",
-    "persoana_contact":                 "PERSOANA DE CONTACT",
-    "departament":                      "DEPARTAMENT",
-    "email":                            "EMAIL",
-    "telefon":                          "TELEFON",
-    "obiectiv_general":                 "OBIECTIV GENERAL",
-    "obiective_specifice":              "OBIECTIVE SPECIFICE",
-    "activitati_proiect":               "ACTIVITATI",
-    "rezultate_proiect":                "REZULTATE",
-}
-
-COLS_HIDDEN = {
-    "nr_crt", "creat_de", "creat_la", "modificat_de", "modificat_la",
-    "acronim_departament", "denumire_departament",
-    "telefon_mobil", "telefon_fix", "persoana_contact",
-}
-COLS_COMPUSE = {
-    "departament": ["acronim_departament", "denumire_departament"],
-    "telefon":     ["telefon_mobil", "telefon_fix"],
-}
-COL_ORDER_GENERALE = [
-    "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
-    "titlul_proiect", "acronim_proiect", "data_inceput", "data_sfarsit",
-    "durata", "status_contract_proiect", "scor_evaluare",
-    "numar_participanti", "denumire_participanti", "rol_upt",
-    "identificare_apel", "data_inchidere_apel", "program_finantare",
-    "tema_topic", "schema_de_finantare", "website",
-]
-COL_ORDER_FINANCIAR = [
-    "cod_identificare", "valuta",
-    "costuri_totale_proiect", "contributie_totala_finantator",
-    "costuri_totale_upt", "contributie_finantator",
-    "costuri_eligibile_estimate_total", "valoare_grant_solicitat_total",
-    "costuri_eligibile_estimate_upt", "valoare_grant_solicitat_upt",
-]
-COL_ORDER_ECHIPA = ["cod_identificare", "nume_prenume", "rol", "persoana_contact", "departament", "email", "telefon"]
-COL_ORDER_TEHNIC = ["cod_identificare", "obiectiv_general", "obiective_specifice", "activitati_proiect", "rezultate_proiect"]
