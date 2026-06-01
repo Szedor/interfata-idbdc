@@ -50,6 +50,7 @@ _COL_ORDER_INTERNATIONALE = [
     "numar_participanti", "denumire_participanti",
     "rol_upt", "identificare_apel", "data_inchidere_apel",
     "program_finantare", "tema_topic", "schema_de_finantare", "website",
+    # observatii exclus — vizibil doar în Calea2
 ]
 
 # Fallback generic pentru tipurile de proiecte fără ordine specifică
@@ -98,11 +99,15 @@ _COL_ORDER_FINANCIAR = [
     # FDI
     "suma_solicitata_fdi", "suma_aprobata_mec",
     "cofinantare_upt_fdi", "total_buget_proiect_fdi",
-    # Internationale
-    "costuri_totale_proiect", "contributie_totala_finantator",
-    "costuri_totale_upt", "contributie_finantator",
-    "costuri_eligibile_estimate_total", "valoare_grant_solicitat_total",
-    "costuri_eligibile_estimate_upt", "valoare_grant_solicitat_upt",
+    # Internationale — ordinea exactă din mapare
+    "costuri_totale_proiect",
+    "contributie_totala_finantator",
+    "costuri_totale_upt",
+    "contributie_finantator",
+    "costuri_eligibile_estimate_total",
+    "valoare_grant_solicitat_total",
+    "costuri_eligibile_estimate_upt",
+    "valoare_grant_solicitat_upt",
     # Altele
     "cost_total_proiect", "cost_proiect_upt",
     "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
