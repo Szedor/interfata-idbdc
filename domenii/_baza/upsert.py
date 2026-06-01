@@ -15,7 +15,8 @@ TABELE_FARA_AUDIT = {
 
 
 def _cleanup(row_dict: dict, table_name: str) -> dict:
-    exclude = {"id", "creat_la", "modificat_la"}
+    # data_ultimei_modificari este gestionat exclusiv de un trigger in BD — nu se trimite din Python
+    exclude = {"id", "creat_la", "modificat_la", "data_ultimei_modificari"}
     
     # Pentru tabela com_date_financiare, eliminăm și an_referinta (dacă există)
     if table_name == "com_date_financiare":
