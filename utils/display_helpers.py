@@ -107,6 +107,7 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         rest = [c for c in visible_cols if c not in COL_ORDER_FDI]
         return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_proiecte_internationale":
+        # Ordinea exactă din mapare — coloane tehnice în ordinea etichetelor vizuale
         COL_ORDER_INT = [
             "denumire_categorie",
             "acronim_tip_proiecte",
@@ -127,6 +128,7 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
             "tema_topic",
             "schema_de_finantare",
             "website",
+            # observatii exclus — vizibil doar în Calea2
         ]
         ordered = [c for c in COL_ORDER_INT if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_INT]
