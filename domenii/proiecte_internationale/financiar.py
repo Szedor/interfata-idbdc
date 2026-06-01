@@ -1,21 +1,20 @@
 # =========================================================
 # IDBDC/domenii/proiecte_internationale/financiar.py
-# VERSIUNE: 1.0
-# STATUS: NOU
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - etichete vizuale și ordine exacte din mapare
 # DATA: 2026.06.01
 # =========================================================
-# DATE FINANCIARE — toate câmpurile introduse manual de
-# operator, fără niciun calcul automat.
-# Ordinea câmpurilor din mapare:
-#  1. VALUTA                                    ← 🔖
-#  2. COSTURI TOTALE PROIECT
-#  3. CONTRIBUTIE UE TOTAL PROIECT
-#  4. COSTURI TOTALE UPT
-#  5. VALOARE CONTRIBUTIE UE PENTRU UPT
-#  6. VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE
-#  7. VALOARE TOTALA GRANT SOLICITAT
-#  8. VALOARE COSTURI ESTIMATE UPT
-#  9. VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT
+# DATE FINANCIARE — ordinea și etichetele exacte din mapare:
+#  1. VALUTA                                       ← 🔖
+#  2. VALOARE TOTALA COSTURI PROIECT               → costuri_totale_proiect
+#  3. CONTRIBUTIE UE TOTAL PROIECT                 → contributie_totala_finantator
+#  4. COSTURI TOTALE UPT                           → costuri_totale_upt
+#  5. VALOARE CONTRIBUTIE UE PENTRU UPT            → contributie_finantator
+#  6. VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE    → costuri_eligibile_estimate_total
+#  7. VALOARE TOTALA GRANT SOLICITAT               → valoare_grant_solicitat_total
+#  8. VALOARE COSTURI ESTIMATE UPT                 → costuri_eligibile_estimate_upt
+#  9. VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT      → valoare_grant_solicitat_upt
+# Toate câmpurile introduse manual — fără calcul automat.
 # =========================================================
 
 import streamlit as st
@@ -23,10 +22,6 @@ import pandas as pd
 
 
 def render(supabase, cod_introdus, is_new, date_existente):
-    """
-    Randează și colectează Date financiare pentru Proiecte Internaționale.
-    Toate valorile sunt introduse manual — fără calcul automat.
-    """
     VALUTE = ["LEI", "EUR", "USD"]
 
     if is_new or not date_existente:
@@ -48,7 +43,7 @@ def render(supabase, cod_introdus, is_new, date_existente):
 
     df = pd.DataFrame([{
         "🔖 VALUTA":                                    valuta_ex,
-        "COSTURI TOTALE PROIECT":                       _sf(row_ex.get("costuri_totale_proiect")),
+        "VALOARE TOTALA COSTURI PROIECT":               _sf(row_ex.get("costuri_totale_proiect")),
         "CONTRIBUTIE UE TOTAL PROIECT":                 _sf(row_ex.get("contributie_totala_finantator")),
         "COSTURI TOTALE UPT":                           _sf(row_ex.get("costuri_totale_upt")),
         "VALOARE CONTRIBUTIE UE PENTRU UPT":            _sf(row_ex.get("contributie_finantator")),
@@ -62,8 +57,8 @@ def render(supabase, cod_introdus, is_new, date_existente):
         "🔖 VALUTA": st.column_config.SelectboxColumn(
             "🔖 VALUTA", options=VALUTE, required=True
         ),
-        "COSTURI TOTALE PROIECT": st.column_config.NumberColumn(
-            "COSTURI TOTALE PROIECT", format="%,.2f", min_value=0.0
+        "VALOARE TOTALA COSTURI PROIECT": st.column_config.NumberColumn(
+            "VALOARE TOTALA COSTURI PROIECT", format="%,.2f", min_value=0.0
         ),
         "CONTRIBUTIE UE TOTAL PROIECT": st.column_config.NumberColumn(
             "CONTRIBUTIE UE TOTAL PROIECT", format="%,.2f", min_value=0.0
@@ -99,14 +94,14 @@ def render(supabase, cod_introdus, is_new, date_existente):
     row = df_edit.iloc[0]
 
     return [{
-        "cod_identificare":                    cod_introdus,
-        "valuta":                              row["🔖 VALUTA"],
-        "costuri_totale_proiect":              float(row["COSTURI TOTALE PROIECT"] or 0),
-        "contributie_totala_finantator":       float(row["CONTRIBUTIE UE TOTAL PROIECT"] or 0),
-        "costuri_totale_upt":                  float(row["COSTURI TOTALE UPT"] or 0),
-        "contributie_finantator":              float(row["VALOARE CONTRIBUTIE UE PENTRU UPT"] or 0),
-        "costuri_eligibile_estimate_total":    float(row["VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE"] or 0),
-        "valoare_grant_solicitat_total":       float(row["VALOARE TOTALA GRANT SOLICITAT"] or 0),
-        "costuri_eligibile_estimate_upt":      float(row["VALOARE COSTURI ESTIMATE UPT"] or 0),
-        "valoare_grant_solicitat_upt":         float(row["VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT"] or 0),
+        "cod_identificare":                 cod_introdus,
+        "valuta":                           row["🔖 VALUTA"],
+        "costuri_totale_proiect":           float(row["VALOARE TOTALA COSTURI PROIECT"] or 0),
+        "contributie_totala_finantator":    float(row["CONTRIBUTIE UE TOTAL PROIECT"] or 0),
+        "costuri_totale_upt":               float(row["COSTURI TOTALE UPT"] or 0),
+        "contributie_finantator":           float(row["VALOARE CONTRIBUTIE UE PENTRU UPT"] or 0),
+        "costuri_eligibile_estimate_total": float(row["VALOARE TOTALA ESTIMATA COSTURI ELIGIBILE"] or 0),
+        "valoare_grant_solicitat_total":    float(row["VALOARE TOTALA GRANT SOLICITAT"] or 0),
+        "costuri_eligibile_estimate_upt":   float(row["VALOARE COSTURI ESTIMATE UPT"] or 0),
+        "valoare_grant_solicitat_upt":      float(row["VALOARE CONTRIBUTIE ESTIMATA PENTRU UPT"] or 0),
     }]
