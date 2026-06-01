@@ -88,6 +88,49 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ordered = [c for c in COL_ORDER_FINANCIAR if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_FINANCIAR]
         return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_proiecte_fdi":
+        COL_ORDER_FDI = [
+            "denumire_categorie",
+            "acronim_tip_proiecte",
+            "cod_identificare",
+            "titlul_proiect",
+            "acronim_proiect",
+            "data_inceput",
+            "data_sfarsit",
+            "durata",
+            "status_contract_proiect",
+            "program",
+            "cod_domeniu_fdi",
+            "cod_temporar",
+        ]
+        ordered = [c for c in COL_ORDER_FDI if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_FDI]
+        return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_proiecte_internationale":
+        COL_ORDER_INT = [
+            "denumire_categorie",
+            "acronim_tip_proiecte",
+            "cod_identificare",
+            "titlul_proiect",
+            "acronim_proiect",
+            "data_inceput",
+            "data_sfarsit",
+            "durata",
+            "status_contract_proiect",
+            "scor_evaluare",
+            "numar_participanti",
+            "denumire_participanti",
+            "rol_upt",
+            "identificare_apel",
+            "data_inchidere_apel",
+            "program_finantare",
+            "tema_topic",
+            "schema_de_finantare",
+            "website",
+        ]
+        ordered = [c for c in COL_ORDER_INT if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_INT]
+        return ordered + rest
     else:
         COL_ORDER_GENERALE = [
             "denumire_categorie", "acronim_tip_contract", "cod_identificare",
