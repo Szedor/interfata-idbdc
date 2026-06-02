@@ -106,6 +106,36 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ordered = [c for c in COL_ORDER_FDI if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_FDI]
         return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_proiecte_see":
+        COL_ORDER_SEE = [
+            "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+            "titlul_proiect", "acronim_proiect",
+            "data_inceput", "data_sfarsit", "durata",
+            "status_contract_proiect",
+            "numar_participanti", "denumire_participanti",
+            "rol_upt", "identificare_apel", "data_inchidere_apel",
+            "mecanism_finantare", "program_finantare",
+            "sector_prioritar_specific", "domeniul", "website",
+            # observatii exclus — vizibil doar în Calea2
+        ]
+        ordered = [c for c in COL_ORDER_SEE if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_SEE]
+        return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_proiecte_interreg":
+        COL_ORDER_INTERREG = [
+            "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+            "titlul_proiect", "acronim_proiect",
+            "data_inceput", "data_sfarsit", "durata",
+            "status_contract_proiect",
+            "numar_participanti", "denumire_participanti",
+            "rol_upt", "identificare_apel", "data_inchidere_apel",
+            "program_finantare", "prioritatea_programului", "obiectivul",
+            "website",
+            # observatii exclus — vizibil doar în Calea2
+        ]
+        ordered = [c for c in COL_ORDER_INTERREG if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_INTERREG]
+        return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_proiecte_internationale":
         # Ordinea exactă din mapare — coloane tehnice în ordinea etichetelor vizuale
         COL_ORDER_INT = [
