@@ -42,6 +42,18 @@ _COL_ORDER_FDI = [
     "status_contract_proiect", "program", "cod_domeniu_fdi", "cod_temporar",
 ]
 
+_COL_ORDER_NONUE = [
+    "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+    "titlul_proiect", "acronim_proiect",
+    "data_inceput", "data_sfarsit", "durata",
+    "status_contract_proiect",
+    "numar_participanti", "denumire_participanti",
+    "rol_upt", "identificare_apel", "data_inchidere_apel",
+    "sursa_finantatoare", "categoria", "tematica",
+    "operatiunea", "mecanism_financiar", "instrument_implementare",
+    "website",
+]
+
 _COL_ORDER_SEE = [
     "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
     "titlul_proiect", "acronim_proiect",
@@ -89,6 +101,7 @@ _COL_ORDER_PROIECTE_GENERIC = [
 # Mapare tabelă → ordine specifică
 _COL_ORDER_PER_TABLE = {
     "base_proiecte_fdi":            _COL_ORDER_FDI,
+    "base_proiecte_nonue":          _COL_ORDER_NONUE,
     "base_proiecte_see":            _COL_ORDER_SEE,
     "base_proiecte_interreg":       _COL_ORDER_INTERREG,
     "base_proiecte_internationale": _COL_ORDER_INTERNATIONALE,
@@ -123,6 +136,8 @@ _COL_ORDER_FINANCIAR = [
     # FDI
     "suma_solicitata_fdi", "suma_aprobata_mec",
     "cofinantare_upt_fdi", "total_buget_proiect_fdi",
+    # NONUE
+    "cheltuieli_eligibile", "grant_solicitat", "grant_aprobat",
     # INTERREG
     "buget_upt", "cofinantare_nationala", "cofinantare_upt",
     # Internationale — ordinea exactă din mapare
