@@ -16,13 +16,17 @@ from domenii.contracte_terti import admin as terti, definitie as terti_def
 from domenii.contracte_speciale import admin as speciale, definitie as speciale_def
 from domenii.proiecte_fdi import admin as fdi, definitie as fdi_def
 from domenii.proiecte_internationale import admin as int_, definitie as int_def
+from domenii.proiecte_interreg import admin as interreg, definitie as interreg_def
+from domenii.proiecte_see import admin as see, definitie as see_def
 
 _DOMENII = {
     ("Contracte", "CEP"):            (cep,  cep_def),
     ("Contracte", "TERTI"):          (terti, terti_def),
     ("Contracte", "SPECIALE"):       (speciale, speciale_def),
     ("Proiecte",  "FDI"):            (fdi,  fdi_def),
-    ("Proiecte",  "INTERNATIONALE"): (int_, int_def),
+    ("Proiecte",  "INTERNATIONALE"): (int_,     int_def),
+    ("Proiecte",  "INTERREG"):       (interreg, interreg_def),
+    ("Proiecte",  "SEE"):            (see,     see_def),
 }
 
 _TAB_CSS = """
