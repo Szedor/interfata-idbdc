@@ -19,6 +19,7 @@ from domenii.proiecte_internationale import admin as int_, definitie as int_def
 from domenii.proiecte_interreg import admin as interreg, definitie as interreg_def
 from domenii.proiecte_see import admin as see, definitie as see_def
 from domenii.proiecte_nonue import admin as nonue, definitie as nonue_def
+from domenii.proiecte_structurale import admin as structurale, definitie as structurale_def
 
 _DOMENII = {
     ("Contracte", "CEP"):            (cep,  cep_def),
@@ -28,7 +29,8 @@ _DOMENII = {
     ("Proiecte",  "INTERNATIONALE"): (int_,     int_def),
     ("Proiecte",  "INTERREG"):       (interreg, interreg_def),
     ("Proiecte",  "SEE"):            (see,     see_def),
-    ("Proiecte",  "NONUE"):          (nonue,   nonue_def),
+    ("Proiecte",  "NONUE"):          (nonue,       nonue_def),
+    ("Proiecte",  "STRUCTURALE"):    (structurale, structurale_def),
 }
 
 _TAB_CSS = """
