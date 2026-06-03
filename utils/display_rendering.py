@@ -42,6 +42,32 @@ _COL_ORDER_FDI = [
     "status_contract_proiect", "program", "cod_domeniu_fdi", "cod_temporar",
 ]
 
+_COL_ORDER_EV_ST = [
+    "denumire_categorie",
+    "natura_eveniment",
+    "cod_identificare",
+    "titlul_eveniment",
+    "data_inceput",
+    "data_sfarsit",
+    "format_eveniment",
+    "loc_desfasurare",
+    "institutii_organizatoare",
+    "clasificare_eveniment",
+    "website",
+]
+
+_COL_ORDER_PNRR = [
+    "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+    "data_contract", "titlul_proiect", "acronim_proiect",
+    "domeniu_cercetare",
+    "data_inceput", "data_sfarsit", "durata",
+    "status_contract_proiect",
+    "numar_participanti", "denumire_participanti",
+    "rol_upt", "identificare_apel", "data_inchidere_apel",
+    "pilonul", "componenta", "investitia", "subinvestitia",
+    "website",
+]
+
 _COL_ORDER_PNCDI = [
     "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
     "data_contract", "titlul_proiect", "acronim_proiect",
@@ -124,6 +150,8 @@ _COL_ORDER_PROIECTE_GENERIC = [
 # Mapare tabelă → ordine specifică
 _COL_ORDER_PER_TABLE = {
     "base_proiecte_fdi":            _COL_ORDER_FDI,
+    "base_evenimente_stiintifice":  _COL_ORDER_EV_ST,
+    "base_proiecte_pnrr":           _COL_ORDER_PNRR,
     "base_proiecte_pncdi":          _COL_ORDER_PNCDI,
     "base_proiecte_structurale":    _COL_ORDER_STRUCTURALE,
     "base_proiecte_nonue":          _COL_ORDER_NONUE,
