@@ -20,6 +20,7 @@ from domenii.proiecte_interreg import admin as interreg, definitie as interreg_d
 from domenii.proiecte_see import admin as see, definitie as see_def
 from domenii.proiecte_nonue import admin as nonue, definitie as nonue_def
 from domenii.proiecte_structurale import admin as structurale, definitie as structurale_def
+from domenii.proiecte_pncdi import admin as pncdi, definitie as pncdi_def
 
 _DOMENII = {
     ("Contracte", "CEP"):            (cep,  cep_def),
@@ -31,6 +32,7 @@ _DOMENII = {
     ("Proiecte",  "SEE"):            (see,     see_def),
     ("Proiecte",  "NONUE"):          (nonue,       nonue_def),
     ("Proiecte",  "STRUCTURALE"):    (structurale, structurale_def),
+    ("Proiecte",  "PNCDI"):          (pncdi,       pncdi_def),
 }
 
 _TAB_CSS = """
@@ -199,12 +201,24 @@ def porneste_motorul(supabase):
             if getattr(defn, "FIN_TABLE", None):
                 fin = rezultate.get("financiar") or st.session_state.get(key_fin_ss)
                 if fin is not None and isinstance(fin, list):
-                    for row in fin:
-                        if "an_referinta" in row:
-                            del row["an_referinta"]
-                        ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
-                        if not ok:
-                            erori.append(f"Date financiare: {msg}")
+                    # Tabelă multi-row (ex: PNCDI) — cheie compusă cod+an, salvare cu delete+insert
+                    if getattr(defn, "FIN_TABLE_MULTI_ROW", False):
+                        ok_del, msg_del = delete_all_for_project(supabase, defn.FIN_TABLE, cod_introdus)
+                        if not ok_del:
+                            erori.append(f"Date financiare — ștergere eșuată: {msg_del}")
+                        else:
+                            if fin:
+                                ok, msg = insert_rows(supabase, defn.FIN_TABLE, fin)
+                                if not ok:
+                                    erori.append(f"Date financiare: {msg}")
+                    else:
+                        # Tabelă standard — un singur rând, an_referinta exclus
+                        for row in fin:
+                            if "an_referinta" in row:
+                                del row["an_referinta"]
+                            ok, msg = upsert_row(supabase, defn.FIN_TABLE, row)
+                            if not ok:
+                                erori.append(f"Date financiare: {msg}")
 
             if "echipa" in rezultate:
                 ok_del, msg_del = delete_all_for_project(supabase, defn.ECHIPA_TABLE, cod_introdus)
