@@ -106,6 +106,40 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ordered = [c for c in COL_ORDER_FDI if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_FDI]
         return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_evenimente_stiintifice":
+        COL_ORDER_EV_ST = [
+            "denumire_categorie",
+            "natura_eveniment",
+            "cod_identificare",
+            "titlul_eveniment",
+            "data_inceput",
+            "data_sfarsit",
+            "format_eveniment",
+            "loc_desfasurare",
+            "institutii_organizatoare",
+            "clasificare_eveniment",
+            "website",
+            # observatii exclus — vizibil doar în Calea2
+        ]
+        ordered = [c for c in COL_ORDER_EV_ST if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_EV_ST]
+        return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_proiecte_pnrr":
+        COL_ORDER_PNRR = [
+            "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
+            "data_contract", "titlul_proiect", "acronim_proiect",
+            "domeniu_cercetare",
+            "data_inceput", "data_sfarsit", "durata",
+            "status_contract_proiect",
+            "numar_participanti", "denumire_participanti",
+            "rol_upt", "identificare_apel", "data_inchidere_apel",
+            "pilonul", "componenta", "investitia", "subinvestitia",
+            "website",
+            # observatii exclus — vizibil doar în Calea2
+        ]
+        ordered = [c for c in COL_ORDER_PNRR if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_PNRR]
+        return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_proiecte_pncdi":
         COL_ORDER_PNCDI = [
             "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
