@@ -21,6 +21,8 @@ from domenii.proiecte_see import admin as see, definitie as see_def
 from domenii.proiecte_nonue import admin as nonue, definitie as nonue_def
 from domenii.proiecte_structurale import admin as structurale, definitie as structurale_def
 from domenii.proiecte_pncdi import admin as pncdi, definitie as pncdi_def
+from domenii.proiecte_pnrr import admin as pnrr, definitie as pnrr_def
+from domenii.evenimente_stiintifice import admin as ev_st, definitie as ev_st_def
 
 _DOMENII = {
     ("Contracte", "CEP"):            (cep,  cep_def),
@@ -33,6 +35,8 @@ _DOMENII = {
     ("Proiecte",  "NONUE"):          (nonue,       nonue_def),
     ("Proiecte",  "STRUCTURALE"):    (structurale, structurale_def),
     ("Proiecte",  "PNCDI"):          (pncdi,       pncdi_def),
+    ("Proiecte",  "PNRR"):           (pnrr,        pnrr_def),
+    ("Evenimente", "STIINTIFICE"):   (ev_st,       ev_st_def),
 }
 
 _TAB_CSS = """
