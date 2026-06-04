@@ -1,10 +1,9 @@
 # =========================================================
 # IDBDC/domenii/contracte_terti/explorator.py
-# v.modul.1.0 - Fațadă Explorator pentru Contracte TERTI
+# VERSIUNE: 2.0 | DATA: 2026.06.02
 # =========================================================
 
 from utils.fisa_completa_orchestrator import render_fisa_completa
-
 
 def run(supabase, cod, tabela_gasita, eticheta):
     render_fisa_completa(supabase, cod, tabela_gasita, eticheta)
