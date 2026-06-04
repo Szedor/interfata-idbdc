@@ -88,6 +88,18 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ordered = [c for c in COL_ORDER_FINANCIAR if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_FINANCIAR]
         return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_contracte_terti":
+        COL_ORDER_TERTI = [
+            "denumire_categorie", "acronim_tip_contract",
+            "cod_identificare", "data_contract",
+            "obiectul_contractului", "denumire_beneficiar",
+            "data_inceput", "data_sfarsit", "durata",
+            "status_contract_proiect", "derulat_prin",
+            # observatii exclus — vizibil doar în Calea2
+        ]
+        ordered = [c for c in COL_ORDER_TERTI if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_TERTI]
+        return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_proiecte_fdi":
         COL_ORDER_FDI = [
             "denumire_categorie",
