@@ -56,6 +56,20 @@ _COL_ORDER_EV_ST = [
     "website",
 ]
 
+_COL_ORDER_EV = [
+    "denumire_categorie",
+    "natura_eveniment",
+    "cod_identificare",
+    "titlul_eveniment",
+    "data_inceput",
+    "data_sfarsit",
+    "format_eveniment",
+    "loc_desfasurare",
+    "institutii_organizare",
+    "clasificare_eveniment",
+    "website",
+]
+
 _COL_ORDER_PNRR = [
     "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
     "data_contract", "titlul_proiect", "acronim_proiect",
@@ -151,6 +165,7 @@ _COL_ORDER_PROIECTE_GENERIC = [
 _COL_ORDER_PER_TABLE = {
     "base_proiecte_fdi":            _COL_ORDER_FDI,
     "base_evenimente_stiintifice":  _COL_ORDER_EV_ST,
+    "base_evenimente_stiintifice":  _COL_ORDER_EV,
     "base_proiecte_pnrr":           _COL_ORDER_PNRR,
     "base_proiecte_pncdi":          _COL_ORDER_PNCDI,
     "base_proiecte_structurale":    _COL_ORDER_STRUCTURALE,
