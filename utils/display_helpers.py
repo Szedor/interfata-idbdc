@@ -124,6 +124,24 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ordered = [c for c in COL_ORDER_EV_ST if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_EV_ST]
         return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_evenimente_stiintifice":
+        COL_ORDER_EV = [
+            "denumire_categorie",
+            "natura_eveniment",
+            "cod_identificare",
+            "titlul_eveniment",
+            "data_inceput",
+            "data_sfarsit",
+            "format_eveniment",
+            "loc_desfasurare",
+            "institutii_organizare",
+            "clasificare_eveniment",
+            "website",
+            # observatii exclus — vizibil doar în Calea2
+        ]
+        ordered = [c for c in COL_ORDER_EV if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_EV]
+        return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_proiecte_pnrr":
         COL_ORDER_PNRR = [
             "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
