@@ -167,16 +167,16 @@ TEHNIC_COL_ORDER = [
 # ── Etichete per tabelă (suprascriu COL_LABELS global) ────────────────
 COL_LABELS_PER_TABLE = {
     "base_contracte_cep": {
-        "denumire_categorie":                  "CATEGORIE",
-        "acronim_tip_contract":                "TIPUL DE CONTRACT",
-        "cod_identificare":                    "NR.CONTRACT",
-        "data_contract":                       "DATA CONTRACTULUI",
-        "obiectul_contractului":               "OBIECTUL CONTRACTULUI",
-        "denumire_beneficiar":                 "BENEFICIAR",
-        "data_inceput":                        "DATA DE INCEPUT",
-        "data_sfarsit":                        "DATA DE SFARSIT",
-        "durata":                              "DURATA (luni)",
-        "status_contract_proiect":             "STATUS CONTRACT",
+        "denumire_categorie":      "CATEGORIE",
+        "acronim_tip_contract":    "TIPUL DE CONTARCT",
+        "cod_identificare":        "NR.CONTRACT",
+        "data_contract":           "DATA CONTRACTULUI",
+        "obiectul_contractului":   "OBIECTUL CONTRACTULUI",
+        "denumire_beneficiar":     "BENEFICIAR",
+        "data_inceput":            "DATA DE INCEPUT",
+        "data_sfarsit":            "DATA DE SFARSIT",
+        "durata":                  "DURATA (luni)",
+        "status_contract_proiect": "STATUS CONTRACT",
     },
     "base_contracte_terti": {
         "denumire_categorie":      "CATEGORIE",
