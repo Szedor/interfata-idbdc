@@ -1,13 +1,18 @@
 # =========================================================
 # IDBDC/domenii/proprietate_industriala/admin.py
-# VERSIUNE: 1.0
-# STATUS: NOU
-# DATA: 2026.05.23
+# VERSIUNE: 2.0
+# STATUS: CORECTAT - importuri aliniate cu fisierele existente
+# DATA: 2026.06.06
 # =========================================================
 
-from domenii.proprietate_industriala.definitie  import BASE_TABLE
-from domenii._baza.sectiune_baza_prop_industr   import render_generale, render_suplimentare
-from domenii._baza.sectiune_echipa              import render as _baza_render_echipa
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from domenii.proprietate_industriala.baza  import render_generale, render_suplimentare
+from domenii._baza.echipa                  import render as _render_echipa
+from domenii.proprietate_industriala.definitie import BASE_TABLE
 
 
 def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_baza_ex):
@@ -21,6 +26,7 @@ def render_date_de_baza(supabase, cod_introdus, cat_sel, tip_sel, is_new, date_b
         date_existente=date_baza_ex,
     )
 
+
 def render_date_suplimentare(supabase, cod_introdus, is_new, date_baza_ex):
     """Tab 2 — Date suplimentare (NUMAI Calea2 / Admin)."""
     return render_suplimentare(
@@ -31,6 +37,7 @@ def render_date_suplimentare(supabase, cod_introdus, is_new, date_baza_ex):
         date_existente=date_baza_ex,
     )
 
+
 def render_echipa(supabase, cod_introdus, is_new, date_echipa_ex):
     """Tab 3 — Echipa."""
-    return _baza_render_echipa(supabase, cod_introdus, is_new, date_echipa_ex)
+    return _render_echipa(supabase, cod_introdus, is_new, date_echipa_ex)
