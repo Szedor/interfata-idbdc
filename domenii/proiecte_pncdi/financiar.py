@@ -1,37 +1,27 @@
 # =========================================================
 # IDBDC/domenii/proiecte_pncdi/financiar.py
-# VERSIUNE: 1.0
-# STATUS: NOU
+# VERSIUNE: 2.0
+# STATUS: RESTRUCTURAT
 # DATA: 2026.06.02
 # =========================================================
-# DATE FINANCIARE — tabelă dedicată: com_date_financiare_pn
-# Structură pe ani de referință — câte un rând per an:
-#  - VALUTA              ← 🔖  (comun pentru toți anii)
-#  - ANUL DE REFERINTA   ← 🔢  (cheie secundară)
-#  - VALOARE AN REFERINTA
-#  - COFINANTARE AN REFERINTA
-# Plus totaluri calculate automat și afișate ca informație:
-#  - VALOARE TOTALA      = suma valorilor anuale
-#  - COFINANTARE TOTALA  = suma cofinanțărilor anuale
-#
-# Operatorul poate adăuga/edita oricâți ani.
-# Totalurile se calculează și se salvează automat.
+# Structură:
+#   - Selectbox VALUTA compact
+#   - Zona 1: VALOARE TOTALA + COFINANTARE TOTALA
+#   - Zona 2: tabel anual (5 rânduri inițial, extendabil)
+#   - Validare live: suma anuală = total
+# Tabelă: com_date_financiare_pn
+# Cheie compusă: cod_identificare + an_referinta
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 
 
-VALUTE = ["LEI", "EUR", "USD"]
-NR_RANDURI_INIT = 4   # ani inițiali goali pentru fișă nouă
+VALUTE         = ["LEI", "EUR", "USD"]
+NR_ANI_INIT    = 5
 
 
 def render(supabase, cod_introdus, is_new, date_existente):
-    """
-    Randează și colectează Date financiare pentru Proiecte PNCDI.
-    Returnează list[dict] pentru salvare în com_date_financiare_pn.
-    Fiecare dict reprezintă un rând (un an de referință).
-    """
 
     # ── Citire date existente ──────────────────────────────────────────
     if is_new or not date_existente:
@@ -47,82 +37,185 @@ def render(supabase, cod_introdus, is_new, date_existente):
         except (TypeError, ValueError):
             return 0.0
 
-    # Valuta din primul rând existent sau implicit LEI
-    valuta_ex = "LEI"
+    # Valuta și totaluri din primul rând (toate rândurile au aceleași totaluri)
+    valuta_ex       = "LEI"
+    total_val_ex    = 0.0
+    total_cofin_ex  = 0.0
     if rows_ex:
-        valuta_ex = rows_ex[0].get("valuta") or "LEI"
+        valuta_ex      = rows_ex[0].get("valuta") or "LEI"
         if valuta_ex not in VALUTE:
             valuta_ex = "LEI"
+        total_val_ex   = _sf(rows_ex[0].get("valoare_totala_contract"))
+        total_cofin_ex = _sf(rows_ex[0].get("cofinantare_totala_contract"))
 
-    # ── Selectbox valută — comun pentru toți anii ──────────────────────
-    valuta = st.selectbox("🔖 VALUTA", options=VALUTE,
-                          index=VALUTE.index(valuta_ex),
-                          key=f"pncdi_valuta_{cod_introdus}")
+    # ── VALUTA — compact ──────────────────────────────────────────────
+    col_v, col_empty = st.columns([1, 3])
+    with col_v:
+        valuta = st.selectbox(
+            "🔖 VALUTA",
+            options=VALUTE,
+            index=VALUTE.index(valuta_ex),
+            key=f"pncdi_valuta_{cod_introdus}",
+        )
 
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    # ── ZONA 1: Valori totale ─────────────────────────────────────────
     st.markdown(
-        "<div style='color:rgba(255,255,255,0.65);font-size:0.85rem;margin-bottom:6px;'>"
-        "Introduceți valorile pentru fiecare an de referință. "
-        "Totalurile se calculează automat.</div>",
+        "<div style='color:rgba(255,255,255,0.70);font-size:0.88rem;"
+        "font-weight:700;text-transform:uppercase;letter-spacing:0.05em;"
+        "margin-bottom:6px;'>① Valori totale contract</div>",
         unsafe_allow_html=True,
     )
 
-    # ── Construire DataFrame ───────────────────────────────────────────
-    if rows_ex:
-        data_init = [{
-            "ANUL DE REFERINTA":        int(r.get("an_referinta") or 0),
-            "VALOARE AN REFERINTA":     _sf(r.get("valoare_contract_an_referinta")),
-            "COFINANTARE AN REFERINTA": _sf(r.get("cofinantare_contract_an_referinta")),
-        } for r in rows_ex]
-    else:
-        data_init = [
-            {"ANUL DE REFERINTA": 0, "VALOARE AN REFERINTA": 0.0, "COFINANTARE AN REFERINTA": 0.0}
-            for _ in range(NR_RANDURI_INIT)
-        ]
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        valoare_totala = st.number_input(
+            f"VALOARE TOTALA ({valuta})",
+            min_value=0.0,
+            value=total_val_ex,
+            format="%.2f",
+            key=f"pncdi_val_total_{cod_introdus}",
+        )
+    with col_t2:
+        cofin_totala = st.number_input(
+            f"COFINANTARE TOTALA ({valuta})",
+            min_value=0.0,
+            value=total_cofin_ex,
+            format="%.2f",
+            key=f"pncdi_cofin_total_{cod_introdus}",
+        )
 
-    df = pd.DataFrame(data_init)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-    col_cfg = {
-        "ANUL DE REFERINTA": st.column_config.NumberColumn(
-            "🔢 ANUL DE REFERINTA", format="%d", min_value=1990, max_value=2100, required=False
+    # ── ZONA 2: Valori anuale ─────────────────────────────────────────
+    st.markdown(
+        "<div style='color:rgba(255,255,255,0.70);font-size:0.88rem;"
+        "font-weight:700;text-transform:uppercase;letter-spacing:0.05em;"
+        "margin-bottom:6px;'>② Valori anuale</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Inițializare date anuale
+    key_ani = f"pncdi_ani_data_{cod_introdus}"
+    if key_ani not in st.session_state:
+        if rows_ex:
+            st.session_state[key_ani] = [
+                {
+                    "AN": int(r.get("an_referinta") or 0),
+                    "VALOARE AN": _sf(r.get("valoare_contract_an_referinta")),
+                    "COFINANTARE AN": _sf(r.get("cofinantare_contract_an_referinta")),
+                }
+                for r in rows_ex if r.get("an_referinta")
+            ]
+            # Completăm până la NR_ANI_INIT dacă e mai puțin
+            while len(st.session_state[key_ani]) < NR_ANI_INIT:
+                st.session_state[key_ani].append(
+                    {"AN": 0, "VALOARE AN": 0.0, "COFINANTARE AN": 0.0}
+                )
+        else:
+            st.session_state[key_ani] = [
+                {"AN": 0, "VALOARE AN": 0.0, "COFINANTARE AN": 0.0}
+                for _ in range(NR_ANI_INIT)
+            ]
+
+    df_ani = pd.DataFrame(st.session_state[key_ani])
+
+    col_cfg_ani = {
+        "AN": st.column_config.NumberColumn(
+            "🔢 AN REFERINTA",
+            format="%d",
+            min_value=1990,
+            max_value=2100,
+            required=False,
         ),
-        "VALOARE AN REFERINTA": st.column_config.NumberColumn(
-            "VALOARE AN REFERINTA", format="%,.2f", min_value=0.0
+        "VALOARE AN": st.column_config.NumberColumn(
+            f"VALOARE AN ({valuta})",
+            format="%,.2f",
+            min_value=0.0,
         ),
-        "COFINANTARE AN REFERINTA": st.column_config.NumberColumn(
-            "COFINANTARE AN REFERINTA", format="%,.2f", min_value=0.0
+        "COFINANTARE AN": st.column_config.NumberColumn(
+            f"COFINANTARE AN ({valuta})",
+            format="%,.2f",
+            min_value=0.0,
         ),
     }
 
     df_edit = st.data_editor(
-        df,
-        column_config=col_cfg,
+        df_ani,
+        column_config=col_cfg_ani,
         hide_index=True,
         use_container_width=True,
-        num_rows="dynamic",   # operatorul poate adăuga rânduri noi
-        key=f"fin_pncdi_editor_{cod_introdus}",
+        num_rows="fixed",
+        key=f"pncdi_ani_editor_{cod_introdus}",
     )
 
-    # ── Calcul totaluri ────────────────────────────────────────────────
-    total_valoare   = float(df_edit["VALOARE AN REFERINTA"].fillna(0).sum())
-    total_cofin     = float(df_edit["COFINANTARE AN REFERINTA"].fillna(0).sum())
+    # Buton adăugare an
+    if st.button("➕ Adaugă an", key=f"pncdi_add_an_{cod_introdus}"):
+        # Sincronizăm datele curente din editor
+        rows_curente = []
+        for _, row in df_edit.iterrows():
+            rows_curente.append({
+                "AN": int(row["AN"]) if row["AN"] and not pd.isna(row["AN"]) else 0,
+                "VALOARE AN": float(row["VALOARE AN"] or 0),
+                "COFINANTARE AN": float(row["COFINANTARE AN"] or 0),
+            })
+        rows_curente.append({"AN": 0, "VALOARE AN": 0.0, "COFINANTARE AN": 0.0})
+        st.session_state[key_ani] = rows_curente
+        if f"pncdi_ani_editor_{cod_introdus}" in st.session_state:
+            del st.session_state[f"pncdi_ani_editor_{cod_introdus}"]
+        st.rerun()
 
-    st.markdown(
-        f"<div style='background:rgba(255,255,255,0.07);border-radius:8px;"
-        f"padding:8px 14px;margin-top:6px;font-size:0.90rem;'>"
-        f"<b style='color:rgba(255,255,255,0.70);'>VALOARE TOTALA:</b> "
-        f"<span style='color:#ffffff;font-weight:700;'>{total_valoare:,.2f} {valuta}</span>"
-        f"&nbsp;&nbsp;&nbsp;"
-        f"<b style='color:rgba(255,255,255,0.70);'>COFINANTARE TOTALA:</b> "
-        f"<span style='color:#ffffff;font-weight:700;'>{total_cofin:,.2f} {valuta}</span>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
+    # ── ZONA 3: Validare live ─────────────────────────────────────────
+    suma_val_ani   = float(df_edit["VALOARE AN"].fillna(0).sum())
+    suma_cofin_ani = float(df_edit["COFINANTARE AN"].fillna(0).sum())
+
+    diff_val   = round(abs(valoare_totala - suma_val_ani), 2)
+    diff_cofin = round(abs(cofin_totala - suma_cofin_ani), 2)
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # Construim mesajul de validare
+    ok_val   = diff_val == 0.0
+    ok_cofin = diff_cofin == 0.0
+
+    if ok_val and ok_cofin:
+        st.markdown(
+            "<div style='background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.45);"
+            "border-radius:10px;padding:9px 14px;'>"
+            "<span style='color:#4ade80;font-weight:700;font-size:0.92rem;'>"
+            "✅ Valorile anuale corespund valorilor totale."
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        linii = []
+        if not ok_val:
+            linii.append(
+                f"Valoare: suma anuală <b>{suma_val_ani:,.2f}</b> ≠ "
+                f"total <b>{valoare_totala:,.2f}</b> "
+                f"(diferență: <b>{diff_val:,.2f} {valuta}</b>)"
+            )
+        if not ok_cofin:
+            linii.append(
+                f"Cofinanțare: suma anuală <b>{suma_cofin_ani:,.2f}</b> ≠ "
+                f"total <b>{cofin_totala:,.2f}</b> "
+                f"(diferență: <b>{diff_cofin:,.2f} {valuta}</b>)"
+            )
+        mesaj = "<br>".join(linii)
+        st.markdown(
+            f"<div style='background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.55);"
+            f"border-radius:10px;padding:9px 14px;'>"
+            f"<span style='color:#fbbf24;font-weight:700;font-size:0.92rem;'>"
+            f"⚠️ Atenție — neconcordanță între valorile anuale și totaluri:<br>{mesaj}"
+            f"</span></div>",
+            unsafe_allow_html=True,
+        )
 
     # ── Construire rezultat pentru salvare ────────────────────────────
-    # Un rând per an valid (an != 0); totalurile se salvează pe fiecare rând
     rezultat = []
     for _, row in df_edit.iterrows():
-        an = row.get("ANUL DE REFERINTA")
+        an = row.get("AN")
         try:
             an_int = int(an) if an and not pd.isna(an) else 0
         except (TypeError, ValueError):
@@ -133,10 +226,10 @@ def render(supabase, cod_introdus, is_new, date_existente):
             "cod_identificare":                  cod_introdus,
             "valuta":                            valuta,
             "an_referinta":                      an_int,
-            "valoare_contract_an_referinta":     float(row["VALOARE AN REFERINTA"] or 0),
-            "cofinantare_contract_an_referinta": float(row["COFINANTARE AN REFERINTA"] or 0),
-            "valoare_totala_contract":           total_valoare,
-            "cofinantare_totala_contract":       total_cofin,
+            "valoare_contract_an_referinta":     float(row["VALOARE AN"] or 0),
+            "cofinantare_contract_an_referinta": float(row["COFINANTARE AN"] or 0),
+            "valoare_totala_contract":           valoare_totala,
+            "cofinantare_totala_contract":       cofin_totala,
         })
 
     return rezultat
