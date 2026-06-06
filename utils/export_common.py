@@ -1,9 +1,14 @@
 # =========================================================
 # utils/export_common.py
-# VERSIUNE: 2.0
-# STATUS: CORECTAT - export exclusiv pentru secțiunile bifate
-# DATA: 2026.05.09
+# VERSIUNE: 2.1
+# STATUS: CORECTAT - tabelă financiară corectă pentru PNCDI/PNRR
+# DATA: 2026.06.06
 # =========================================================
+# MODIFICĂRI VERSIUNEA 2.1:
+#   - Fallback-ul din sectiuni_active (când nu e transmis din
+#     orchestrator) folosește com_date_financiare_pn pentru
+#     PNCDI și PNRR, și com_date_financiare pentru restul.
+#
 # MODIFICĂRI VERSIUNEA 2.0:
 #   - build_horizontal_export_data și build_vertical_export_data
 #     primesc parametrul sectiuni_active (lista secțiunilor
@@ -89,9 +94,11 @@ def build_horizontal_export_data(supabase, cod: str, tabela_gasita: str,
     export_data = {"headers": [], "values": []}
 
     if sectiuni_active is None:
+        _TABELE_FIN_PN = {"base_proiecte_pncdi", "base_proiecte_pnrr"}
+        _tabela_fin = "com_date_financiare_pn" if tabela_gasita in _TABELE_FIN_PN else "com_date_financiare"
         sectiuni_active = [
             ("Generale", tabela_gasita, "generale"),
-            ("Financiar", "com_date_financiare", "financiar"),
+            ("Financiar", _tabela_fin,  "financiar"),
             ("Echipa", "com_echipe_proiect", "echipa"),
             ("Tehnic", "com_aspecte_tehnice", "tehnic"),
         ]
@@ -129,9 +136,11 @@ def build_vertical_export_data(supabase, cod: str, tabela_gasita: str,
     export_data = {"sections": []}
 
     if sectiuni_active is None:
+        _TABELE_FIN_PN = {"base_proiecte_pncdi", "base_proiecte_pnrr"}
+        _tabela_fin = "com_date_financiare_pn" if tabela_gasita in _TABELE_FIN_PN else "com_date_financiare"
         sectiuni_active = [
             ("Generale", tabela_gasita, "generale"),
-            ("Financiar", "com_date_financiare", "financiar"),
+            ("Financiar", _tabela_fin,  "financiar"),
             ("Echipa", "com_echipe_proiect", "echipa"),
             ("Tehnic", "com_aspecte_tehnice", "tehnic"),
         ]
