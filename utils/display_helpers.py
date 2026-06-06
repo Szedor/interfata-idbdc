@@ -75,6 +75,17 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ordered = [c for c in TEHNIC_COL_ORDER if c in visible_cols]
         rest = [c for c in visible_cols if c not in TEHNIC_COL_ORDER]
         return ordered + rest
+    elif table == "com_date_financiare_pn":
+        COL_ORDER_FIN_PN = [
+            "cod_identificare", "valuta",
+            "valoare_totala_contract", "cofinantare_totala_contract",
+            "an_referinta",
+            "valoare_contract_an_referinta",
+            "cofinantare_contract_an_referinta",
+        ]
+        ordered = [c for c in COL_ORDER_FIN_PN if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_FIN_PN]
+        return ordered + rest
     elif table == "com_date_financiare":
         COL_ORDER_FINANCIAR = [
             "cod_identificare", "valuta",
@@ -118,6 +129,30 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ordered = [c for c in COL_ORDER_FDI if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_FDI]
         return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_prop_industr":
+        COL_ORDER_PI = [
+            "denumire_categorie",
+            "acronim_prop_industr",
+            "denumire_prop_industr",
+            "titlul_proprietatii",
+            "cod_identificare",
+            "data_depozit_cerere",
+            "numar_publicare_cerere",
+            "numar_oficial_acordare",
+            "data_oficiala_de_acordare",
+            "data_inceput_valabilitate",
+            "ani_de_valabilitate",
+            "data_sfarsit_valabilitate",
+            "id_proiect_contract_sursa",
+            "denumire_solicitant",
+            "denumire_titular",
+            "link_espacenet",
+            "titlu_engleza_diploma",
+            # date suplimentare excluse din Calea1
+        ]
+        ordered = [c for c in COL_ORDER_PI if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_PI]
+        return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_evenimente_stiintifice":
         COL_ORDER_EV_ST = [
             "denumire_categorie",
@@ -135,6 +170,30 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         ]
         ordered = [c for c in COL_ORDER_EV_ST if c in visible_cols]
         rest = [c for c in visible_cols if c not in COL_ORDER_EV_ST]
+        return ordered + rest
+    elif (tabela_baza_ctx or table or "") == "base_prop_industr":
+        COL_ORDER_PI = [
+            "denumire_categorie",
+            "acronim_prop_industr",
+            "denumire_prop_industr",
+            "titlul_proprietatii",
+            "cod_identificare",
+            "data_depozit_cerere",
+            "numar_publicare_cerere",
+            "numar_oficial_acordare",
+            "data_oficiala_de_acordare",
+            "data_inceput_valabilitate",
+            "ani_de_valabilitate",
+            "data_sfarsit_valabilitate",
+            "id_proiect_contract_sursa",
+            "denumire_solicitant",
+            "denumire_titular",
+            "link_espacenet",
+            "titlu_engleza_diploma",
+            # date suplimentare excluse din Calea1
+        ]
+        ordered = [c for c in COL_ORDER_PI if c in visible_cols]
+        rest = [c for c in visible_cols if c not in COL_ORDER_PI]
         return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_evenimente_stiintifice":
         COL_ORDER_EV = [
