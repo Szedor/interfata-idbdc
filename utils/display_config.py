@@ -792,6 +792,15 @@ COL_LABELS_PER_TABLE = {
         "link_espacenet":              "LINK ESPACENET",
         "titlu_engleza_diploma":       "TITLU ENGLEZA DIPLOMA",
     },
+    "com_date_financiare_pn": {
+        "cod_identificare":                  "NR.CONTRACT / COD PROIECT",
+        "valuta":                            "VALUTA",
+        "valoare_totala_contract":           "VALOARE TOTALA",
+        "cofinantare_totala_contract":       "COFINANTARE TOTALA",
+        "an_referinta":                      "ANUL DE REFERINTA",
+        "valoare_contract_an_referinta":     "VALOARE AN REFERINTA",
+        "cofinantare_contract_an_referinta": "COFINANTARE AN REFERINTA",
+    },
     "com_date_financiare": {
         "cod_identificare":                    "NR.CONTRACT",
         "valuta":                              "VALUTA",
