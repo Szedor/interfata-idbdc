@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/domenii/evenimente_stiintifice/baza.py
-# VERSIUNE: 2.2
-# STATUS: RESTRUCTURAT — Corecție sincronizare st.data_editor și session_state
-# DATA: 2026.06.07
+# VERSIUNE: 2.3
+# STATUS: CORECTAT — Sincronizare stabilă data_editor fără salturi
+# DATA: 2026.06.08
 # =========================================================
 # DATE DE BAZĂ — format data_editor (tabel), ordinea din mapare:
 #  1. CATEGORIE                          (readonly)
@@ -67,46 +67,35 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     natura_list  = [""] + sorted(natura_map.keys())
     format_list  = [""] + sorted(format_map.keys())
 
-    # ── Chei session_state pentru valori autocompletate ───────────────
-    key_row      = f"ev_row_{cod_introdus}"
-    key_natura   = f"ev_nat_{cod_introdus}"
-    key_format   = f"ev_fmt_{cod_introdus}"
+    # ── Chei unice session_state salvate stabil ──────────────────────
+    key_row      = f"ev_row_stabil_{cod_introdus}"
 
-    # Inițializare la prima deschidere
-    natura_init  = date_existente.get("natura_eveniment", "") or ""
-    format_init  = date_existente.get("format_eveniment", "") or ""
-
-    if key_natura not in st.session_state:
-        st.session_state[key_natura] = natura_init
-    if key_format not in st.session_state:
-        st.session_state[key_format] = format_init
-
-    # Valori curente autocompletate din mapări
-    cotatie_cur = natura_map.get(st.session_state[key_natura], "")
-    obs_cur     = format_map.get(st.session_state[key_format], "")
-
-    # ── Construire rând inițial pentru data_editor ────────────────────
-    row_init = {
-        "CATEGORIE":                          cat_sel,
-        "COD EVENIMENT":                      cod_introdus,
-        "TITLUL EVENIMENTULUI":               date_existente.get("titlul_eveniment", "") or "",
-        "📅 DATA DE INCEPUT":                 to_date(date_existente.get("data_inceput")),
-        "📅 DATA DE SFARSIT":                 to_date(date_existente.get("data_sfarsit")),
-        "🔖 FORMATUL EVENIMENTULUI":          st.session_state[key_format],
-        "LOCUL DE DESFASURARE":               date_existente.get("loc_desfasurare", "") or "",
-        "INSTITUTIILE ORGANIZATOARE":         date_existente.get("institutii_organizatoare", "") or "",
-        "🔖 NATURA EVENIMENTULUI STIINTIFIC": st.session_state[key_natura],
-        "COTATIA EVENIMENTULUI":              cotatie_cur,
-        "WEBSITE":                            date_existente.get("website", "") or "",
-        "OBSERVATII":                         obs_cur,
-    }
-
+    # Construire rând inițial o singură dată (la prima încărcare a fișei)
     if key_row not in st.session_state:
-        st.session_state[key_row] = row_init
+        natura_init  = date_existente.get("natura_eveniment", "") or ""
+        format_init  = date_existente.get("format_eveniment", "") or ""
+        cotatie_init = natura_map.get(natura_init, "") or date_existente.get("cotatie_eveniment", "") or ""
+        obs_init     = format_map.get(format_init, "") or date_existente.get("observatii", "") or ""
 
+        st.session_state[key_row] = {
+            "CATEGORIE":                          cat_sel,
+            "COD EVENIMENT":                      cod_introdus,
+            "TITLUL EVENIMENTULUI":               date_existente.get("titlul_eveniment", "") or "",
+            "📅 DATA DE INCEPUT":                 to_date(date_existente.get("data_inceput")),
+            "📅 DATA DE SFARSIT":                 to_date(date_existente.get("data_sfarsit")),
+            "🔖 FORMATUL EVENIMENTULUI":          format_init,
+            "LOCUL DE DESFASURARE":               date_existente.get("loc_desfasurare", "") or "",
+            "INSTITUTIILE ORGANIZATOARE":         date_existente.get("institutii_organizatoare", "") or "",
+            "🔖 NATURA EVENIMENTULUI STIINTIFIC": natura_init,
+            "COTATIA EVENIMENTULUI":              cotatie_init,
+            "WEBSITE":                            date_existente.get("website", "") or "",
+            "OBSERVATII":                         obs_init,
+        }
+
+    # Creăm DataFrame direct din starea stabilă
     df = pd.DataFrame([st.session_state[key_row]])
 
-    # ── Forțare conversie tipuri de date pentru calendar ──────────────
+    # Forțăm coloanele de tip dată să fie native Datetime înainte de st.data_editor
     if "📅 DATA DE INCEPUT" in df.columns:
         df["📅 DATA DE INCEPUT"] = pd.to_datetime(df["📅 DATA DE INCEPUT"], errors="coerce")
     if "📅 DATA DE SFARSIT" in df.columns:
@@ -157,57 +146,51 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         hide_index=True,
         use_container_width=True,
         num_rows="fixed",
-        key=f"ev_editor_{cod_introdus}",
+        key=f"ev_editor_stabil_{cod_introdus}",
     )
 
+    # Extragem rândul editat în timp real de utilizator
     row = df_edit.iloc[0]
 
-    # ── Sincronizare IMMEDIATĂ a tuturor câmpurilor introduse de utilizator ──
-    row_curent = dict(st.session_state[key_row])
-    cimpuri_editabile = [
-        "TITLUL EVENIMENTULUI", "📅 DATA DE INCEPUT", "📅 DATA DE SFARSIT",
-        "LOCUL DE DESFASURARE", "INSTITUTIILE ORGANIZATOARE", "WEBSITE",
-        "🔖 NATURA EVENIMENTULUI STIINTIFIC", "🔖 FORMATUL EVENIMENTULUI"
-    ]
-    for camp in cimpuri_editabile:
-        row_curent[camp] = row.get(camp, row_curent.get(camp))
+    # Determinăm valorile curente introduse
+    natura_curenta = row.get("🔖 NATURA EVENIMENTULUI STIINTIFIC", "") or ""
+    format_curent  = row.get("🔖 FORMATUL EVENIMENTULUI", "") or ""
 
-    # ── Detectare schimbări Nomenclatoare și declanșare Autocompletare ──
-    natura_noua = row.get("🔖 NATURA EVENIMENTULUI STIINTIFIC", "") or ""
-    format_nou  = row.get("🔖 FORMATUL EVENIMENTULUI", "") or ""
-    needs_rerun = False
+    # Calculăm automat cotația și observațiile pe baza a ceea ce a selectat utilizatorul acum pe ecran
+    cotatie_calculata = natura_map.get(natura_curenta, "")
+    observatii_calculate = format_map.get(format_curent, "")
 
-    if natura_noua != st.session_state[key_natura]:
-        st.session_state[key_natura] = natura_noua
-        row_curent["COTATIA EVENIMENTULUI"] = natura_map.get(natura_noua, "")
-        needs_rerun = True
+    # Sincronizăm starea din memorie cu absolut tot ce a modificat utilizatorul, inclusiv autocompletările
+    st.session_state[key_row] = {
+        "CATEGORIE":                          cat_sel,
+        "COD EVENIMENT":                      cod_introdus,
+        "TITLUL EVENIMENTULUI":               row.get("TITLUL EVENIMENTULUI", ""),
+        "📅 DATA DE INCEPUT":                 row.get("📅 DATA DE INCEPUT"),
+        "📅 DATA DE SFARSIT":                 row.get("📅 DATA DE SFARSIT"),
+        "🔖 FORMATUL EVENIMENTULUI":          format_curent,
+        "LOCUL DE DESFASURARE":               row.get("LOCUL DE DESFASURARE", ""),
+        "INSTITUTIILE ORGANIZATOARE":         row.get("INSTITUTIILE ORGANIZATOARE", ""),
+        "🔖 NATURA EVENIMENTULUI STIINTIFIC": natura_curenta,
+        "COTATIA EVENIMENTULUI":              cotatie_calculata,
+        "WEBSITE":                            row.get("WEBSITE", ""),
+        "OBSERVATII":                         observatii_calculate,
+    }
 
-    if format_nou != st.session_state[key_format]:
-        st.session_state[key_format] = format_nou
-        row_curent["OBSERVATII"] = format_map.get(format_nou, "")
-        needs_rerun = True
-
-    # Salvăm starea completă și consolidată înainte de orice potențial rerun
-    st.session_state[key_row] = row_curent
-
-    if needs_rerun:
-        st.rerun()
-
-    # ── Returnare dict pentru upsert în baza de date ──────────────────
+    # ── Returnare dict pentru introducere în baza de date Supabase ──
     def _str(v):
         return str(v).strip() if v else None
 
     return {
         "cod_identificare":         cod_introdus,
         "denumire_categorie":       cat_sel,
-        "titlul_eveniment":         _str(row_curent["TITLUL EVENIMENTULUI"]),
-        "data_inceput":             fmt_date(row_curent["📅 DATA DE INCEPUT"]),
-        "data_sfarsit":             fmt_date(row_curent["📅 DATA DE SFARSIT"]),
-        "format_eveniment":         st.session_state[key_format] or None,
-        "loc_desfasurare":          _str(row_curent["LOCUL DE DESFASURARE"]),
-        "institutii_organizatoare": _str(row_curent["INSTITUTIILE ORGANIZATOARE"]),
-        "natura_eveniment":         st.session_state[key_natura] or None,
-        "cotatie_eveniment":        natura_map.get(st.session_state[key_natura], "") or None,
-        "website":                  _str(row_curent["WEBSITE"]),
-        "observatii":               format_map.get(st.session_state[key_format], "") or None,
+        "titlul_eveniment":         _str(row["TITLUL EVENIMENTULUI"]),
+        "data_inceput":             fmt_date(row["📅 DATA DE INCEPUT"]),
+        "data_sfarsit":             fmt_date(row["📅 DATA DE SFARSIT"]),
+        "format_eveniment":         _str(format_curent),
+        "loc_desfasurare":          _str(row["LOCUL DE DESFASURARE"]),
+        "institutii_organizatoare": _str(row["INSTITUTIILE ORGANIZATOARE"]),
+        "natura_eveniment":         _str(natura_curenta),
+        "cotatie_eveniment":        _str(cotatie_calculata),
+        "website":                  _str(row["WEBSITE"]),
+        "observatii":               _str(observatii_calculate),
     }
