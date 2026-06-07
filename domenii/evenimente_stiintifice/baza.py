@@ -1,8 +1,8 @@
 # =========================================================
 # IDBDC/domenii/evenimente_stiintifice/baza.py
-# VERSIUNE: 2.0
-# STATUS: RESTRUCTURAT — format tabel, autocompletare reactivă
-# DATA: 2026.06.06
+# VERSIUNE: 2.1
+# STATUS: RESTRUCTURAT — Corecție tipuri de date calendar
+# DATA: 2026.06.07
 # =========================================================
 # DATE DE BAZĂ — format data_editor (tabel), ordinea din mapare:
 #  1. CATEGORIE                          (readonly)
@@ -115,6 +115,12 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
         st.session_state[key_row] = row_init
 
     df = pd.DataFrame([st.session_state[key_row]])
+
+    # ── Forțare conversie tipuri de date pentru a preveni StreamlitAPIException ──
+    if "📅 DATA DE INCEPUT" in df.columns:
+        df["📅 DATA DE INCEPUT"] = pd.to_datetime(df["📅 DATA DE INCEPUT"], errors="coerce")
+    if "📅 DATA DE SFARSIT" in df.columns:
+        df["📅 DATA DE SFARSIT"] = pd.to_datetime(df["📅 DATA DE SFARSIT"], errors="coerce")
 
     col_cfg = {
         "CATEGORIE": st.column_config.TextColumn(
