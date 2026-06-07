@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/domenii/evenimente_stiintifice/baza.py
-# VERSIUNE: 5.1
-# STATUS: CORECTAT — Remediat sintaxă CSS, UI Optimizat structural
+# VERSIUNE: 5.2
+# STATUS: SECURIZAT — Eliminat CSS problematic, UI Procentual STABIL
 # DATA: 2026.06.08
 # =========================================================
 
@@ -43,17 +43,6 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     format_list  = [""] + sorted(_get_format_map(supabase))
     natura_list  = [""] + sorted(natura_map.keys())
 
-    # ── [1] Injectare CSS corectă pentru forțare text NEGRU ABSOLUT în casete ──
-    css_style = """
-    <style>
-        input, select, textarea, [data-baseweb="select"] * {
-            color: #000000 !important;
-            -webkit-text-fill-color: #000000 !important;
-        }
-    </style>
-    """
-    st.markdown(css_style, unsafe_allow_markup=True)
-
     st.markdown("### 📝 Date de Bază Eveniment Științific")
 
     # ── R1 -> CATEGORIE - 50%, COD EVENIMENT - 50% ────────────────────
@@ -91,7 +80,6 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
             index=natura_list.index(natura_init) if natura_init in natura_list else 0
         )
     with r4_col2:
-        # [2] Am eliminat textul din paranteză de la etichetă
         cotatie_calculata = natura_map.get(natura_sel, "")
         st.text_input("COTATIA EVENIMENTULUI", value=cotatie_calculata, disabled=True)
     with r4_col3:
@@ -107,7 +95,6 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     with r5_col1:
         website_ev = st.text_input("WEBSITE", value=date_existente.get("website", "") or "")
     with r5_col2:
-        # [2] Am eliminat textul din paranteză de la etichetă și am aliniat caseta la aceeași înălțime cu WEBSITE
         obs_ev = st.text_input("OBSERVATII", value=date_existente.get("observatii", "") or "")
 
     # Funcție ajutătoare pentru curățat textul
