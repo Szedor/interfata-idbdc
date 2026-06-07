@@ -154,9 +154,9 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         rest = [c for c in visible_cols if c not in COL_ORDER_PI]
         return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_evenimente_stiintifice":
+        # Ordinea exactă din mapare; observatii exclus din Calea1
         COL_ORDER_EV_ST = [
             "denumire_categorie",
-            "natura_eveniment",
             "cod_identificare",
             "titlul_eveniment",
             "data_inceput",
@@ -164,7 +164,8 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
             "format_eveniment",
             "loc_desfasurare",
             "institutii_organizatoare",
-            "clasificare_eveniment",
+            "natura_eveniment",
+            "cotatie_eveniment",
             "website",
             # observatii exclus — vizibil doar în Calea2
         ]
