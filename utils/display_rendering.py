@@ -44,7 +44,6 @@ _COL_ORDER_FDI = [
 
 _COL_ORDER_EV_ST = [
     "denumire_categorie",
-    "natura_eveniment",
     "cod_identificare",
     "titlul_eveniment",
     "data_inceput",
@@ -52,8 +51,29 @@ _COL_ORDER_EV_ST = [
     "format_eveniment",
     "loc_desfasurare",
     "institutii_organizatoare",
-    "clasificare_eveniment",
+    "natura_eveniment",
+    "cotatie_eveniment",
     "website",
+]
+
+_COL_ORDER_PI = [
+    "denumire_categorie",
+    "acronim_prop_industr",
+    "denumire_prop_industr",
+    "titlul_proprietatii",
+    "cod_identificare",
+    "data_depozit_cerere",
+    "numar_publicare_cerere",
+    "numar_oficial_acordare",
+    "data_oficiala_de_acordare",
+    "data_inceput_valabilitate",
+    "ani_de_valabilitate",
+    "data_sfarsit_valabilitate",
+    "id_proiect_contract_sursa",
+    "denumire_solicitant",
+    "denumire_titular",
+    "link_espacenet",
+    "titlu_engleza_diploma",
 ]
 
 _COL_ORDER_EV = [
@@ -165,6 +185,7 @@ _COL_ORDER_PROIECTE_GENERIC = [
 _COL_ORDER_PER_TABLE = {
     "base_proiecte_fdi":            _COL_ORDER_FDI,
     "base_evenimente_stiintifice":  _COL_ORDER_EV_ST,
+    "base_prop_industr":            _COL_ORDER_PI,
     "base_evenimente_stiintifice":  _COL_ORDER_EV,
     "base_proiecte_pnrr":           _COL_ORDER_PNRR,
     "base_proiecte_pncdi":          _COL_ORDER_PNCDI,
