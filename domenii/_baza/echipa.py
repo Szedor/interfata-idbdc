@@ -1,20 +1,8 @@
 # =========================================================
 # IDBDC/domenii/_baza/echipa.py
-# VERSIUNE: 3.1
-# STATUS: ACTUALIZAT - toate elementele pe un singur rând
-# DATA: 2026.05.29
-# =========================================================
-# CONȚINUT:
-#   Secțiunea Echipă cu rânduri individuale per membru.
-#
-# MODIFICĂRI VERSIUNEA 3.1:
-#   - Toate cele 4 elemente (Membru N, NUME ȘI PRENUME,
-#     ROLUL ÎN ECHIPĂ, PERSOANĂ DE CONTACT) afișate
-#     pe un singur rând.
-#   - NUME ȘI PRENUME redus la 2/3, ROLUL ÎN ECHIPĂ
-#     redus la 1/2 față de versiunea anterioară.
-#   - Eticheta corectată: ROLUL ÎN ECHIPĂ (nu CONTRACT).
-#   - Eliminată nota de subsol.
+# VERSIUNE: 3.2
+# STATUS: ACTUALIZAT - Adăugat titlu secțiune uniformizat UI
+# DATA: 2026.06.08
 # =========================================================
 
 import streamlit as st
@@ -65,6 +53,9 @@ def _build_info_map(persoane_data, dep_map):
 
 
 def render(supabase, cod_introdus, is_new, date_existente):
+    # ── [1] Adăugare titlu secțiune pentru aliniere și uniformizare UI cu restul tab-urilor ──
+    st.markdown("### 👥 Membrii Echipei de Cercetare")
+
     persoane_data = _fetch_persoane(supabase)
     dep_map       = _fetch_departamente(supabase)
     info_map      = _build_info_map(persoane_data, dep_map)
@@ -97,8 +88,6 @@ def render(supabase, cod_introdus, is_new, date_existente):
         key_r = f"echipa_{cod_introdus}_{idx}_rol"
         key_c = f"echipa_{cod_introdus}_{idx}_contact"
 
-        # Toate cele 4 elemente pe un singur rând
-        # Proporții: etichetă(1) | nume(4) | rol(3) | bifa(2)
         col_lbl, col_nume, col_rol, col_contact = st.columns([1, 4, 3, 2])
 
         with col_lbl:
@@ -132,7 +121,6 @@ def render(supabase, cod_introdus, is_new, date_existente):
                 key=key_c,
             )
 
-        # Departament și contact sub rând
         if nume_ales and nume_ales in info_map:
             info  = info_map[nume_ales]
             parts = []
@@ -164,7 +152,6 @@ def render(supabase, cod_introdus, is_new, date_existente):
         st.session_state[key_nr] += 1
         st.rerun()
 
-    # Colectare rezultat pentru salvare
     rezultat = []
     for idx in range(nr_membri):
         n = str(st.session_state.get(f"echipa_{cod_introdus}_{idx}_nume", "") or "").strip()
@@ -179,4 +166,4 @@ def render(supabase, cod_introdus, is_new, date_existente):
             "persoana_contact": c,
             "functie_upt":      "",
         })
-    return rezultat
+    return resultado
