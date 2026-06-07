@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/domenii/evenimente_stiintifice/baza.py
-# VERSIUNE: 5.0
-# STATUS: FINISAT — UI Optimizat structural, text negru absolut
+# VERSIUNE: 5.1
+# STATUS: CORECTAT — Remediat sintaxă CSS, UI Optimizat structural
 # DATA: 2026.06.08
 # =========================================================
 
@@ -43,18 +43,16 @@ def render(supabase, cod_introdus, cat_sel, tip_label, tabela_nume, is_new, date
     format_list  = [""] + sorted(_get_format_map(supabase))
     natura_list  = [""] + sorted(natura_map.keys())
 
-    # ── [1] Injectare CSS pentru forțare text NEGRU ABSOLUT în casete ──
-    st.markdown(
-        """
-        <style>
-            input, select, textarea, [data-baseweb="select"] * {
-                color: #000000 !important;
-                -webkit-text-fill-color: #000000 !important;
-            }
-        </style>
-        """,
-        unsafe_allow_markup=True
-    )
+    # ── [1] Injectare CSS corectă pentru forțare text NEGRU ABSOLUT în casete ──
+    css_style = """
+    <style>
+        input, select, textarea, [data-baseweb="select"] * {
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
+        }
+    </style>
+    """
+    st.markdown(css_style, unsafe_allow_markup=True)
 
     st.markdown("### 📝 Date de Bază Eveniment Științific")
 
