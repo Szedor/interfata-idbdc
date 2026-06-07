@@ -1,26 +1,13 @@
 # =========================================================
 # utils/display_rendering.py
-# VERSIUNE: 2.2
-# STATUS: CORECTAT - aliniere coloane Echipă; etichetă NR.CONTRACT
-# DATA: 2026.05.09
-# =========================================================
-# MODIFICĂRI VERSIUNEA 2.2:
-#   - CORECȚIE: în render_echipa_compact, etichetele
-#     "PERSOANA DE CONTACT" și "MEMBRII ECHIPEI" sunt acum
-#     aliniate în coloana 2 (identic cu toate celelalte etichete),
-#     iar valorile corespunzătoare în coloana 3.
-#   - CORECȚIE: eticheta cod_identificare afișată ca
-#     "NR.CONTRACT" pentru contracte și "ID PROIECT" pentru
-#     proiecte, în loc de "NR.CONTRACT/ID PROIECT".
-#     Determinat după tabela_baza_ctx transmisă la apel.
-#
-# MODIFICĂRI VERSIUNEA 2.1:
-#   - Câmpuri audit ascunse în Calea1.
-#   - cod_identificare afișat în secțiunea Echipă.
+# VERSIUNE: 2.3
+# STATUS: CORECTAT - Spargere automată rânduri pentru enumerări instituții
+# DATA: 2026.06.08
 # =========================================================
 
 import streamlit as st
 import html as _html
+import re as _re
 from utils.display_config import (
     CARD_PRIORITY, _TABELE_CONTRACTE, _COLS_EXCLUDE_CONTRACTE,
     COLS_HIDDEN_FISA, TEHNIC_COL_ORDER
@@ -28,13 +15,11 @@ from utils.display_config import (
 from utils.display_helpers import col_label, fmt_numeric, get_contact_info, is_persoana_contact
 from utils.supabase_helpers import safe_select_eq
 
-# Câmpuri niciodată afișate în Calea1
 _COLS_HIDDEN_CAL1 = COLS_HIDDEN_FISA | {
     "observatii",
     "creat_de", "creat_la", "modificat_de", "modificat_la",
 }
 
-# Ordinea câmpurilor per tabelă de proiect — câte una specifică fiecărui tip
 _COL_ORDER_FDI = [
     "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
     "titlul_proiect", "acronim_proiect",
@@ -167,10 +152,8 @@ _COL_ORDER_INTERNATIONALE = [
     "numar_participanti", "denumire_participanti",
     "rol_upt", "identificare_apel", "data_inchidere_apel",
     "program_finantare", "tema_topic", "schema_de_finantare", "website",
-    # observatii exclus — vizibil doar în Calea2
 ]
 
-# Fallback generic pentru tipurile de proiecte fără ordine specifică
 _COL_ORDER_PROIECTE_GENERIC = [
     "denumire_categorie", "acronim_tip_proiecte", "cod_identificare",
     "titlul_proiect", "acronim_proiect",
@@ -181,7 +164,6 @@ _COL_ORDER_PROIECTE_GENERIC = [
     "cod_temporar",
 ]
 
-# Mapare tabelă → ordine specifică
 _COL_ORDER_PER_TABLE = {
     "base_proiecte_fdi":            _COL_ORDER_FDI,
     "base_evenimente_stiintifice":  _COL_ORDER_EV_ST,
@@ -196,7 +178,6 @@ _COL_ORDER_PER_TABLE = {
     "base_proiecte_internationale": _COL_ORDER_INTERNATIONALE,
 }
 
-# Ordinea câmpurilor generice (contracte, evenimente, proprietate)
 _COL_ORDER_GENERALE = [
     "denumire_categorie", "acronim_tip_contract", "acronim_tip_proiecte",
     "cod_identificare",
@@ -214,28 +195,19 @@ _COL_ORDER_GENERALE = [
     "inventatori", "cuvinte_cheie", "descriere",
 ]
 
-
-# Ordinea câmpurilor financiare — acoperă toate tipurile de proiecte și contracte
 _COL_ORDER_FINANCIAR = [
     "cod_identificare", "valuta",
-    # Contracte
     "valoare_contract_cep_terti_speciale",
     "valoare_anuala_contract", "valoare_totala_contract",
     "cofinantare_anuala_contract", "cofinantare_totala_contract",
-    # FDI
     "suma_solicitata_fdi", "suma_aprobata_mec",
     "cofinantare_upt_fdi", "total_buget_proiect_fdi",
-    # PNCDI (com_date_financiare_pn)
     "an_referinta", "valoare_contract_an_referinta",
     "cofinantare_contract_an_referinta",
     "valoare_totala_contract", "cofinantare_totala_contract",
-    # STRUCTURALE
     "cheltuieli_neeligibile", "costuri_totale_upt",
-    # NONUE
     "cheltuieli_eligibile", "grant_solicitat", "grant_aprobat",
-    # INTERREG
     "buget_upt", "cofinantare_nationala", "cofinantare_upt",
-    # Internationale — ordinea exactă din mapare
     "costuri_totale_proiect",
     "contributie_totala_finantator",
     "costuri_totale_upt",
@@ -244,7 +216,6 @@ _COL_ORDER_FINANCIAR = [
     "valoare_grant_solicitat_total",
     "costuri_eligibile_estimate_upt",
     "valoare_grant_solicitat_upt",
-    # Altele
     "cost_total_proiect", "cost_proiect_upt",
     "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
 ]
@@ -258,7 +229,6 @@ _TABELE_PROIECTE = {
 
 @st.cache_data(show_spinner=False, ttl=600)
 def _get_domeniu_abreviere(_supabase, cod_domeniu: str) -> str:
-    """Returnează abrevierea domeniului FDI din nom_domenii_fdi."""
     if not cod_domeniu:
         return ""
     try:
@@ -283,9 +253,7 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
 
     all_items = []
     for row in rows:
-        # ── Selectăm ordinea în funcție de tipul tabelei ──────
         if table == "com_aspecte_tehnice":
-            ordered_keys = _get_ordered(_COL_ORDER_GENERALE + list(TEHNIC_COL_ORDER), row, extra_hidden)
             ordered_keys = [c for c in TEHNIC_COL_ORDER if c in row and _is_visible(row, c, extra_hidden)] + \
                            [c for c in row.keys() if c not in TEHNIC_COL_ORDER and _is_visible(row, c, extra_hidden)]
         elif table == "com_date_financiare":
@@ -309,13 +277,19 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
                 is_num = False
             val_str = fmt_numeric(raw_val, c) if is_num else str(raw_val)
 
-            # ── Domeniu FDI: adăugăm abrevierea ───────────────
             if c == "cod_domeniu_fdi" and supabase:
                 abrev = _get_domeniu_abreviere(supabase, str(raw_val).strip())
                 if abrev:
                     val_str = f"{val_str} — {abrev}"
 
-            all_items.append((col_label(c, table or tabela_baza_ctx), _html.escape(val_str)))
+            # ── [2] Detecție și formatare automată a enumerărilor (1., 2.) în Calea 1 ──
+            # Dacă suntem pe câmpul de instituții organizatoare și avem format de tip "1. ... 2. ..."
+            val_html = _html.escape(val_str)
+            if c in ("institutii_organizatoare", "institutii_organizare"):
+                # Înlocuim punctele-virgulă sau spațiile care preced o cifră urmată de punct cu un rând nou (<br>)
+                val_html = _re.sub(r'(?:;\s*|\s+)(?=\d+\.)', '<br>', val_html)
+
+            all_items.append((col_label(c, table or tabela_baza_ctx), val_html))
 
     if not all_items:
         st.info(f"Nu există câmpuri completate pentru secțiunea {section_label}.")
@@ -337,7 +311,7 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
             f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
             f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
             f"text-transform:uppercase;letter-spacing:0.04em;'>{label}</span></td>"
-            f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
+            f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'> "
             f"<span style='color:#ffffff;font-size:0.95rem;font-weight:700;'>{value}</span></td>"
             f"</tr>"
         )
@@ -371,20 +345,13 @@ def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None, tabela_b
         st.info("Nu există echipă înregistrată pentru această fișă.")
         return
 
-    # Eticheta cod_identificare: NR.CONTRACT pentru contracte, ID PROIECT pentru proiecte
     eticheta_cod = "ID PROIECT" if tabela_baza_ctx in _TABELE_PROIECTE else "NR.CONTRACT"
-
     cod_id = str(rows[0].get("cod_identificare") or cod_ctx or "").strip()
 
     rows_sorted   = sorted(rows, key=lambda r: (0 if is_persoana_contact(r) else 1,
                                                 str(r.get("nume_prenume") or "")))
     persoane_cont = [r for r in rows_sorted if is_persoana_contact(r)]
     membri        = [r for r in rows_sorted if not is_persoana_contact(r)]
-
-    # ── Construim toate rândurile tabelului ────────────────────────────
-    # Col 1 (10%): eticheta secțiunii „ECHIPA" — rowspan total
-    # Col 2 (23%): eticheta câmpului
-    # Col 3 (67%): valoarea
 
     def _fmt_persoana(r):
         nume    = str(r.get("nume_prenume") or "").strip()
@@ -402,7 +369,6 @@ def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None, tabela_b
         parts = [_html.escape(p) for p in [nume, rol] if p]
         return " · ".join(parts)
 
-    # Rânduri: (eticheta_camp, valoare_html)
     randuri = []
 
     if cod_id:
@@ -437,7 +403,7 @@ def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None, tabela_b
             )
         rows_html += (
             f"<tr>{sec_cell}"
-            f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top;'>"
+            f"<td style='padding:3px 12px 3px 0;width:23%;vertical-align:top inferiority;'>"
             f"<span style='color:rgba(255,255,255,0.50);font-size:0.76rem;font-weight:700;"
             f"text-transform:uppercase;letter-spacing:0.04em;'>{eticheta_camp}</span></td>"
             f"<td style='padding:3px 0 3px 0;width:67%;vertical-align:top;'>"
@@ -450,7 +416,6 @@ def render_echipa_compact(rows: list, cod_ctx: str = "", supabase=None, tabela_b
         unsafe_allow_html=True,
     )
 
-    # Buton extindere membri (în afara tabelului)
     if membri:
         PREVIEW = 6
         show_all_key = f"echipa_show_all_{cod_ctx or id(rows)}"
