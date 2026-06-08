@@ -1,7 +1,7 @@
 # =========================================================
 # IDBDC/domenii/_baza/echipa.py
-# VERSIUNE: 3.3
-# STATUS: FINISAT - Corectat NameError (resultado -> rezultat)
+# VERSIUNE: 3.4
+# STATUS: FINISAT - Corectat NameError și aliniat UI Uniform
 # DATA: 2026.06.09
 # =========================================================
 
@@ -146,4 +146,4 @@ def render(supabase, cod_introdus, is_new, date_existente_lista=None):
         r = str(st.session_state.get(f"echipa_{cod_introdus}_{idx}_rol", "") or "").strip()
         rezultat.append({"nume_prenume": n, "rol": r})
 
-    return resultado if 'resultado' in locals() else rezultat
+    return rezultat
