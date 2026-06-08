@@ -1,21 +1,14 @@
 # =========================================================
 # IDBDC/calea2_admin/main.py
-# VERSIUNE: 1.0
-# STATUS: NOU - intrare Calea2 pentru noua structură modulară
-# DATA: 2026.05.09
-# =========================================================
-# CONȚINUT:
-#   Punct de intrare al Căii2 (Administrare).
-#   Autentificare în două etape prin core/auth.py.
-#   Conexiune Supabase prin core/db.py.
-#   Lansează calea2_admin/motor.py după autentificare.
+# VERSIUNE: 1.1
+# STATUS: CORECTAT - S-a eliminat poarta de Maintenance globală
+# DATA: 2026.06.08
 # =========================================================
 
 import streamlit as st
 from core.db   import get_supabase
 from core.auth import check_gate_password, identify_operator
 from calea2_admin.motor import porneste_motorul
-from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
 
 TITLE_LINE_1 = "🛠️ Administrare baze de date"
 TITLE_LINE_2 = "Departamentul Cercetare Dezvoltare Inovare"
@@ -59,7 +52,8 @@ _CSS = """
 
 def run():
     st.set_page_config(page_title="IDBDC – Administrare", layout="wide", initial_sidebar_state="expanded")
-    _maintenance_gate_fn(st, pwd_key="_mw_pwd_c2", btn_key="_mw_btn_c2")
+    
+    # --- MODIFICARE: Linia de Maintenance a fost eliminată chirurgical ---
 
     supabase = get_supabase()
     st.markdown(_CSS, unsafe_allow_html=True)
@@ -89,6 +83,7 @@ def run():
         st.sidebar.markdown("### Pas 1 — Parolă acces modul")
         parola = st.sidebar.text_input("Parola:", type="password", key="p1_pass")
         if st.sidebar.button("Autorizare acces", use_container_width=True):
+            # Observație: Aici funcția caută poarta "admin", exact cum am descoperit în baza de date!
             if check_gate_password(supabase, "admin", parola):
                 st.session_state.autorizat_p1 = True
                 st.rerun()
