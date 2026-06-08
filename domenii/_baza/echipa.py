@@ -166,4 +166,4 @@ def render(supabase, cod_introdus, is_new, date_existente):
             "persoana_contact": c,
             "functie_upt":      "",
         })
-    return resultado
+    return resultat
