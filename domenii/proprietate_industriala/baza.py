@@ -1,50 +1,44 @@
 # =========================================================
 # IDBDC/domenii/proprietate_industriala/baza.py
-# VERSIUNE: 2.3 - Rezolvare definitivă corelare nomenclator și conversie numerică sigură
+# VERSIUNE: 2.0 - Structură pe rânduri (R1-R6) și calcul automat durată
 # DATA: 2026.06.09
 # =========================================================
 
 import streamlit as st
 import datetime
 
-def _incarca_nomenclator_pi(supabase):
-    """Încarcă datele brute din nom_prop_industr pentru mapare în timp real."""
+@st.cache_data(show_spinner=False, ttl=600)
+def _incarca_nomenclator_pi(_supabase):
+    """Încarcă datele din nom_prop_industr pentru mapare automată."""
     try:
-        res = supabase.table("nom_prop_industr").select("acronim_prop_industr, denumire_prop_industr, ani_de_valabilitate").execute()
+        res = _supabase.table("nom_prop_industr").select("acronim_prop_industr, denumire_prop_industr, ani_de_valabilitate").execute()
         return res.data or []
     except Exception:
         return []
 
 def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_existente):
     st.markdown(
-        "<div style='background-color:#0b2a52; padding:8px 15px; border-radius:6px; margin-bottom:15px.'>"
+        "<div style='background-color:#0b2a52; padding:8px 15px; border-radius:6px; margin-bottom:15px;'>"
         "<h3 style='margin:0; color:#ffffff; font-size:1.2rem;'>📋 DATE DE BAZĂ GENERALE</h3>"
         "</div>",
         unsafe_allow_html=True
     )
 
-    if not date_existente:
-        date_existente = {}
-
     nom_data = _incarca_nomenclator_pi(supabase)
-    liste_acronime = [r["acronim_prop_industr"] for r in nom_data if r.get("acronim_prop_industr")]
-    map_denumiri = {r["acronim_prop_industr"]: r["denumire_prop_industr"] for r in nom_data if r.get("acronim_prop_industr")}
-    map_ani = {r["acronim_prop_industr"]: r["ani_de_valabilitate"] for r in nom_data if r.get("acronim_prop_industr")}
-
-    if not liste_acronime:
-        liste_acronime = [""]
+    liste_acronime = [r["acronim_prop_industr"] for r in nom_data]
+    map_denumiri = {r["acronim_prop_industr"]: r["denumire_prop_industr"] for r in nom_data}
+    map_ani = {r["acronim_prop_industr"]: r["ani_de_valabilitate"] for r in nom_data}
 
     # R1 -> ACRONIM (25%), DENUMIRE PROPRIETATE (50%), NR. INREGISTRARE CERERE (25%)
     r1_c1, r1_c2, r1_c3 = st.columns([25, 50, 25])
     with r1_c1:
-        saved_acr = date_existente.get("acronim_prop_industr", "") or ""
         idx_acr = 0
+        saved_acr = date_existente.get("acronim_prop_industr", "")
         if saved_acr in liste_acronime:
             idx_acr = liste_acronime.index(saved_acr)
         acronim = st.selectbox("ACRONIM TIP PROPRIETATE", options=liste_acronime, index=idx_acr, key=f"pi_acr_{cod_introdus}")
     
     with r1_c2:
-        # Se forțează preluarea din dicționarul reactiv la fiecare schimbare a selectbox-ului
         denumire_nom = map_denumiri.get(acronim, "")
         st.text_input("DENUMIRE PROPRIETATE INDUSTRIALA", value=denumire_nom, disabled=True, key=f"pi_den_nom_{cod_introdus}")
     
@@ -52,69 +46,58 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
         st.text_input("NR. INREGISTRARE CERERE", value=cod_introdus, disabled=True, key=f"pi_cod_{cod_introdus}")
 
     # R2 -> TITLUL PROPRIETATII - 100%
-    saved_titlu = date_existente.get("titlul_proprietatii", "") or ""
-    titlul_prop = st.text_area("TITLUL PROPRIETATII", value=saved_titlu, height=65, key=f"pi_titlu_{cod_introdus}")
+    titlul_prop = st.text_area("TITLUL PROPRIETATII", value=date_existente.get("titlul_proprietatii", "") or "", height=65, key=f"pi_titlu_{cod_introdus}")
 
     # R3 -> DATA DEPOZIT CERERE (25%), NR. PUBLICARE CERERE (25%), DATA OFICIALA DE ACORDARE (25%), NR. OFICIAL DE ACORDARE (25%)
     r3_c1, r3_c2, r3_c3, r3_c4 = st.columns([25, 25, 25, 25])
     with r3_c1:
         val_dep = date_existente.get("data_depozit_cerere")
         dt_dep = datetime.date.fromisoformat(val_dep) if val_dep else None
-        data_depozit = st.date_input("DATA DEPOZIT CERERE", value=dt_dep, key=f"pi_dt_dep_{cod_introdus}")
+        data_depozit = st.date_input("DATA DEPOZIT CERERE", value=dt_dep, key=f"pi_dt_dep_{cod_introdus}", default=None)
     with r3_c2:
-        saved_pub = date_existente.get("numar_publicare_cerere", "") or ""
-        nr_pub = st.text_input("NR. PUBLICARE CERERE", value=saved_pub, key=f"pi_nr_pub_{cod_introdus}")
+        nr_pub = st.text_input("NR. PUBLICARE CERERE", value=date_existente.get("numar_publicare_cerere", "") or "", key=f"pi_nr_pub_{cod_introdus}")
     with r3_c3:
         val_ac = date_existente.get("data_oficiala_de_acordare")
         dt_ac = datetime.date.fromisoformat(val_ac) if val_ac else None
-        data_oficiala = st.date_input("DATA OFICIALA DE ACORDARE", value=dt_ac, key=f"pi_dt_ac_{cod_introdus}")
+        data_oficiala = st.date_input("DATA OFICIALA DE ACORDARE", value=dt_ac, key=f"pi_dt_ac_{cod_introdus}", default=None)
     with r3_c4:
-        saved_of = date_existente.get("numar_oficial_acordare", "") or ""
-        nr_oficial = st.text_input("NR. OFICIAL DE ACORDARE", value=saved_of, key=f"pi_nr_of_{cod_introdus}")
+        nr_oficial = st.text_input("NR. OFICIAL DE ACORDARE", value=date_existente.get("numar_oficial_acordare", "") or "", key=f"pi_nr_of_{cod_introdus}")
 
     # R4 -> DATA INCEPUT VALABILITATE (25%), DURATA (25%), DATA SFARSIT (25%), ID PROIECT SURSA (25%)
     r4_c1, r4_c2, r4_c3, r4_c4 = st.columns([25, 25, 25, 25])
     with r4_c1:
         val_inc = date_existente.get("data_inceput_valabilitate")
         dt_inc = datetime.date.fromisoformat(val_inc) if val_inc else None
-        data_inc = st.date_input("DATA INCEPUT VALABILITATE", value=dt_inc, key=f"pi_dt_inc_{cod_introdus}")
+        data_inc = st.date_input("DATA INCEPUT VALABILITATE", value=dt_inc, key=f"pi_dt_inc_{cod_introdus}", default=None)
     
     with r4_c2:
-        try:
-            durata_ani = int(map_ani.get(acronim, 0))
-        except Exception:
-            durata_ani = 0
+        durata_ani = int(map_ani.get(acronim, 0))
         st.number_input("DURATA DE VALABILITATE (ani)", value=durata_ani, disabled=True, key=f"pi_durata_{cod_introdus}")
     
     with r4_c3:
         if data_inc and durata_ani > 0:
             try:
                 dt_sfarsit = data_inc.replace(year=data_inc.year + durata_ani)
-            except ValueError:
-                dt_sfarsit = data_inc + datetime.timedelta(days=durata_ani * 365)
+            except ValueError: # Tratare caz an bisect (29 Februarie)
+                dt_sfarsit = data_inc + datetime.timedelta(days=durata_ani*365)
         else:
             dt_sfarsit = None
         st.date_input("DATA SFARSIT VALABILITATE", value=dt_sfarsit, disabled=True, key=f"pi_dt_sf_{cod_introdus}")
     
     with r4_c4:
-        saved_id = date_existente.get("id_proiect_contract_sursa", "") or ""
-        id_proiect = st.text_input("ID PROIECT SURSA/CONTRACT", value=saved_id, key=f"pi_id_pr_{cod_introdus}")
+        id_proiect = st.text_input("ID PROIECT SURSA/CONTRACT", value=date_existente.get("id_proiect_contract_sursa", "") or "", key=f"pi_id_pr_{cod_introdus}")
 
     # R5 -> DENUMIRE TITULAR (33%), DENUMIRE SOLICITANT (33%), LINK ESPACENET (33%)
     r5_c1, r5_c2, r5_c3 = st.columns([33, 33, 34])
     with r5_c1:
-        saved_tit = date_existente.get("denumire_titular", "") or ""
-        titular = st.text_input("DENUMIRE TITULAR", value=saved_tit, key=f"pi_titular_{cod_introdus}")
+        titular = st.text_input("DENUMIRE TITULAR", value=date_existente.get("denumire_titular", "") or "", key=f"pi_titular_{cod_introdus}")
     with r5_c2:
-        saved_sol = date_existente.get("denumire_solicitant", "") or ""
-        solicitant = st.text_input("DENUMIRE SOLICITANT", value=saved_sol, key=f"pi_solic_{cod_introdus}")
+        solicitant = st.text_input("DENUMIRE SOLICITANT", value=date_existente.get("denumire_solicitant", "") or "", key=f"pi_solic_{cod_introdus}")
     with r5_c3:
-        saved_lnk = date_existente.get("link_espacenet", "") or ""
-        link_espa = st.text_input("LINK ESPACENET", value=saved_lnk, key=f"pi_link_{cod_introdus}")
+        link_espa = st.text_input("LINK ESPACENET", value=date_existente.get("link_espacenet", "") or "", key=f"pi_link_{cod_introdus}")
 
     # R6 -> TITLU ENGLEZA DIPLOMA - 100%
-    saved_dip = date_existente.get("titlu_engleza_diploma", "") or ""
-    titlu_en_dip = st.text_input("TITLU ENGLEZA DIPLOMA", value=saved_dip, key=f"pi_en_dip_{cod_introdus}")
+    titlu_en_dip = st.text_input("TITLU ENGLEZA DIPLOMA", value=date_existente.get("titlu_engleza_diploma", "") or "", key=f"pi_en_dip_{cod_introdus}")
 
     return {
         "cod_identificare": cod_introdus,
@@ -138,23 +121,18 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
 
 def render_suplimentare(supabase, cod_introdus, is_new, date_existente):
     st.markdown(
-        "<div style='background-color:#0b2a52; padding:8px 15px; border-radius:6px; margin-bottom:15px; margin-top:10px;'> "
+        "<div style='background-color:#0b2a52; padding:8px 15px; border-radius:6px; margin-bottom:15px; margin-top:10px;'>"
         "<h3 style='margin:0; color:#ffffff; font-size:1.2rem;'>🔒 DATE SUPLIMENTARE DE CONTROL</h3>"
         "</div>",
         unsafe_allow_html=True
     )
 
-    if not date_existente:
-        date_existente = {}
-
     # R1 -> NR. SI DATA NOTIFICARE (25%), DOCUMENT OFICIAL (50%), STATUS DOCUMENT (25%)
     r1_c1, r1_c2, r1_c3 = st.columns([25, 50, 25])
     with r1_c1:
-        saved_notif = date_existente.get("numar_data_notificare_intern", "") or ""
-        nr_notif = st.text_input("NR. SI DATA DE NOTIFICARE INTERNA", value=saved_notif, key=f"pi_nr_not_{cod_introdus}")
+        nr_notif = st.text_input("NR. SI DATA DE NOTIFICARE INTERNA", value=date_existente.get("numar_data_notificare_intern", "") or "", key=f"pi_nr_not_{cod_introdus}")
     with r1_c2:
-        saved_doc = date_existente.get("document_oficial_original", "") or ""
-        doc_oficial = st.text_input("DOCUMENT OFICIAL ORIGINAL", value=saved_doc, key=f"pi_doc_of_{cod_introdus}")
+        doc_oficial = st.text_input("DOCUMENT OFICIAL ORIGINAL", value=date_existente.get("document_oficial_original", "") or "", key=f"pi_doc_of_{cod_introdus}")
     with r1_c3:
         status_opts = ["", "In curs de examinare", "Acordat", "Respins", "Retras"]
         saved_status = date_existente.get("status_document", "") or ""
@@ -164,50 +142,34 @@ def render_suplimentare(supabase, cod_introdus, is_new, date_existente):
     # R2 -> DOMENIU APLICARE (33%), SPIN OFF (33%), CONTRACT CESIUNE (33%)
     r2_c1, r2_c2, r2_c3 = st.columns([33, 33, 34])
     with r2_c1:
-        saved_dom = date_existente.get("domeniu_aplicare_idbdc", "") or ""
-        domeniu = st.text_input("DOMENIU APLICARE", value=saved_dom, key=f"pi_domeniu_{cod_introdus}")
+        domeniu = st.text_input("DOMENIU APLICARE", value=date_existente.get("domeniu_aplicare_idbdc", "") or "", key=f"pi_domeniu_{cod_introdus}")
     with r2_c2:
-        saved_spin = date_existente.get("spin_off", "") or ""
-        spin_off = st.text_input("SPIN OFF", value=saved_spin, key=f"pi_spin_{cod_introdus}")
+        spin_off = st.text_input("SPIN OFF", value=date_existente.get("spin_off", "") or "", key=f"pi_spin_{cod_introdus}")
     with r2_c3:
-        saved_ces = date_existente.get("contract_cesiune_externi", "") or ""
-        contract_ces = st.text_input("CONTRACT CESIUNE INVENTATORI EXTERNI", value=saved_ces, key=f"pi_cesiune_{cod_introdus}")
+        contract_ces = st.text_input("CONTRACT CESIUNE INVENTATORI EXTERNI", value=date_existente.get("contract_cesiune_externi", "") or "", key=f"pi_cesiune_{cod_introdus}")
 
     # R3 -> NUMAR AUTORI TOTAL (25%), TITLU ENGLEZA EPO (75%)
     r3_c1, r3_c2 = st.columns([25, 75])
     with r3_c1:
-        saved_aut_tot = date_existente.get("numar_autori_total", "")
-        val_aut_tot = str(saved_aut_tot) if saved_aut_tot is not None else ""
-        nr_autori_total = st.text_input("NUMAR AUTORI TOTAL", value=val_aut_tot, key=f"pi_aut_tot_{cod_introdus}")
+        nr_autori_total = st.text_input("NUMAR AUTORI TOTAL", value=str(date_existente.get("numar_autori_total", "") or ""), key=f"pi_aut_tot_{cod_introdus}")
     with r3_c2:
-        saved_epo = date_existente.get("titlu_engleza_epo", "") or ""
-        titlu_epo = st.text_input("TITLU ENGLEZA EPO", value=saved_epo, key=f"pi_epo_{cod_introdus}")
+        titlu_epo = st.text_input("TITLU ENGLEZA EPO", value=date_existente.get("titlu_engleza_epo", "") or "", key=f"pi_epo_{cod_introdus}")
 
     # R4 -> NUMAR AUTORI UPT (25%), TITLU ENGLEZA FISA INVENTIEI (75%)
     r4_c1, r4_c2 = st.columns([25, 75])
     with r4_c1:
-        saved_aut_upt = date_existente.get("numar_autori_upt", "")
-        val_aut_upt = str(saved_aut_upt) if saved_aut_upt is not None else ""
-        nr_autori_upt = st.text_input("NUMAR AUTORI UPT", value=val_aut_upt, key=f"pi_aut_upt_{cod_introdus}")
+        nr_autori_upt = st.text_input("NUMAR AUTORI UPT", value=str(date_existente.get("numar_autori_upt", "") or ""), key=f"pi_aut_upt_{cod_introdus}")
     with r4_c2:
-        saved_fisa = date_existente.get("titlu_engleza_fisa_inventiei", "") or ""
-        titlu_fisa = st.text_input("TITLU ENGLEZA FISA INVENTIEI", value=saved_fisa, key=f"pi_fisa_{cod_introdus}")
+        titlu_fisa = st.text_input("TITLU ENGLEZA FISA INVENTIEI", value=date_existente.get("titlu_engleza_fisa_inventiei", "") or "", key=f"pi_fisa_{cod_introdus}")
 
     # R5 -> COMENTARII DOCUMENT - 100%
-    saved_com_doc = date_existente.get("comentarii_document", "") or ""
-    com_doc = st.text_area("COMENTARII DOCUMENT", value=saved_com_doc, height=70, key=f"pi_com_doc_{cod_introdus}")
+    com_doc = st.text_area("COMENTARII DOCUMENT", value=date_existente.get("comentarii_document", "") or "", height=70, key=f"pi_com_doc_{cod_introdus}")
     
     # R6 -> COMENTARII DIVERSE - 100%
-    saved_com_div = date_existente.get("comentarii_diverse", "") or ""
-    com_div = st.text_area("COMENTARII DIVERSE", value=saved_com_div, height=70, key=f"pi_com_div_{cod_introdus}")
+    com_div = st.text_area("COMENTARII DIVERSE", value=date_existente.get("comentarii_diverse", "") or "", height=70, key=f"pi_com_div_{cod_introdus}")
 
     def _str(v):
         return str(v).strip() if v else None
-
-    # Conversie sigură în întreg pentru a elimina definitiv crăparea paginii la salvare/randare
-    def _safe_int(v):
-        s = str(v).strip()
-        return int(s) if s.isdigit() else None
 
     return {
         "numar_data_notificare_intern": _str(nr_notif),
@@ -216,8 +178,8 @@ def render_suplimentare(supabase, cod_introdus, is_new, date_existente):
         "domeniu_aplicare_idbdc": _str(domeniu),
         "spin_off": _str(spin_off),
         "contract_cesiune_externi": _str(contract_ces),
-        "numar_autori_total": _safe_int(nr_autori_total),
-        "numar_autori_upt": _safe_int(nr_autori_upt),
+        "numar_autori_total": int(nr_autori_total) if nr_autori_total.isdigit() else None,
+        "numar_autori_upt": int(nr_autori_upt) if nr_autori_upt.isdigit() else None,
         "titlu_engleza_epo": _str(titlu_epo),
         "titlu_engleza_fisa_inventiei": _str(titlu_fisa),
         "comentarii_document": _str(com_doc),
