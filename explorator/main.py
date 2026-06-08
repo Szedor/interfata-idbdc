@@ -1,12 +1,13 @@
 # =========================================================
 # IDBDC/explorator/main.py
-# VERSIUNE: 3.5 - Acces bazat pe filtre operator
+# VERSIUNE: 3.6 - S-a eliminat poarta de Maintenance globală
 # =========================================================
 
 import streamlit as st
 from supabase import Client, create_client
 from config import Config
 
+# Păstrăm importul doar în caz de utilizare viitoare, dar nu îl mai apelăm în run()
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
 
 from utils.display_config import ALL_BASE_TABLES, TABLE_LABELS
@@ -210,14 +211,11 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
-    # Aplică filtrele operatorului (dacă există) – doar pentru afișare, nu pentru acces
-    # Accesul real este controlat în Calea2, nu în Calea1
     if tabela_gasita == "base_contracte_cep":
         run_fisa_cep(supabase, cod, tabela_gasita, "CEP")
     elif tabela_gasita == "base_contracte_terti":
         run_fisa_terti(supabase, cod, tabela_gasita, "TERȚI")
     elif tabela_gasita == "base_contracte_speciale":
-        # Contractele SPECIALE nu sunt accesibile în Calea1
         st.error("⚠️ Acest tip de contract nu este disponibil pentru interogare publică.")
         return
     elif tabela_gasita == "base_proiecte_fdi":
@@ -239,7 +237,9 @@ def render_raportari(supabase):
 
 def run():
     st.set_page_config(page_title="IDBDC – Explorare", layout="wide")
-    _maintenance_gate_fn(st, pwd_key="_mw_pwd_c1", btn_key="_mw_btn_c1")
+    
+    # --- MODIFICARE: Linia de Maintenance globală a fost eliminată chirurgical ---
+    
     gate_control()
     hide_streamlit_chrome()
     apply_style_full_blue()
