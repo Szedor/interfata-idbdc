@@ -93,7 +93,7 @@ def _apply_style():
 def _render_toggle():
     dark = _get_theme_c2()
     label = "☀️ Light mode" if dark else "🌙 Dark mode"
-    _, col_btn = st.columns([9, 1])
+    _, col_btn = st.columns([8, 1])
     with col_btn:
         if st.button(label, key="toggle_theme_c2"):
             st.session_state.dark_mode_c2 = not dark
