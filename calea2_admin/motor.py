@@ -213,12 +213,44 @@ def porneste_motorul(supabase):
             erori = []
 
             baza = rezultate.get("baza") or st.session_state.get(key_baza_ss)
+
+            if tip_sel == "PROPRIETATE INDUSTRIALA":
+                from domenii.proprietate_industriala.baza import _get_tip_prop_map, _add_ani
+                from core.helpers import fmt_date
+                ss = st.session_state
+                tip_prop_map = _get_tip_prop_map(supabase)
+                tip_ales  = ss.get(f"pi_tip_{cod_introdus}", "")
+                tip_info  = tip_prop_map.get(tip_ales, {"denumire": "", "ani": 0}) if tip_ales else {"denumire": "", "ani": 0}
+                den_auto  = tip_info["denumire"]
+                ani_nom   = tip_info["ani"]
+                data_iv   = ss.get(f"pi_data_iv_{cod_introdus}")
+                data_sf   = _add_ani(data_iv, ani_nom)
+                sf_str    = fmt_date(data_sf) or ""
+                baza = {
+                    "cod_identificare":          cod_introdus,
+                    "denumire_categorie":        cat_sel,
+                    "acronim_prop_industr":      tip_ales or None,
+                    "denumire_prop_industr":     den_auto or None,
+                    "titlul_proprietatii":       (str(ss.get(f"pi_titlu_{cod_introdus}", "") or "").strip()) or None,
+                    "data_depozit_cerere":       fmt_date(ss.get(f"pi_data_dep_{cod_introdus}")),
+                    "numar_publicare_cerere":    (str(ss.get(f"pi_nr_pub_{cod_introdus}", "") or "").strip()) or None,
+                    "numar_oficial_acordare":    (str(ss.get(f"pi_nr_ac_{cod_introdus}", "") or "").strip()) or None,
+                    "data_oficiala_de_acordare": fmt_date(ss.get(f"pi_data_ac_{cod_introdus}")),
+                    "data_inceput_valabilitate": fmt_date(data_iv),
+                    "ani_de_valabilitate":       int(ani_nom) if ani_nom else None,
+                    "data_sfarsit_valabilitate": sf_str or None,
+                    "id_proiect_contract_sursa": (str(ss.get(f"pi_id_sursa_{cod_introdus}", "") or "").strip()) or None,
+                    "denumire_solicitant":       (str(ss.get(f"pi_solicitant_{cod_introdus}", "") or "").strip()) or None,
+                    "denumire_titular":          (str(ss.get(f"pi_titular_{cod_introdus}", "") or "").strip()) or None,
+                    "link_espacenet":            (str(ss.get(f"pi_link_{cod_introdus}", "") or "").strip()) or None,
+                    "titlu_engleza_diploma":     (str(ss.get(f"pi_titlu_en_{cod_introdus}", "") or "").strip()) or None,
+                }
+
             if baza:
                 ok, msg = upsert_row(supabase, defn.BASE_TABLE, {**baza, "cod_identificare": cod_introdus})
                 if not ok:
                     erori.append(f"Date de bază: {msg}")
 
-            # Date suplimentare (Proprietate industriala — acelasi tabel BASE_TABLE)
             supl = rezultate.get("suplimentare") or st.session_state.get(key_baza_ss + "_supl")
             if supl:
                 ok, msg = upsert_row(supabase, defn.BASE_TABLE, {**supl, "cod_identificare": cod_introdus})
