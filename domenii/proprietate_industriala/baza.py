@@ -1,17 +1,41 @@
 # =========================================================
 # IDBDC/domenii/proprietate_industriala/baza.py
-# VERSIUNE: 2.1
-# STATUS: ACTUALIZAT - UI restructurat, autocompletare din nomenclator
+# VERSIUNE: 2.0
+# STATUS: RESTRUCTURAT - layout pe rânduri conform mapare
 # DATA: 2026.06.09
+# =========================================================
+# MODIFICĂRI VERSIUNEA 2.0:
+#   - Adăugat titlu secțiune "📋 Date de bază" înainte de câmpuri
+#   - Layout reorganizat pe rânduri exacte din mapare:
+#     R1: ACRONIM TIP PROPRIETATE(25%) | DENUMIRE(50%) | NR.INREG(25%)
+#     R2: TITLUL PROPRIETATII (100%)
+#     R3: DATA DEPOZIT(25%) | NR.PUBLICARE(25%) | DATA ACORDARE(25%) | NR.ACORDARE(25%)
+#     R4: DATA INCEPUT VAL(25%) | DURATA VAL auto(25%) | DATA SFARSIT VAL auto(25%) | ID SURSA(25%)
+#     R5: DENUMIRE TITULAR(33%) | DENUMIRE SOLICITANT(33%) | LINK ESPACENET(33%)
+#     R6: TITLU ENGLEZA DIPLOMA (100%)
+#   - DURATA DE VALABILITATE preluata automat din nom_prop_industr
+#   - DATA SFARSIT VALABILITATE calculata automat
+#   - Adăugat titlu secțiune "🔒 Date suplimentare" înainte de câmpuri
+#   - Layout Date suplimentare reorganizat:
+#     R1: NR.NOTIF.INTERNA(25%) | DOC.OFICIAL(50%) | STATUS DOC(25%)
+#     R2: DOMENIU APLICARE(33%) | SPIN OFF(33%) | CONTRACT CESIUNE(33%)
+#     R3: NR.AUTORI TOTAL(25%) | TITLU EPO(75%)
+#     R4: NR.AUTORI UPT(25%) | TITLU FISA INVENTIEI(75%)
+#     R5: COMENTARII DOCUMENT (100%)
+#     R6: COMENTARII DIVERSE (100%)
 # =========================================================
 
 import streamlit as st
+import pandas as pd
 from datetime import date as _date
 from core.helpers import to_date, fmt_date
 
 
+# ── Cache nomenclatoare ────────────────────────────────────────────────
+
 @st.cache_data(show_spinner=False, ttl=600)
 def _get_tip_prop_map(_supabase):
+    """Returneaza dict {acronim_prop_industr: {denumire, ani}}."""
     try:
         res = _supabase.table("nom_prop_industr") \
             .select("acronim_prop_industr,denumire_prop_industr,ani_de_valabilitate").execute()
@@ -36,6 +60,7 @@ def _get_status_doc_list(_supabase):
 
 
 def _add_ani(d, ani):
+    """Adauga un numar de ani la o data."""
     if not d or not ani:
         return None
     try:
@@ -44,32 +69,40 @@ def _add_ani(d, ani):
         return None
 
 
+# ── SECTIUNEA 1: DATE DE BAZA ──────────────────────────────────────────
+
 def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_existente):
     tip_prop_map = _get_tip_prop_map(supabase)
     tip_list     = [""] + sorted(tip_prop_map.keys())
 
+    key_tip = f"pi_tip_{cod_introdus}"
+
+    if key_tip not in st.session_state:
+        st.session_state[key_tip] = date_existente.get("acronim_prop_industr", "") or ""
+
+    # ── Titlu secțiune ─────────────────────────────────────────────────
     st.markdown(
-        "<div style='color:rgba(255,255,255,0.70);font-size:0.88rem;"
-        "font-weight:700;text-transform:uppercase;letter-spacing:0.05em;"
-        "margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.20);"
-        "padding-bottom:4px;'>📋 Date de bază</div>",
+        "<div style='color:rgba(255,255,255,0.70);font-size:0.95rem;font-weight:800;"
+        "text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;"
+        "border-bottom:1px solid rgba(255,255,255,0.20);padding-bottom:6px;'>"
+        "📋 Date de bază</div>",
         unsafe_allow_html=True,
     )
 
+    # ── R1: ACRONIM TIP(25%) | DENUMIRE(50%) | NR.INREG(25%) ──────────
     col_tip, col_den, col_cod = st.columns([25, 50, 25])
     with col_tip:
-        acronim_ex = date_existente.get("acronim_prop_industr", "") or ""
-        idx_tip = tip_list.index(acronim_ex) if acronim_ex in tip_list else 0
+        idx_tip = tip_list.index(st.session_state[key_tip]) \
+                  if st.session_state[key_tip] in tip_list else 0
         tip_ales = st.selectbox(
             "🔖 ACRONIM TIP PROPRIETATE",
             options=tip_list,
             index=idx_tip,
-            key=f"pi_tip_{cod_introdus}",
+            key=key_tip,
         )
-
     tip_info = tip_prop_map.get(tip_ales, {"denumire": "", "ani": 0}) if tip_ales else {"denumire": "", "ani": 0}
     den_auto = tip_info["denumire"]
-    ani_nom  = tip_info["ani"]
+    ani_auto = tip_info["ani"]
 
     with col_den:
         st.text_input(
@@ -86,57 +119,64 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
             key=f"pi_cod_{cod_introdus}",
         )
 
+    # ── R2: TITLUL PROPRIETATII (100%) ─────────────────────────────────
     titlu = st.text_input(
         "TITLUL PROPRIETATII",
         value=date_existente.get("titlul_proprietatii", "") or "",
         key=f"pi_titlu_{cod_introdus}",
     )
 
-    col_r3a, col_r3b, col_r3c, col_r3d = st.columns([25, 25, 25, 25])
-    with col_r3a:
+    # ── R3: DATA DEPOZIT(25%) | NR.PUBLICARE(25%) | DATA ACORDARE(25%) | NR.ACORDARE(25%) ──
+    col_d1, col_n1, col_d2, col_n2 = st.columns([25, 25, 25, 25])
+    with col_d1:
         data_depozit = st.date_input(
             "📅 DATA DEPOZIT CERERE",
             value=to_date(date_existente.get("data_depozit_cerere")),
             format="YYYY-MM-DD",
             key=f"pi_data_dep_{cod_introdus}",
         )
-    with col_r3b:
+    with col_n1:
         nr_publicare = st.text_input(
             "NR.PUBLICARE CERERE",
             value=str(date_existente.get("numar_publicare_cerere") or ""),
             key=f"pi_nr_pub_{cod_introdus}",
         )
-    with col_r3c:
+    with col_d2:
         data_acordare = st.date_input(
             "📅 DATA OFICIALA DE ACORDARE",
             value=to_date(date_existente.get("data_oficiala_de_acordare")),
             format="YYYY-MM-DD",
             key=f"pi_data_ac_{cod_introdus}",
         )
-    with col_r3d:
+    with col_n2:
         nr_acordare = st.text_input(
             "NR.OFICIAL DE ACORDARE",
             value=str(date_existente.get("numar_oficial_acordare") or ""),
             key=f"pi_nr_ac_{cod_introdus}",
         )
 
-    col_r4a, col_r4b, col_r4c, col_r4d = st.columns([25, 25, 25, 25])
-    with col_r4a:
+    # ── R4: DATA INCEPUT VAL(25%) | DURATA(25%) | DATA SFARSIT VAL(25%) | ID SURSA(25%) ──
+    col_iv, col_dur, col_sv, col_sursa = st.columns([25, 25, 25, 25])
+    with col_iv:
         data_inceput_val = st.date_input(
             "📅 DATA INCEPUT VALABILITATE",
             value=to_date(date_existente.get("data_inceput_valabilitate")),
             format="YYYY-MM-DD",
             key=f"pi_data_iv_{cod_introdus}",
         )
-    with col_r4b:
+    with col_dur:
+        # Prioritate: durata din nomenclator (pe baza acronim selectat)
+        # Fallback: valoarea existenta in BD
+        ani_bd = int(date_existente.get("ani_de_valabilitate") or 0)
+        ani_display = ani_auto if ani_auto > 0 else ani_bd
         st.text_input(
-            "DURATA VALABILITATE (ani)",
-            value=str(ani_nom) if ani_nom else "",
+            "DURATA DE VALABILITATE (ani)",
+            value=str(ani_display) if ani_display else "",
             disabled=True,
             key=f"pi_ani_val_display_{cod_introdus}",
         )
-    with col_r4c:
-        data_sfarsit_val = _add_ani(data_inceput_val, ani_nom)
+    with col_sv:
+        data_sfarsit_val = _add_ani(data_inceput_val, ani_display)
         sf_str = fmt_date(data_sfarsit_val) or ""
         st.text_input(
             "📅 DATA SFARSIT VALABILITATE",
@@ -144,33 +184,35 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
             disabled=True,
             key=f"pi_data_sv_{cod_introdus}",
         )
-    with col_r4d:
+    with col_sursa:
         id_sursa = st.text_input(
             "ID PROIECT SURSA/CONTRACT",
             value=date_existente.get("id_proiect_contract_sursa", "") or "",
             key=f"pi_id_sursa_{cod_introdus}",
         )
 
-    col_r5a, col_r5b, col_r5c = st.columns([33, 33, 34])
-    with col_r5a:
+    # ── R5: DENUMIRE TITULAR(33%) | DENUMIRE SOLICITANT(33%) | LINK ESPACENET(33%) ──
+    col_tit, col_sol, col_link = st.columns([33, 33, 33])
+    with col_tit:
         titular = st.text_input(
             "DENUMIRE TITULAR",
             value=date_existente.get("denumire_titular", "") or "",
             key=f"pi_titular_{cod_introdus}",
         )
-    with col_r5b:
+    with col_sol:
         solicitant = st.text_input(
             "DENUMIRE SOLICITANT",
             value=date_existente.get("denumire_solicitant", "") or "",
             key=f"pi_solicitant_{cod_introdus}",
         )
-    with col_r5c:
+    with col_link:
         link_esp = st.text_input(
             "LINK ESPACENET",
             value=date_existente.get("link_espacenet", "") or "",
             key=f"pi_link_{cod_introdus}",
         )
 
+    # ── R6: TITLU ENGLEZA DIPLOMA (100%) ───────────────────────────────
     titlu_en = st.text_input(
         "TITLU ENGLEZA DIPLOMA",
         value=date_existente.get("titlu_engleza_diploma", "") or "",
@@ -191,7 +233,7 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
         "numar_oficial_acordare":    _str(nr_acordare),
         "data_oficiala_de_acordare": fmt_date(data_acordare),
         "data_inceput_valabilitate": fmt_date(data_inceput_val),
-        "ani_de_valabilitate":       int(ani_nom) if ani_nom else None,
+        "ani_de_valabilitate":       int(ani_display) if ani_display else None,
         "data_sfarsit_valabilitate": sf_str if sf_str else None,
         "id_proiect_contract_sursa": _str(id_sursa),
         "denumire_solicitant":       _str(solicitant),
@@ -201,21 +243,25 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
     }
 
 
+# ── SECTIUNEA 2: DATE SUPLIMENTARE (numai Calea2) ─────────────────────
+
 def render_suplimentare(supabase, cod_introdus, tabela_nume, is_new, date_existente):
     status_doc_list = _get_status_doc_list(supabase)
 
+    # ── Titlu secțiune ─────────────────────────────────────────────────
     st.markdown(
-        "<div style='color:rgba(255,255,255,0.70);font-size:0.88rem;"
-        "font-weight:700;text-transform:uppercase;letter-spacing:0.05em;"
-        "margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.20);"
-        "padding-bottom:4px;'>🔒 Date suplimentare</div>",
+        "<div style='color:rgba(255,255,255,0.70);font-size:0.95rem;font-weight:800;"
+        "text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;"
+        "border-bottom:1px solid rgba(255,255,255,0.20);padding-bottom:6px;'>"
+        "🔒 Date suplimentare</div>",
         unsafe_allow_html=True,
     )
 
+    # ── R1: NR.NOTIF.INTERNA(25%) | DOC.OFICIAL(50%) | STATUS DOC(25%) ──
     col_r1a, col_r1b, col_r1c = st.columns([25, 50, 25])
     with col_r1a:
         nr_notif = st.text_input(
-            "NR.SI DATA NOTIFICARE INTERNA",
+            "NR.SI DATA DE NOTIFICARE INTERNA",
             value=date_existente.get("numar_data_notificare_intern", "") or "",
             key=f"pi_nr_notif_{cod_introdus}",
         )
@@ -226,15 +272,18 @@ def render_suplimentare(supabase, cod_introdus, tabela_nume, is_new, date_existe
             key=f"pi_doc_of_{cod_introdus}",
         )
     with col_r1c:
+        status_val = date_existente.get("status_document", "") or ""
+        opts_status = [""] + status_doc_list
+        idx_status = opts_status.index(status_val) if status_val in opts_status else 0
         status_doc = st.selectbox(
             "🔖 STATUS DOCUMENT",
-            options=[""] + status_doc_list,
-            index=([""] + status_doc_list).index(date_existente.get("status_document", "") or "")
-                  if (date_existente.get("status_document", "") or "") in status_doc_list else 0,
+            options=opts_status,
+            index=idx_status,
             key=f"pi_status_doc_{cod_introdus}",
         )
 
-    col_r2a, col_r2b, col_r2c = st.columns([33, 33, 34])
+    # ── R2: DOMENIU APLICARE(33%) | SPIN OFF(33%) | CONTRACT CESIUNE(33%) ──
+    col_r2a, col_r2b, col_r2c = st.columns([33, 33, 33])
     with col_r2a:
         domeniu_apl = st.text_input(
             "DOMENIU APLICARE",
@@ -254,6 +303,7 @@ def render_suplimentare(supabase, cod_introdus, tabela_nume, is_new, date_existe
             key=f"pi_contract_ces_{cod_introdus}",
         )
 
+    # ── R3: NR.AUTORI TOTAL(25%) | TITLU EPO(75%) ──────────────────────
     col_r3a, col_r3b = st.columns([25, 75])
     with col_r3a:
         nr_autori_total = st.number_input(
@@ -269,6 +319,7 @@ def render_suplimentare(supabase, cod_introdus, tabela_nume, is_new, date_existe
             key=f"pi_titlu_epo_{cod_introdus}",
         )
 
+    # ── R4: NR.AUTORI UPT(25%) | TITLU FISA INVENTIEI(75%) ────────────
     col_r4a, col_r4b = st.columns([25, 75])
     with col_r4a:
         nr_autori_upt = st.number_input(
@@ -284,6 +335,7 @@ def render_suplimentare(supabase, cod_introdus, tabela_nume, is_new, date_existe
             key=f"pi_titlu_fisa_{cod_introdus}",
         )
 
+    # ── R5: COMENTARII DOCUMENT (100%) ─────────────────────────────────
     com_doc = st.text_area(
         "COMENTARII DOCUMENT",
         value=date_existente.get("comentarii_document", "") or "",
@@ -291,6 +343,7 @@ def render_suplimentare(supabase, cod_introdus, tabela_nume, is_new, date_existe
         key=f"pi_com_doc_{cod_introdus}",
     )
 
+    # ── R6: COMENTARII DIVERSE (100%) ──────────────────────────────────
     com_div = st.text_area(
         "COMENTARII DIVERSE",
         value=date_existente.get("comentarii_diverse", "") or "",
