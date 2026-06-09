@@ -122,7 +122,6 @@ def run():
 
     _apply_style()
     render_toggle()
-    render_header()
 
     st.markdown(
         f'<div class="admin-header">'
