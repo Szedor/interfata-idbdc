@@ -1,13 +1,12 @@
 # =========================================================
 # IDBDC/explorator/main.py
-# VERSIUNE: 3.6 - S-a eliminat poarta de Maintenance globală
+# VERSIUNE: 3.7 - Adăugat toggle Dark/Light mode
 # =========================================================
 
 import streamlit as st
 from supabase import Client, create_client
 from config import Config
 
-# Păstrăm importul doar în caz de utilizare viitoare, dar nu îl mai apelăm în run()
 from _maintenance_msg import maintenance_gate as _maintenance_gate_fn
 
 from utils.display_config import ALL_BASE_TABLES, TABLE_LABELS
@@ -38,45 +37,85 @@ def hide_streamlit_chrome():
     )
 
 
-def apply_style_full_blue():
+def _get_theme_c1():
+    return st.session_state.get("dark_mode_c1", True)
+
+
+def apply_style():
+    dark = _get_theme_c1()
+
+    if dark:
+        bg             = ACADEMIC_BLUE
+        text_color     = "#ffffff"
+        title_color    = "#ffffff"
+        input_bg       = "#1a3a5c"
+        input_border   = "rgba(255,255,255,0.30)"
+        btn_bg         = "rgba(255,255,255,0.96)"
+        btn_color      = "#0b1f3a"
+        btn_hover_bg   = "#ffffff"
+        btn_hover_color= "#003366"
+        divider_clr    = "rgba(255,255,255,0.20)"
+    else:
+        bg             = "#F8FBFF"
+        text_color     = "#0b2a52"
+        title_color    = "#0b2a52"
+        input_bg       = "#ffffff"
+        input_border   = "rgba(11,42,82,0.30)"
+        btn_bg         = "rgba(11,42,82,0.10)"
+        btn_color      = "#0b1f3a"
+        btn_hover_bg   = "#0b2a52"
+        btn_hover_color= "#ffffff"
+        divider_clr    = "rgba(11,42,82,0.20)"
+
     st.markdown(
         f"""
         <style>
-          .stApp {{ background: {ACADEMIC_BLUE} !important; }}
+          .stApp {{ background: {bg} !important; }}
           div.block-container {{ padding-top: 1.1rem; padding-bottom: 1.0rem; max-width: 1550px; }}
           .idbdc-header {{ text-align: center; margin-top: 0.2rem; margin-bottom: 0.9rem; }}
-          .idbdc-title-1 {{ font-size: 2.05rem; font-weight: 900; line-height: 1.15; color: #ffffff; margin: 0; }}
-          .idbdc-title-2 {{ font-size: 1.86rem; font-weight: 800; line-height: 1.2; color: rgba(255,255,255,0.95); margin: 0.35rem 0 0 0; }}
-          label, .stMarkdown, .stCaption, .stText {{ color: #ffffff !important; }}
-          [data-testid="stMarkdownContainer"] p {{ color: #ffffff !important; }}
+          .idbdc-title-1 {{ font-size: 2.05rem; font-weight: 900; line-height: 1.15; color: {title_color}; margin: 0; }}
+          .idbdc-title-2 {{ font-size: 1.86rem; font-weight: 800; line-height: 1.2; color: {title_color}; opacity: 0.95; margin: 0.35rem 0 0 0; }}
+          label, .stMarkdown, .stCaption, .stText {{ color: {text_color} !important; }}
+          [data-testid="stMarkdownContainer"] p {{ color: {text_color} !important; }}
           .stTextInput > div > div, .stTextInput > div > div > input,
           .stTextInput input, .stTextInput input:hover, .stTextInput input:focus,
           .stSelectbox > div > div, .stSelectbox [data-baseweb="select"],
           .stMultiSelect > div > div, .stMultiSelect [data-baseweb="select"] > div {{
-            background: #1a3a5c !important; color: #ffffff !important;
-            border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.30) !important;
-            caret-color: #ffffff !important;
+            background: {input_bg} !important; color: {"#ffffff" if dark else "#0b2a52"} !important;
+            border-radius: 10px !important; border: 1px solid {input_border} !important;
+            caret-color: {"#ffffff" if dark else "#0b2a52"} !important;
           }}
           .stButton > button,
           .stDownloadButton > button {{
             border-radius: 10px !important;
             font-weight: 900 !important;
-            background: rgba(255,255,255,0.96) !important;
-            color: #0b1f3a !important;
-            -webkit-text-fill-color: #0b1f3a !important;
-            border: 1px solid rgba(255,255,255,0.55) !important;
+            background: {btn_bg} !important;
+            color: {btn_color} !important;
+            -webkit-text-fill-color: {btn_color} !important;
+            border: 1px solid {"rgba(255,255,255,0.55)" if dark else "rgba(11,42,82,0.35)"} !important;
           }}
           .stButton > button:hover,
           .stDownloadButton > button:hover {{
-            background: #ffffff !important;
-            color: #0b1f3a !important;
-            -webkit-text-fill-color: #0b1f3a !important;
+            background: {btn_hover_bg} !important;
+            color: {btn_hover_color} !important;
+            -webkit-text-fill-color: {btn_hover_color} !important;
           }}
-          h1, h2, h3 {{ color: #ffffff !important; }}
+          h1, h2, h3 {{ color: {title_color} !important; }}
+          hr {{ border-color: {divider_clr} !important; }}
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_toggle():
+    dark = _get_theme_c1()
+    label = "☀️ Light mode" if dark else "🌙 Dark mode"
+    _, col_btn = st.columns([9, 1])
+    with col_btn:
+        if st.button(label, key="toggle_theme_c1"):
+            st.session_state.dark_mode_c1 = not dark
+            st.rerun()
 
 
 def render_header():
@@ -107,17 +146,22 @@ def gate_control():
         return
 
     hide_streamlit_chrome()
+
+    dark = _get_theme_c1()
+    bg = ACADEMIC_BLUE if dark else "#F8FBFF"
+    text_color = "#ffffff" if dark else "#0b2a52"
+
     st.markdown(
         f"""
         <style>
-          .stApp {{ background: {ACADEMIC_BLUE} !important; }}
+          .stApp {{ background: {bg} !important; }}
           div.block-container {{ padding-top: 4.0rem; padding-bottom: 2.0rem; }}
           .gate-box {{
             background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.25);
             border-radius: 18px; padding: 26px 22px 18px 22px;
           }}
-          .gate-title {{ text-align: center; font-size: 1.45rem; font-weight: 900; color: #ffffff; }}
-          .gate-subtitle {{ text-align: center; color: rgba(255,255,255,0.92); font-size: 1.02rem; }}
+          .gate-title {{ text-align: center; font-size: 1.45rem; font-weight: 900; color: {text_color}; }}
+          .gate-subtitle {{ text-align: center; color: {"rgba(255,255,255,0.92)" if dark else "rgba(11,42,82,0.80)"}; font-size: 1.02rem; }}
           .stTextInput input {{ background: rgba(255,255,255,0.96) !important; color: #0b1f3a !important; }}
           .stButton > button {{
             width: 100%;
@@ -237,12 +281,13 @@ def render_raportari(supabase):
 
 def run():
     st.set_page_config(page_title="IDBDC – Explorare", layout="wide")
-    
-    # --- MODIFICARE: Linia de Maintenance globală a fost eliminată chirurgical ---
-    
+
+    if "dark_mode_c1" not in st.session_state:
+        st.session_state.dark_mode_c1 = True
+
     gate_control()
     hide_streamlit_chrome()
-    apply_style_full_blue()
+    apply_style()
 
     try:
         url = Config.SUPABASE_URL
@@ -252,6 +297,8 @@ def run():
         st.stop()
 
     supabase: Client = create_client(url, key)
+
+    render_toggle()
     render_header()
     st.divider()
 
