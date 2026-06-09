@@ -240,8 +240,8 @@ def email_gate(supabase: Client):
             "cadrelor didactice și cercetătorilor UPT.</div>",
             unsafe_allow_html=True,
         )
-        email = st.text_input("Email instituțional (prenume.nume@upt.ro)", value="")
-        if st.button("Autentificare"):
+        email = st.text_input("Autentificare instituțională", value="", placeholder="prenume.nume@upt.ro")
+        if st.button("Autentificare", use_container_width=True):
             e = (email or "").strip().lower()
             if not UPT_EMAIL_REGEX.match(e):
                 st.error("Email invalid. Exemplu: prenume.nume@upt.ro")
