@@ -1,4 +1,3 @@
-```python
 # =========================================================
 # IDBDC/calea2_admin/motor.py
 # v.modul.2.3
@@ -214,44 +213,6 @@ def porneste_motorul(supabase):
             erori = []
 
             baza = rezultate.get("baza") or st.session_state.get(key_baza_ss)
-
-            # ── Autocompletare Proprietate industriala ──────────────────────
-            # Daca suntem pe domeniul Proprietate industriala si baza exista,
-            # recalculam denumire_prop_industr, ani_de_valabilitate si
-            # data_sfarsit_valabilitate din nomenclator, pe baza acronimului
-            # ales de utilizator (stocat automat de Streamlit in session_state).
-            if baza is not None and tip_sel == "PROPRIETATE INDUSTRIALA":
-                from domenii.proprietate_industriala.baza import _get_tip_prop_map
-                from core.helpers import to_date, fmt_date
-                from datetime import date as _date
-
-                acronim_curent = st.session_state.get(
-                    f"pi_tip_{cod_introdus}", baza.get("acronim_prop_industr", "")
-                )
-                if acronim_curent:
-                    tip_map = _get_tip_prop_map(supabase)
-                    tip_info = tip_map.get(acronim_curent, {})
-                    den_auto = tip_info.get("denumire", "") or ""
-                    ani_nom  = int(tip_info.get("ani", 0) or 0)
-
-                    baza = dict(baza)
-                    baza["acronim_prop_industr"]  = acronim_curent
-                    baza["denumire_prop_industr"] = den_auto if den_auto else baza.get("denumire_prop_industr")
-                    baza["ani_de_valabilitate"]   = ani_nom if ani_nom else baza.get("ani_de_valabilitate")
-
-                    # Recalculam data sfarsit valabilitate
-                    data_iv_raw = st.session_state.get(
-                        f"pi_data_iv_{cod_introdus}", baza.get("data_inceput_valabilitate")
-                    )
-                    data_iv = to_date(data_iv_raw) if data_iv_raw else None
-                    if data_iv and ani_nom:
-                        try:
-                            data_sf = _date(data_iv.year + ani_nom, data_iv.month, data_iv.day)
-                            baza["data_sfarsit_valabilitate"] = fmt_date(data_sf)
-                        except (ValueError, TypeError):
-                            pass
-            # ────────────────────────────────────────────────────────────────
-
             if baza:
                 ok, msg = upsert_row(supabase, defn.BASE_TABLE, {**baza, "cod_identificare": cod_introdus})
                 if not ok:
@@ -328,4 +289,3 @@ def porneste_motorul(supabase):
                 st.session_state.pop(k, None)
             st.session_state["admin_msg"] = ("success", "Înregistrarea a fost eliminată.")
             st.rerun()
-```
