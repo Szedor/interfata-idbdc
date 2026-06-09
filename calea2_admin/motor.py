@@ -1,3 +1,4 @@
+```python
 # =========================================================
 # IDBDC/calea2_admin/motor.py
 # v.modul.2.3
@@ -327,3 +328,4 @@ def porneste_motorul(supabase):
                 st.session_state.pop(k, None)
             st.session_state["admin_msg"] = ("success", "Înregistrarea a fost eliminată.")
             st.rerun()
+```
