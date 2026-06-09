@@ -121,7 +121,8 @@ def run():
             st.session_state[key] = val
 
     _apply_style()
-    _render_toggle()
+    render_toggle()
+    render_header()
 
     st.markdown(
         f'<div class="admin-header">'
