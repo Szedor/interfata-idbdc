@@ -120,6 +120,7 @@ def run():
         if key not in st.session_state:
             st.session_state[key] = val
 
+    _apply_style()
     _render_toggle()
 
     st.markdown(
