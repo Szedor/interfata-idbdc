@@ -1,6 +1,6 @@
 # =========================================================
 # IDBDC/domenii/proprietate_industriala/baza.py
-# VERSIUNE: 2.1 - Corectat st.date_input pentru compatibilitate server
+# VERSIUNE: 2.0 - Structură pe rânduri (R1-R6) și calcul automat durată
 # DATA: 2026.06.09
 # =========================================================
 
@@ -18,7 +18,7 @@ def _incarca_nomenclator_pi(_supabase):
 
 def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_existente):
     st.markdown(
-        "<div style='background-color:#0b2a52; padding:8px 15px; border-radius:6px; margin-bottom:15px.'>"
+        "<div style='background-color:#0b2a52; padding:8px 15px; border-radius:6px; margin-bottom:15px;'>"
         "<h3 style='margin:0; color:#ffffff; font-size:1.2rem;'>📋 DATE DE BAZĂ GENERALE</h3>"
         "</div>",
         unsafe_allow_html=True
@@ -53,13 +53,13 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
     with r3_c1:
         val_dep = date_existente.get("data_depozit_cerere")
         dt_dep = datetime.date.fromisoformat(val_dep) if val_dep else None
-        data_depozit = st.date_input("DATA DEPOZIT CERERE", value=dt_dep, key=f"pi_dt_dep_{cod_introdus}")
+        data_depozit = st.date_input("DATA DEPOZIT CERERE", value=dt_dep, key=f"pi_dt_dep_{cod_introdus}", default=None)
     with r3_c2:
         nr_pub = st.text_input("NR. PUBLICARE CERERE", value=date_existente.get("numar_publicare_cerere", "") or "", key=f"pi_nr_pub_{cod_introdus}")
     with r3_c3:
         val_ac = date_existente.get("data_oficiala_de_acordare")
         dt_ac = datetime.date.fromisoformat(val_ac) if val_ac else None
-        data_oficiala = st.date_input("DATA OFICIALA DE ACORDARE", value=dt_ac, key=f"pi_dt_ac_{cod_introdus}")
+        data_oficiala = st.date_input("DATA OFICIALA DE ACORDARE", value=dt_ac, key=f"pi_dt_ac_{cod_introdus}", default=None)
     with r3_c4:
         nr_oficial = st.text_input("NR. OFICIAL DE ACORDARE", value=date_existente.get("numar_oficial_acordare", "") or "", key=f"pi_nr_of_{cod_introdus}")
 
@@ -68,7 +68,7 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
     with r4_c1:
         val_inc = date_existente.get("data_inceput_valabilitate")
         dt_inc = datetime.date.fromisoformat(val_inc) if val_inc else None
-        data_inc = st.date_input("DATA INCEPUT VALABILITATE", value=dt_inc, key=f"pi_dt_inc_{cod_introdus}")
+        data_inc = st.date_input("DATA INCEPUT VALABILITATE", value=dt_inc, key=f"pi_dt_inc_{cod_introdus}", default=None)
     
     with r4_c2:
         durata_ani = int(map_ani.get(acronim, 0))
@@ -78,7 +78,7 @@ def render_generale(supabase, cod_introdus, cat_sel, tabela_nume, is_new, date_e
         if data_inc and durata_ani > 0:
             try:
                 dt_sfarsit = data_inc.replace(year=data_inc.year + durata_ani)
-            except ValueError:
+            except ValueError: # Cazul anilor bisecți
                 dt_sfarsit = data_inc + datetime.timedelta(days=durata_ani*365)
         else:
             dt_sfarsit = None
