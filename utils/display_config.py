@@ -856,5 +856,5 @@ ALL_BASE_TABLES = [
     "base_proiecte_see",
     "base_proiecte_structurale",
     "base_evenimente_stiintifice",
-    "base_prop_intelect",
+    "base_prop_industr",
 ]
