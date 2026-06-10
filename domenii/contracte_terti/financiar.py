@@ -57,5 +57,5 @@ def render(supabase, cod_introdus, is_new, date_existente):
     return [{
         "cod_identificare": cod_introdus,
         "valuta":           row["🔖 VALUTA"],
-        "valoare_contract": float(row["VALOARE CONTRACT"] or 0),
+        "valoare_contract_cep_terti_speciale": float(row["VALOARE CONTRACT"] or 0),
     }]
