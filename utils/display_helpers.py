@@ -1,6 +1,12 @@
 # =========================================================
 # utils/display_helpers.py
-# VERSIUNE: 2.0
+# VERSIUNE: 2.1
+# MODIFICARI v.2.1:
+#   - get_visible_ordered_fields: ordine campuri financiare
+#     specifica per tabela sursa (tabela_baza_ctx) pentru
+#     com_date_financiare — conform mapare oficiala
+#   - Campurile fara valori nu apar in Calea1 (regula generala
+#     deja activa prin filtrul _is_visible)
 # STATUS: ACTUALIZAT - câmpuri compuse DEPARTAMENT și TELEFON
 # DATA: 2026.05.09
 # =========================================================
@@ -87,7 +93,78 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
         rest = [c for c in visible_cols if c not in COL_ORDER_FIN_PN]
         return ordered + rest
     elif table == "com_date_financiare":
-        COL_ORDER_FINANCIAR = [
+        # Ordine specifica per tabela sursa (tabela_baza_ctx) — conform mapare
+        _FIN_ORDER_PER_TABLE = {
+            "base_proiecte_internationale": [
+                "cod_identificare", "valuta",
+                "costuri_totale_proiect",
+                "contributie_totala_finantator",
+                "costuri_totale_upt",
+                "contributie_finantator",
+                "costuri_eligibile_estimate_total",
+                "valoare_grant_solicitat_total",
+                "costuri_eligibile_estimate_upt",
+                "valoare_grant_solicitat_upt",
+            ],
+            "base_proiecte_interreg": [
+                "cod_identificare", "valuta",
+                "costuri_totale_proiect",
+                "buget_upt",
+                "contributie_finantator",
+                "cofinantare_nationala",
+                "cofinantare_upt",
+            ],
+            "base_proiecte_see": [
+                "cod_identificare", "valuta",
+                "costuri_totale_proiect",
+                "buget_upt",
+                "contributie_finantator",
+                "cofinantare_nationala",
+                "cofinantare_upt",
+            ],
+            "base_proiecte_nonue": [
+                "cod_identificare", "valuta",
+                "costuri_totale_proiect",
+                "cheltuieli_eligibile",
+                "contributie_finantator",
+                "cofinantare_upt",
+                "grant_solicitat",
+                "grant_aprobat",
+            ],
+            "base_proiecte_structurale": [
+                "cod_identificare", "valuta",
+                "costuri_totale_proiect",
+                "contributie_totala_finantator",
+                "cheltuieli_eligibile",
+                "cheltuieli_neeligibile",
+                "costuri_totale_upt",
+                "buget_upt",
+                "contributie_finantator",
+                "cofinantare_nationala",
+                "cofinantare_upt",
+            ],
+            "base_proiecte_fdi": [
+                "cod_identificare", "valuta",
+                "suma_solicitata_fdi",
+                "suma_aprobata_mec",
+                "cofinantare_upt_fdi",
+                "total_buget_proiect_fdi",
+            ],
+            "base_contracte_cep": [
+                "cod_identificare", "valuta",
+                "valoare_contract_cep_terti_speciale",
+            ],
+            "base_contracte_terti": [
+                "cod_identificare", "valuta",
+                "valoare_contract_cep_terti_speciale",
+            ],
+            "base_contracte_speciale": [
+                "cod_identificare", "valuta",
+                "valoare_contract_cep_terti_speciale",
+            ],
+        }
+        _ctx = tabela_baza_ctx or ""
+        col_order = _FIN_ORDER_PER_TABLE.get(_ctx, [
             "cod_identificare", "valuta",
             "valoare_contract_cep_terti_speciale",
             "valoare_anuala_contract", "valoare_totala_contract",
@@ -95,9 +172,9 @@ def get_visible_ordered_fields(row: dict, table: str, tabela_baza_ctx: str = Non
             "suma_solicitata_fdi", "cofinantare_upt_fdi",
             "cost_total_proiect", "cost_proiect_upt",
             "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
-        ]
-        ordered = [c for c in COL_ORDER_FINANCIAR if c in visible_cols]
-        rest = [c for c in visible_cols if c not in COL_ORDER_FINANCIAR]
+        ])
+        ordered = [c for c in col_order if c in visible_cols]
+        rest = [c for c in visible_cols if c not in col_order]
         return ordered + rest
     elif (tabela_baza_ctx or table or "") == "base_contracte_terti":
         COL_ORDER_TERTI = [
