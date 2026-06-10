@@ -43,7 +43,6 @@ def upsert_row(supabase, table_name: str, row_data: dict, match_col="cod_identif
             return False, f"Lipsă {match_col}."
 
     if table_name not in TABELE_FARA_AUDIT:
-        st.write(f"DEBUG operator_username: '{st.session_state.get('operator_username')}'")  # ← adaugă această linie
         username = st.session_state.get("operator_username") or "necunoscut"
         payload["modificat_de"] = username
         if not payload.get("creat_de"):
