@@ -1,8 +1,23 @@
 # =========================================================
 # utils/display_rendering.py
-# VERSIUNE: 2.3
-# STATUS: CORECTAT - Spargere automată rânduri pentru enumerări instituții
-# DATA: 2026.06.08
+# VERSIUNE: 2.4
+# STATUS: CORECTAT - ordine câmpuri financiare per tabelă sursă
+#         + filtrare valori 0 în secțiunea Financiar Calea1
+# DATA: 2026.06.10
+# =========================================================
+# MODIFICĂRI VERSIUNEA 2.4:
+#   - render_sectiune_tabel: pentru com_date_financiare,
+#     ordinea câmpurilor se preia din display_helpers
+#     get_visible_ordered_fields() care respectă
+#     _FIN_ORDER_PER_TABLE per tabela_baza_ctx.
+#     Anterior se folosea _COL_ORDER_FINANCIAR generic
+#     care ignora tabela sursă și dădea ordine greșită.
+#   - _is_visible: câmpurile financiare (care conțin
+#     "valoare", "buget", "suma", "cost", "contributie",
+#     "cofinantare", "grant", "costuri", "cheltuieli")
+#     cu valoarea 0 sau 0.0 sunt acum ascunse în Calea1.
+#     Câmpurile nesalvate în Calea2 sunt stocate ca 0.0
+#     în baza de date și nu trebuie afișate.
 # =========================================================
 
 import streamlit as st
@@ -12,7 +27,10 @@ from utils.display_config import (
     CARD_PRIORITY, _TABELE_CONTRACTE, _COLS_EXCLUDE_CONTRACTE,
     COLS_HIDDEN_FISA, TEHNIC_COL_ORDER
 )
-from utils.display_helpers import col_label, fmt_numeric, get_contact_info, is_persoana_contact
+from utils.display_helpers import (
+    col_label, fmt_numeric, get_contact_info, is_persoana_contact,
+    get_visible_ordered_fields,
+)
 from utils.supabase_helpers import safe_select_eq
 
 _COLS_HIDDEN_CAL1 = COLS_HIDDEN_FISA | {
@@ -168,7 +186,6 @@ _COL_ORDER_PER_TABLE = {
     "base_proiecte_fdi":            _COL_ORDER_FDI,
     "base_evenimente_stiintifice":  _COL_ORDER_EV_ST,
     "base_prop_industr":            _COL_ORDER_PI,
-    "base_evenimente_stiintifice":  _COL_ORDER_EV,
     "base_proiecte_pnrr":           _COL_ORDER_PNRR,
     "base_proiecte_pncdi":          _COL_ORDER_PNCDI,
     "base_proiecte_structurale":    _COL_ORDER_STRUCTURALE,
@@ -191,33 +208,8 @@ _COL_ORDER_GENERALE = [
     "natura_eveniment", "format_eveniment", "loc_desfasurare",
     "numar_participanti", "institutii_organizare",
     "acronim_prop_intelect", "nr_cerere", "nr_brevet",
-    "data_acordare", "data_oficiala_acordare", "numar_oficial_acordare",
+    "data_acordare", "data_officiala_acordare", "numar_oficial_acordare",
     "inventatori", "cuvinte_cheie", "descriere",
-]
-
-_COL_ORDER_FINANCIAR = [
-    "cod_identificare", "valuta",
-    "valoare_contract_cep_terti_speciale",
-    "valoare_anuala_contract", "valoare_totala_contract",
-    "cofinantare_anuala_contract", "cofinantare_totala_contract",
-    "suma_solicitata_fdi", "suma_aprobata_mec",
-    "cofinantare_upt_fdi", "total_buget_proiect_fdi",
-    "an_referinta", "valoare_contract_an_referinta",
-    "cofinantare_contract_an_referinta",
-    "valoare_totala_contract", "cofinantare_totala_contract",
-    "cheltuieli_neeligibile", "costuri_totale_upt",
-    "cheltuieli_eligibile", "grant_solicitat", "grant_aprobat",
-    "buget_upt", "cofinantare_nationala", "cofinantare_upt",
-    "costuri_totale_proiect",
-    "contributie_totala_finantator",
-    "costuri_totale_upt",
-    "contributie_finantator",
-    "costuri_eligibile_estimate_total",
-    "valoare_grant_solicitat_total",
-    "costuri_eligibile_estimate_upt",
-    "valoare_grant_solicitat_upt",
-    "cost_total_proiect", "cost_proiect_upt",
-    "contributie_ue_total_proiect", "contributie_ue_proiect_upt",
 ]
 
 _TABELE_PROIECTE = {
@@ -225,6 +217,12 @@ _TABELE_PROIECTE = {
     "base_proiecte_internationale", "base_proiecte_interreg",
     "base_proiecte_noneu", "base_proiecte_see", "base_proiecte_structurale",
 }
+
+# Cuvinte cheie pentru câmpuri financiare — valorile 0 se ascund
+_FINANCIAL_KEYS = (
+    "valoare", "buget", "suma", "cost", "contributie",
+    "cofinantare", "grant", "costuri", "cheltuieli",
+)
 
 
 @st.cache_data(show_spinner=False, ttl=600)
@@ -242,6 +240,34 @@ def _get_domeniu_abreviere(_supabase, cod_domeniu: str) -> str:
     return ""
 
 
+def _is_visible(row: dict, col: str, extra_hidden: set) -> bool:
+    """
+    Determină dacă un câmp trebuie afișat în Calea1.
+    Regulă specială pentru câmpurile financiare:
+    valoarea 0 / 0.0 înseamnă câmp nesalvat → se ascunde.
+    """
+    if col in _COLS_HIDDEN_CAL1:
+        return False
+    if col in extra_hidden:
+        return False
+    val = row.get(col)
+    if val is None:
+        return False
+    if str(val).strip() in ("", "None", "nan"):
+        return False
+
+    # Câmpuri financiare cu valoare 0 → ascunde
+    col_lower = col.lower()
+    if any(k in col_lower for k in _FINANCIAL_KEYS):
+        try:
+            if float(str(val).replace(",", ".").strip()) == 0.0:
+                return False
+        except (ValueError, TypeError):
+            pass
+
+    return True
+
+
 def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
                            tabela_baza_ctx: str = None, supabase=None):
     if not rows:
@@ -254,11 +280,20 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
     all_items = []
     for row in rows:
         if table == "com_aspecte_tehnice":
+            # Ordinea fixă pentru aspecte tehnice
             ordered_keys = [c for c in TEHNIC_COL_ORDER if c in row and _is_visible(row, c, extra_hidden)] + \
                            [c for c in row.keys() if c not in TEHNIC_COL_ORDER and _is_visible(row, c, extra_hidden)]
+
         elif table == "com_date_financiare":
-            ordered_keys = [c for c in _COL_ORDER_FINANCIAR if c in row and _is_visible(row, c, extra_hidden)] + \
-                           [c for c in row.keys() if c not in _COL_ORDER_FINANCIAR and _is_visible(row, c, extra_hidden)]
+            # ── CORECȚIE v2.4 ────────────────────────────────────────────
+            # Preluăm ordinea corectă din display_helpers care respectă
+            # _FIN_ORDER_PER_TABLE per tabela_baza_ctx.
+            # Anterior se folosea _COL_ORDER_FINANCIAR generic → ordine greșită.
+            # get_visible_ordered_fields aplică și filtrul de câmpuri goale,
+            # dar NU filtrul de 0 pentru financiare → aplicăm _is_visible după.
+            all_cols_ordered = get_visible_ordered_fields(row, table, tabela_baza_ctx)
+            ordered_keys = [c for c in all_cols_ordered if _is_visible(row, c, extra_hidden)]
+
         elif is_proiect_ctx:
             _tbl_key = tabela_baza_ctx or table or ""
             _col_order = _COL_ORDER_PER_TABLE.get(_tbl_key, _COL_ORDER_PROIECTE_GENERIC)
@@ -282,11 +317,9 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
                 if abrev:
                     val_str = f"{val_str} — {abrev}"
 
-            # ── [2] Detecție și formatare automată a enumerărilor (1., 2.) în Calea 1 ──
-            # Dacă suntem pe câmpul de instituții organizatoare și avem format de tip "1. ... 2. ..."
+            # Detecție și formatare automată a enumerărilor (1., 2.) în Calea 1
             val_html = _html.escape(val_str)
             if c in ("institutii_organizatoare", "institutii_organizare"):
-                # Înlocuim punctele-virgulă sau spațiile care preced o cifră urmată de punct cu un rând nou (<br>)
                 val_html = _re.sub(r'(?:;\s*|\s+)(?=\d+\.)', '<br>', val_html)
 
             all_items.append((col_label(c, table or tabela_baza_ctx), val_html))
@@ -319,19 +352,6 @@ def render_sectiune_tabel(section_label: str, rows: list, table: str = None,
         f"<table style='width:100%;border-collapse:collapse;margin-bottom:0;'>{rows_html}</table>",
         unsafe_allow_html=True,
     )
-
-
-def _is_visible(row: dict, col: str, extra_hidden: set) -> bool:
-    if col in _COLS_HIDDEN_CAL1:
-        return False
-    if col in extra_hidden:
-        return False
-    val = row.get(col)
-    if val is None:
-        return False
-    if str(val).strip() in ("", "None", "nan"):
-        return False
-    return True
 
 
 def _get_ordered(order_list, row, extra_hidden):
