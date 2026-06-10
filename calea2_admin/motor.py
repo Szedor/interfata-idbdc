@@ -1,14 +1,13 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# v.modul.2.3
-# STATUS: ACTUALIZAT - Evenimente stiintifice si Proprietate
-#         industriala adaugate; categorii aliniate cu com_operatori
+# v.modul.2.4
+# STATUS: ACTUALIZAT - Afisare coloane audit pentru ADMIN
 # =========================================================
-# MODIFICARI v.2.3:
-#   - Adaugat domeniu ("Proprietate industriala", "PROPRIETATE INDUSTRIALA")
-#   - Categoria "Evenimente" redenumita in "Evenimente stiintifice"
-#     pentru a corespunde exact cu filtru_categorie din com_operatori
-#   - Import modul proprietate_industriala
+# MODIFICARI v.2.4:
+#   - In tab-ul "Date de baza", ADMIN vede cele 4 coloane
+#     de audit: creat_de, creat_la, modificat_de, modificat_la
+#   - Afisare doar vizuala (read-only), sub formularul principal
+#   - Vizibil exclusiv pentru operatorii cu rol ADMIN
 # =========================================================
 
 import sys
@@ -186,6 +185,51 @@ def porneste_motorul(supabase):
         if r:
             st.session_state[key_baza_ss] = r
         rezultate["baza"] = r
+
+        # ── Coloane audit — vizibile doar pentru ADMIN ────────────────
+        if is_admin and not is_new and date_baza_ex:
+            creat_de      = date_baza_ex.get("creat_de") or "—"
+            creat_la      = date_baza_ex.get("creat_la") or "—"
+            modificat_de  = date_baza_ex.get("modificat_de") or "—"
+            modificat_la  = date_baza_ex.get("modificat_la") or "—"
+            st.markdown(
+                f"""
+                <div style='margin-top:14px;background:rgba(255,255,255,0.06);
+                border:1px solid rgba(255,255,255,0.18);border-radius:10px;
+                padding:10px 16px;'>
+                <div style='color:rgba(255,255,255,0.50);font-size:0.74rem;font-weight:800;
+                text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;'>
+                🔐 Audit (vizibil doar ADMIN)</div>
+                <table style='width:100%;border-collapse:collapse;'>
+                <tr>
+                <td style='width:25%;color:rgba(255,255,255,0.50);font-size:0.76rem;
+                font-weight:700;text-transform:uppercase;padding:3px 12px 3px 0;'>
+                Creat de</td>
+                <td style='color:#ffffff;font-size:0.92rem;font-weight:700;padding:3px 0;'>
+                {creat_de}</td>
+                <td style='width:25%;color:rgba(255,255,255,0.50);font-size:0.76rem;
+                font-weight:700;text-transform:uppercase;padding:3px 12px 3px 24px;'>
+                Creat la</td>
+                <td style='color:#ffffff;font-size:0.92rem;font-weight:700;padding:3px 0;'>
+                {creat_la}</td>
+                </tr>
+                <tr>
+                <td style='color:rgba(255,255,255,0.50);font-size:0.76rem;
+                font-weight:700;text-transform:uppercase;padding:3px 12px 3px 0;'>
+                Modificat de</td>
+                <td style='color:#ffffff;font-size:0.92rem;font-weight:700;padding:3px 0;'>
+                {modificat_de}</td>
+                <td style='color:rgba(255,255,255,0.50);font-size:0.76rem;
+                font-weight:700;text-transform:uppercase;padding:3px 12px 3px 24px;'>
+                Modificat la</td>
+                <td style='color:#ffffff;font-size:0.92rem;font-weight:700;padding:3px 0;'>
+                {modificat_la}</td>
+                </tr>
+                </table>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     elif tab_activ == "🔒 Date suplimentare" and hasattr(modul, "render_date_suplimentare"):
         r = modul.render_date_suplimentare(supabase, cod_introdus, is_new, date_baza_ex)
