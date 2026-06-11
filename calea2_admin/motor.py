@@ -1,7 +1,13 @@
 # =========================================================
 # IDBDC/calea2_admin/motor.py
-# v.modul.2.4
-# STATUS: ACTUALIZAT - Afisare coloane audit pentru ADMIN
+# v.modul.2.5
+# STATUS: ACTUALIZAT - adăugată categoria RESURSE UMANE
+# =========================================================
+# MODIFICARI v.2.5:
+#   - Categoria "Resurse umane" / "RESURSE UMANE" adăugată
+#     în _DOMENII cu redirecționare către motorul dedicat
+#     motor_resurse_umane.porneste_motorul_ru().
+#   - Restul motorului neatins.
 # =========================================================
 # MODIFICARI v.2.4:
 #   - In tab-ul "Date de baza", ADMIN vede cele 4 coloane
@@ -31,6 +37,7 @@ from domenii.proiecte_pncdi import admin as pncdi, definitie as pncdi_def
 from domenii.proiecte_pnrr import admin as pnrr, definitie as pnrr_def
 from domenii.evenimente_stiintifice import admin as ev_st, definitie as ev_st_def
 from domenii.proprietate_industriala import admin as prop_ind, definitie as prop_ind_def
+from calea2_admin.motor_resurse_umane import porneste_motorul_ru
 
 _DOMENII = {
     ("Contracte",                "CEP"):                    (cep,      cep_def),
@@ -46,6 +53,8 @@ _DOMENII = {
     ("Proiecte",                 "PNRR"):                   (pnrr,     pnrr_def),
     ("Evenimente stiintifice",   "EVENIMENTE STIINTIFICE"): (ev_st,    ev_st_def),
     ("Proprietate industriala",  "PROPRIETATE INDUSTRIALA"): (prop_ind, prop_ind_def),
+    # ── Resurse umane — motor dedicat ─────────────────────────────────
+    ("Resurse umane",            "RESURSE UMANE"):          None,
 }
 
 _TAB_CSS = """
@@ -103,6 +112,11 @@ def porneste_motorul(supabase):
 
     if tip_sel == "- Alege -":
         st.info("Selectați tipul din meniul lateral.")
+        return
+
+    # ── Redirecționare către motorul dedicat Resurse Umane ─────────────
+    if cat_sel == "Resurse umane" and tip_sel == "RESURSE UMANE":
+        porneste_motorul_ru(supabase)
         return
 
     entry = _DOMENII.get((cat_sel, tip_sel))
