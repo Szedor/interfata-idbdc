@@ -215,7 +215,7 @@ _COL_ORDER_GENERALE = [
 _TABELE_PROIECTE = {
     "base_proiecte_fdi", "base_proiecte_pncdi", "base_proiecte_pnrr",
     "base_proiecte_internationale", "base_proiecte_interreg",
-    "base_proiecte_noneu", "base_proiecte_see", "base_proiecte_structurale",
+    "base_proiecte_nonue", "base_proiecte_see", "base_proiecte_structurale",
 }
 
 # Cuvinte cheie pentru câmpuri financiare — valorile 0 se ascund
