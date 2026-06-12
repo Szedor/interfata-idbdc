@@ -26,6 +26,11 @@ st.markdown(
         [data-testid="stDecoration"] { display: none !important; }
         [data-testid="stStatusWidget"] { display: none !important; }
         [data-testid="manage-app-button"] { display: none !important; }
+        div[class*="manage"] { display: none !important; }
+        button[kind="managedApp"] { display: none !important; }
+        .stAppDeployButton { display: none !important; }
+        iframe[title="streamlit_app"] ~ div { display: none !important; }
+        [data-testid="stActionButtonIcon"] { display: none !important; }
         div[class*="viewerBadge"] { display: none !important; }
         ._profilePreview_gzau3_63 { display: none !important; }
         .viewerBadge_container__r5tak { display: none !important; }
