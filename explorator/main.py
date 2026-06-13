@@ -1,6 +1,15 @@
 # =========================================================
 # IDBDC/explorator/main.py
-# VERSIUNE: 3.7 - Adăugat toggle Dark/Light mode
+# VERSIUNE: 3.9
+# STATUS: ACTUALIZAT - parole Tab2 (exp2026) si Tab3 (rap2026)
+# DATA: 2026.06.13
+# =========================================================
+# MODIFICĂRI VERSIUNEA 3.9:
+#   - Tab2 protejat cu parolă din Secrets (PASSWORD_TAB2)
+#   - Tab3 protejat cu parolă din Secrets (PASSWORD_TAB3)
+#   - Autentificare per sesiune: odată introdusă parola corectă,
+#     tab-ul rămâne deblocat până la închiderea sesiunii
+#   - Restul neatins față de versiunea 3.8
 # =========================================================
 
 import streamlit as st
@@ -16,6 +25,7 @@ from utils.fisa_completa_orchestrator import render_fisa_completa as render_fisa
 from explorator.fise.contracte_cep import run as run_fisa_cep
 from explorator.fise.contracte_terti import run as run_fisa_terti
 from explorator.fise.contracte_speciale import run as run_fisa_speciale
+from explorator.explorare_avansata import render_tab2_explorare_avansata
 
 ACADEMIC_BLUE = "#0b2a52"
 TITLE_LINE_1 = "🔎 BAZE DE DATE  -  Interogare | Cautare | Consultare avansata"
@@ -269,14 +279,49 @@ def render_fisa_completa(supabase: Client):
         render_fisa_generica(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
 
-def render_explorare_criteriu(supabase):
-    st.markdown("## 🔎 Explorare universală")
-    st.info("Această secțiune este în curs de dezvoltare.", icon="ℹ️")
+def _gate_tab(key_session: str, secret_key: str, titlu: str,
+              descriere: str, render_fn):
+    """
+    Afișează un câmp de parolă în fața unui tab.
+    Odată introdusă corect, tab-ul rămâne deblocat pe toată sesiunea.
+    Parola se citește din Streamlit Secrets (secret_key).
+    """
+    if st.session_state.get(key_session, False):
+        render_fn()
+        return
 
+    parola_corecta = st.secrets.get(secret_key, "")
 
-def render_raportari(supabase):
-    st.markdown("## 📊 Raportări")
-    st.info("Această secțiune este în curs de dezvoltare.", icon="ℹ️")
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);"
+        f"border-radius:14px;padding:28px 28px 24px 28px;max-width:480px;margin:0 auto;'>"
+        f"<div style='text-align:center;font-size:1.8rem;margin-bottom:12px;'>🔐</div>"
+        f"<div style='color:#ffffff;font-weight:800;font-size:1.05rem;text-align:center;"
+        f"margin-bottom:8px;'>{titlu}</div>"
+        f"<div style='color:rgba(255,255,255,0.70);font-size:0.92rem;text-align:center;"
+        f"margin-bottom:18px;'>{descriere}</div>",
+        unsafe_allow_html=True,
+    )
+
+    col_inp, col_btn = st.columns([3, 1])
+    with col_inp:
+        pwd = st.text_input(
+            "Parolă",
+            type="password",
+            key=f"pwd_input_{key_session}",
+            label_visibility="collapsed",
+            placeholder="Introduceți parola de acces",
+        )
+    with col_btn:
+        if st.button("▶ Acces", key=f"pwd_btn_{key_session}", use_container_width=True):
+            if pwd and pwd == parola_corecta:
+                st.session_state[key_session] = True
+                st.rerun()
+            else:
+                st.error("Parolă incorectă.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def run():
@@ -304,16 +349,30 @@ def run():
 
     tab1, tab2, tab3 = st.tabs([
         "📄 Fișa completă (după cod)",
-        "🔎 Explorare universală",
+        "🔎 Explorare avansată",
         "📊 Raportări",
     ])
 
     with tab1:
         render_fisa_completa(supabase)
+
     with tab2:
-        render_explorare_criteriu(supabase)
+        _gate_tab(
+            key_session  = "tab2_deblocat",
+            secret_key   = "PASSWORD_TAB2",
+            titlu        = "🔎 Explorare avansată",
+            descriere    = "Această secțiune este disponibilă în prezent exclusiv operatorilor autorizați.",
+            render_fn    = lambda: render_tab2_explorare_avansata(supabase),
+        )
+
     with tab3:
-        render_raportari(supabase)
+        _gate_tab(
+            key_session  = "tab3_deblocat",
+            secret_key   = "PASSWORD_TAB3",
+            titlu        = "📊 Raportări",
+            descriere    = "Această secțiune este disponibilă în prezent exclusiv operatorilor autorizați.",
+            render_fn    = lambda: st.info("Secțiunea Raportări — în pregătire.", icon="📊"),
+        )
 
 
 if __name__ == "__main__":
