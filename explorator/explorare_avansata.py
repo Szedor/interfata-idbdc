@@ -696,7 +696,7 @@ def render_tab2_explorare_avansata(supabase: Client):
             st.info(
                 f"Au fost identificate {total_rows} rezultate. "
                 f"Se afișează primele {limita_int}. "
-                f"Selectați „Toate" sau rafinați criteriile."
+                f"Selectați 'Toate' sau rafinați criteriile."
             )
         shown_df = display_df.head(limita_int).copy()
     else:
