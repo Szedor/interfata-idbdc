@@ -1,22 +1,20 @@
 # =========================================================
 # IDBDC/explorator/explorare_avansata.py
-# VERSIUNE: 3.0
-# STATUS: RESCRIS - 5 criterii corecte, Sursa de finantare ca pivot
+# VERSIUNE: 4.0
+# STATUS: ACTUALIZAT
 # DATA: 2026.06.13
 # =========================================================
-# MODIFICĂRI VERSIUNEA 3.0:
-#   - Criteriul 2 corectat: "Sursa de finantare" înlocuiește
-#     "Titlu / denumire / obiect" (care era redundant cu Tab1)
-#   - 5 criterii: Categorie, Sursa finantare, Perioada,
-#     Entitati implicate, Status
-#   - Afișare implicită 250 rezultate cu selector 100/250/500/Toate
-#   - Tabel de rezultate cu coloane comune tuturor categoriilor
-#   - Export CSV și Excel
+# MODIFICĂRI VERSIUNEA 4.0:
+#   - [1] Eliminat "Contracte SPECIALE" din lista Categoria principală
+#   - [2] Click pe COD IDENTIFICARE din tabel → deschide fișa completă
+#   - [3] Adăugate funcții export PDF și Print (identic Tab1)
+#   - [4] UI autorizare acces identic cu gate_control din main.py
 # =========================================================
 
 import io
+import html as _html
 from datetime import date, datetime
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -29,63 +27,59 @@ from supabase import Client
 
 TABLE_CONFIG = {
     "base_contracte_cep": {
-        "label":      "📄 Contracte CEP",
-        "categorie":  "Contracte",
+        "label":        "📄 Contracte CEP",
+        "categorie":    "Contracte",
         "subcategorie": "CEP",
     },
     "base_contracte_terti": {
-        "label":      "📄 Contracte TERȚI",
-        "categorie":  "Contracte",
+        "label":        "📄 Contracte TERȚI",
+        "categorie":    "Contracte",
         "subcategorie": "TERȚI",
     },
-    "base_contracte_speciale": {
-        "label":      "📄 Contracte SPECIALE",
-        "categorie":  "Contracte",
-        "subcategorie": "SPECIALE",
-    },
+    # base_contracte_speciale exclus din lista de căutare [1]
     "base_proiecte_fdi": {
-        "label":      "🔬 Proiecte FDI",
-        "categorie":  "Proiecte",
+        "label":        "🔬 Proiecte FDI",
+        "categorie":    "Proiecte",
         "subcategorie": "FDI",
     },
     "base_proiecte_pncdi": {
-        "label":      "🔬 Proiecte PNCDI",
-        "categorie":  "Proiecte",
+        "label":        "🔬 Proiecte PNCDI",
+        "categorie":    "Proiecte",
         "subcategorie": "PNCDI",
     },
     "base_proiecte_pnrr": {
-        "label":      "🔬 Proiecte PNRR",
-        "categorie":  "Proiecte",
+        "label":        "🔬 Proiecte PNRR",
+        "categorie":    "Proiecte",
         "subcategorie": "PNRR",
     },
     "base_proiecte_internationale": {
-        "label":      "🌍 Proiecte Internaționale",
-        "categorie":  "Proiecte",
+        "label":        "🌍 Proiecte Internaționale",
+        "categorie":    "Proiecte",
         "subcategorie": "Internaționale",
     },
     "base_proiecte_interreg": {
-        "label":      "🌍 Proiecte INTERREG",
-        "categorie":  "Proiecte",
+        "label":        "🌍 Proiecte INTERREG",
+        "categorie":    "Proiecte",
         "subcategorie": "INTERREG",
     },
     "base_proiecte_nonue": {
-        "label":      "🌍 Proiecte NON-EU",
-        "categorie":  "Proiecte",
+        "label":        "🌍 Proiecte NON-EU",
+        "categorie":    "Proiecte",
         "subcategorie": "NON-EU",
     },
     "base_proiecte_see": {
-        "label":      "🌍 Proiecte SEE",
-        "categorie":  "Proiecte",
+        "label":        "🌍 Proiecte SEE",
+        "categorie":    "Proiecte",
         "subcategorie": "SEE",
     },
     "base_evenimente_stiintifice": {
-        "label":      "🎓 Evenimente Științifice",
-        "categorie":  "Evenimente",
+        "label":        "🎓 Evenimente Științifice",
+        "categorie":    "Evenimente",
         "subcategorie": "Științifice",
     },
     "base_prop_industr": {
-        "label":      "💡 Proprietate Industrială",
-        "categorie":  "Proprietate Industrială",
+        "label":        "💡 Proprietate Industrială",
+        "categorie":    "Proprietate Industrială",
         "subcategorie": "PI",
     },
 }
@@ -170,6 +164,9 @@ VALUE_FIELDS = [
     "grant_aprobat",
 ]
 
+# Tabele care folosesc tabel financiar PN
+_TABELE_FIN_PN = {"base_proiecte_pncdi", "base_proiecte_pnrr"}
+
 
 # =========================================================
 # FUNCȚII AJUTĂTOARE
@@ -207,7 +204,6 @@ def _to_float(v: Any):
     s = _safe_text(v).replace(" ", "")
     if not s:
         return None
-    # normalizare separator
     if "," in s and "." in s:
         s = s.replace(".", "").replace(",", ".") if s.rfind(",") > s.rfind(".") else s.replace(",", "")
     elif "," in s:
@@ -249,13 +245,14 @@ def _rows_to_df(rows: list, table_name: str) -> pd.DataFrame:
         return pd.DataFrame()
     df = pd.DataFrame(rows).copy()
     cfg = TABLE_CONFIG.get(table_name, {})
-    df["_sursa"]      = cfg.get("label", table_name)
-    df["_categorie"]  = cfg.get("categorie", "")
+    df["_sursa"]        = cfg.get("label", table_name)
+    df["_categorie"]    = cfg.get("categorie", "")
     df["_subcategorie"] = cfg.get("subcategorie", "")
-    df["_titlu"]      = df.apply(lambda r: _first_nonempty(r, TITLE_FIELDS), axis=1)
-    df["_status"]     = df.apply(lambda r: _first_nonempty(r, STATUS_FIELDS), axis=1)
+    df["_titlu"]        = df.apply(lambda r: _first_nonempty(r, TITLE_FIELDS), axis=1)
+    df["_status"]       = df.apply(lambda r: _first_nonempty(r, STATUS_FIELDS), axis=1)
+    df["_table_name"]   = table_name  # păstrat pentru deschiderea fisei [2]
 
-    # Valoare numerică (primul câmp nevid din VALUE_FIELDS)
+    # Valoare numerică
     val_list = []
     for _, r in df.iterrows():
         v = None
@@ -273,7 +270,7 @@ def _rows_to_df(rows: list, table_name: str) -> pd.DataFrame:
         if dcol in df.columns:
             df[dcol] = df[dcol].apply(_try_parse_date)
 
-    # An referință — extras din data_inceput dacă nu există explicit
+    # An referință
     if "an_referinta" in df.columns:
         df["_an"] = df["an_referinta"].apply(
             lambda x: int(float(x)) if _to_float(x) is not None else None
@@ -318,24 +315,21 @@ def _apply_filters(
         return df
     out = df.copy()
 
-    # Criteriul 1 — Categoria principală
     if categorii_selectate:
         out = out[out["_sursa"].isin(categorii_selectate)]
 
-    # Criteriul 2 — Sursa de finanțare (pivot)
     if sursa_text.strip():
         needle = sursa_text.strip().lower()
         out = out[out.apply(
             lambda r: _contains_in_fields(r, needle, SURSA_FIELDS), axis=1
         )]
 
-    # Criteriul 3 — Perioadă / interval
     if an_de_la is not None and "_an" in out.columns:
         out = out[out["_an"].fillna(-999999) >= int(an_de_la)]
     if an_pana_la is not None and "_an" in out.columns:
         out = out[out["_an"].fillna(999999) <= int(an_pana_la)]
 
-    if (data_de_la or data_pana_la):
+    if data_de_la or data_pana_la:
         existing = [c for c in DATE_FIELDS if c in out.columns]
         if existing:
             def _date_ok(row):
@@ -351,14 +345,12 @@ def _apply_filters(
                 return False
             out = out[out.apply(_date_ok, axis=1)]
 
-    # Criteriul 4 — Entități implicate
     if entitate_text.strip():
         needle = entitate_text.strip().lower()
         out = out[out.apply(
             lambda r: _contains_in_fields(r, needle, ENTITATE_FIELDS), axis=1
         )]
 
-    # Criteriul 5 — Status
     if status_text.strip():
         needle = status_text.strip().lower()
         out = out[out["_status"].fillna("").str.lower().str.contains(needle, na=False)]
@@ -377,17 +369,16 @@ def _prepare_display_df(df: pd.DataFrame) -> pd.DataFrame:
     cols_display = []
     rename_map = {}
 
-    # Codul identificare
     if "cod_identificare" in df.columns:
         cols_display.append("cod_identificare")
         rename_map["cod_identificare"] = "COD IDENTIFICARE"
 
     cols_display += ["_sursa", "_titlu", "_status", "_an"]
     rename_map.update({
-        "_sursa":    "SURSĂ / CATEGORIE",
-        "_titlu":    "TITLU / DENUMIRE / OBIECT",
-        "_status":   "STATUS",
-        "_an":       "AN",
+        "_sursa":  "SURSĂ / CATEGORIE",
+        "_titlu":  "TITLU / DENUMIRE / OBIECT",
+        "_status": "STATUS",
+        "_an":     "AN",
     })
 
     if "data_inceput" in df.columns:
@@ -403,14 +394,12 @@ def _prepare_display_df(df: pd.DataFrame) -> pd.DataFrame:
     final = [c for c in cols_display if c in df.columns]
     disp = df[final].copy()
 
-    # Formatare date
     for c in disp.columns:
         if pd.api.types.is_datetime64_any_dtype(disp[c]):
             disp[c] = disp[c].apply(
                 lambda x: x.strftime("%d.%m.%Y") if pd.notna(x) else ""
             )
 
-    # Formatare cod_identificare — fără zecimale
     if "cod_identificare" in disp.columns:
         def _fmt_cod(v):
             s = _safe_text(v)
@@ -420,7 +409,6 @@ def _prepare_display_df(df: pd.DataFrame) -> pd.DataFrame:
             return s
         disp["cod_identificare"] = disp["cod_identificare"].apply(_fmt_cod)
 
-    # An fără zecimale
     if "_an" in disp.columns:
         disp["_an"] = disp["_an"].apply(
             lambda x: str(int(x)) if pd.notna(x) and x is not None else ""
@@ -439,10 +427,150 @@ def _export_excel_bytes(df: pd.DataFrame) -> bytes:
 
 
 # =========================================================
+# FIȘA COMPLETĂ — deschisă din tabel [2]
+# =========================================================
+
+def _render_fisa_din_explorare(supabase: Client, cod: str, tabela: str):
+    """
+    Afișează fișa completă a unui cod selectat din tabelul de rezultate.
+    Folosește același sistem ca Tab1.
+    """
+    from utils.display_config import TABLE_LABELS
+    from utils.fisa_completa_orchestrator import render_fisa_completa as render_fisa_generica
+    from explorator.fise.contracte_cep import run as run_fisa_cep
+    from explorator.fise.contracte_terti import run as run_fisa_terti
+    from explorator.fise.proiecte_fdi import run as run_fisa_fdi
+
+    st.divider()
+    titlu_fisa = TABLE_LABELS.get(tabela, "Fișă")
+    titlu_fisa_curat = titlu_fisa.split(" ", 1)[-1] if " " in titlu_fisa else titlu_fisa
+
+    col_back, col_titlu = st.columns([1, 8])
+    with col_back:
+        if st.button("← Înapoi la rezultate", key="tab2_back_btn"):
+            st.session_state.pop("tab2_fisa_cod", None)
+            st.session_state.pop("tab2_fisa_tabela", None)
+            st.rerun()
+
+    st.markdown(
+        f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
+        f"letter-spacing:0.03em;margin-bottom:1rem;'>"
+        f"INFORMAȚII {titlu_fisa_curat.upper()} — COD: {_html.escape(str(cod))}</div>",
+        unsafe_allow_html=True,
+    )
+
+    if tabela == "base_contracte_cep":
+        run_fisa_cep(supabase, cod, tabela, "CEP")
+    elif tabela == "base_contracte_terti":
+        run_fisa_terti(supabase, cod, tabela, "TERȚI")
+    elif tabela == "base_proiecte_fdi":
+        run_fisa_fdi(supabase, cod, tabela, "FDI")
+    else:
+        render_fisa_generica(supabase, cod, tabela, titlu_fisa_curat)
+
+
+# =========================================================
+# EXPORT PDF ȘI PRINT — identic Tab1 [3]
+# =========================================================
+
+def _render_export_fisa(supabase: Client, cod: str, tabela: str):
+    """
+    Butoane Export CSV, Excel, PDF și Print pentru fișa deschisă din explorare.
+    """
+    from utils.export_common import build_horizontal_export_data, build_vertical_export_data
+    from utils.export_csv_excel import build_csv_bytes, build_excel_bytes
+    from utils.export_pdf import generate_pdf_vertical
+    from utils.export_print import generate_print_html_vertical
+    from utils.display_config import TABLE_LABELS
+
+    titlu_fisa = TABLE_LABELS.get(tabela, "Fișă")
+    titlu_fisa_curat = titlu_fisa.split(" ", 1)[-1] if " " in titlu_fisa else titlu_fisa
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    e1, e2, e3, e4 = st.columns([1.2, 1.2, 1.2, 1.2])
+
+    with e1:
+        try:
+            exp_h = build_horizontal_export_data(supabase, cod, tabela)
+            csv_bytes = build_csv_bytes(exp_h)
+            st.download_button(
+                "⬇️ Export CSV",
+                data=csv_bytes,
+                file_name=f"fisa_{cod}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="tab2_fisa_csv",
+            )
+        except Exception:
+            st.button("⬇️ Export CSV", disabled=True, use_container_width=True, key="tab2_fisa_csv_d")
+
+    with e2:
+        try:
+            exp_h = build_horizontal_export_data(supabase, cod, tabela)
+            xlsx_bytes = build_excel_bytes(exp_h)
+            st.download_button(
+                "⬇️ Export Excel",
+                data=xlsx_bytes,
+                file_name=f"fisa_{cod}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="tab2_fisa_xlsx",
+            )
+        except Exception:
+            st.button("⬇️ Export Excel", disabled=True, use_container_width=True, key="tab2_fisa_xlsx_d")
+
+    with e3:
+        try:
+            pdf_bytes, _ = generate_pdf_vertical(
+                supabase, cod, tabela, titlu_fisa_curat,
+                build_vertical_export_data,
+            )
+            if pdf_bytes:
+                st.download_button(
+                    "⬇️ Export PDF",
+                    data=pdf_bytes,
+                    file_name=f"fisa_{cod}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="tab2_fisa_pdf",
+                )
+            else:
+                st.button("⬇️ Export PDF", disabled=True, use_container_width=True, key="tab2_fisa_pdf_d")
+        except Exception:
+            st.button("⬇️ Export PDF", disabled=True, use_container_width=True, key="tab2_fisa_pdf_d2")
+
+    with e4:
+        try:
+            print_html = generate_print_html_vertical(
+                supabase, cod, tabela, titlu_fisa_curat,
+                build_vertical_export_data,
+            )
+            st.download_button(
+                "🖨️ Print / HTML",
+                data=print_html.encode("utf-8"),
+                file_name=f"fisa_{cod}.html",
+                mime="text/html",
+                use_container_width=True,
+                key="tab2_fisa_print",
+            )
+        except Exception:
+            st.button("🖨️ Print / HTML", disabled=True, use_container_width=True, key="tab2_fisa_print_d")
+
+
+# =========================================================
 # RENDER PRINCIPAL
 # =========================================================
 
 def render_tab2_explorare_avansata(supabase: Client):
+
+    # ── Dacă e deschisă o fișă din tabel, o afișăm [2] ────────────────
+    if "tab2_fisa_cod" in st.session_state and "tab2_fisa_tabela" in st.session_state:
+        cod_fisa    = st.session_state["tab2_fisa_cod"]
+        tabela_fisa = st.session_state["tab2_fisa_tabela"]
+        _render_export_fisa(supabase, cod_fisa, tabela_fisa)
+        _render_fisa_din_explorare(supabase, cod_fisa, tabela_fisa)
+        return
+
     st.markdown("## 🔎 Explorare avansată")
     st.markdown(
         "<div style='color:rgba(255,255,255,0.88);font-size:1.02rem;font-weight:600;"
@@ -578,7 +706,7 @@ def render_tab2_explorare_avansata(supabase: Client):
         for k in [
             "tab2_categorii", "tab2_sursa", "tab2_an_de_la", "tab2_an_pana_la",
             "tab2_data_de_la", "tab2_data_pana_la", "tab2_entitate", "tab2_status",
-            "tab2_results_df",
+            "tab2_results_df", "tab2_results_raw",
         ]:
             st.session_state.pop(k, None)
         st.rerun()
@@ -636,13 +764,16 @@ def render_tab2_explorare_avansata(supabase: Client):
                 entitate_text=entitate_text,
                 status_text=status_text,
             )
-            st.session_state["tab2_results_df"] = df_filtered.copy()
+            # Păstrăm df-ul raw (cu _table_name) pentru a putea deschide fișa [2]
+            st.session_state["tab2_results_raw"] = df_filtered.copy()
+            st.session_state["tab2_results_df"]  = df_filtered.copy()
 
     # ── Afișare rezultate ──────────────────────────────────────────────
     if "tab2_results_df" not in st.session_state:
         return
 
     results_df = st.session_state["tab2_results_df"].copy()
+    results_raw = st.session_state.get("tab2_results_raw", results_df).copy()
 
     if results_df.empty:
         st.info("Nu au fost identificate înregistrări pentru combinația selectată.")
@@ -659,11 +790,10 @@ def render_tab2_explorare_avansata(supabase: Client):
     )
 
     # Selector limită afișare
-    s1, s2, s3 = st.columns([1.4, 1.4, 4.2])
+    s1, s2, _ = st.columns([1.4, 1.4, 4.2])
     with s1:
         optiuni_limita = [100, 250, 500, 1000, "Toate"]
-        # Implicit 250, sau primul din listă mai mare decât total
-        idx_default = 1  # 250
+        idx_default = 1
         if total_rows <= 100:
             idx_default = 0
         limita = st.selectbox(
@@ -682,25 +812,32 @@ def render_tab2_explorare_avansata(supabase: Client):
 
     display_df = _prepare_display_df(results_df)
 
-    # Sortare
     if sortare in display_df.columns:
         try:
             display_df = display_df.sort_values(by=sortare, kind="stable", na_position="last")
         except Exception:
             pass
 
-    # Aplicare limită
     if limita != "Toate":
         limita_int = int(limita)
         if total_rows > limita_int:
             st.info(
                 f"Au fost identificate {total_rows} rezultate. "
                 f"Se afișează primele {limita_int}. "
-                f"Selectați 'Toate' sau rafinați criteriile."
+                f"Selectati 'Toate' sau rafinati criteriile."
             )
         shown_df = display_df.head(limita_int).copy()
+        shown_raw = results_raw.head(limita_int).copy()
     else:
-        shown_df = display_df.copy()
+        shown_df  = display_df.copy()
+        shown_raw = results_raw.copy()
+
+    # ── Tabel cu selector cod pentru deschidere fișă [2] ──────────────
+    if "COD IDENTIFICARE" in shown_df.columns:
+        coduri_disponibile = shown_df["COD IDENTIFICARE"].dropna().unique().tolist()
+        coduri_disponibile = [c for c in coduri_disponibile if str(c).strip()]
+    else:
+        coduri_disponibile = []
 
     st.dataframe(
         shown_df,
@@ -709,7 +846,38 @@ def render_tab2_explorare_avansata(supabase: Client):
         height=520,
     )
 
-    # ── Export ────────────────────────────────────────────────────────
+    # Selector cod → deschide fișă [2]
+    if coduri_disponibile:
+        st.markdown(
+            "<div style='color:rgba(255,255,255,0.70);font-size:0.88rem;font-weight:700;"
+            "margin-top:10px;margin-bottom:4px;'>"
+            "Deschide fișa completă pentru un cod din listă:</div>",
+            unsafe_allow_html=True,
+        )
+        col_sel, col_btn = st.columns([2, 1])
+        with col_sel:
+            cod_ales = st.selectbox(
+                "Cod identificare",
+                options=["— selectați —"] + coduri_disponibile,
+                key="tab2_cod_ales",
+                label_visibility="collapsed",
+            )
+        with col_btn:
+            if st.button("📄 Deschide fișa", key="tab2_open_fisa_btn", use_container_width=True):
+                if cod_ales and cod_ales != "— selectați —":
+                    # Găsim tabela corespunzătoare codului ales
+                    match = shown_raw[
+                        shown_raw["cod_identificare"].astype(str).str.strip() == str(cod_ales).strip()
+                    ]
+                    if not match.empty and "_table_name" in match.columns:
+                        tabela_aleasa = match.iloc[0]["_table_name"]
+                    else:
+                        tabela_aleasa = ""
+                    st.session_state["tab2_fisa_cod"]    = str(cod_ales)
+                    st.session_state["tab2_fisa_tabela"] = tabela_aleasa
+                    st.rerun()
+
+    # ── Export tabel rezultate ─────────────────────────────────────────
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     e1, e2 = st.columns([1.2, 1.2])
     with e1:
