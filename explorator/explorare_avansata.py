@@ -1,14 +1,13 @@
 # =========================================================
 # IDBDC/explorator/explorare_avansata.py
-# VERSIUNE: 6.0
+# VERSIUNE: 7.0
 # STATUS: ACTUALIZAT
 # DATA: 2026.06.13
 # =========================================================
-# MODIFICĂRI VERSIUNEA 6.0:
-#   - Fisa deschisa din tabel afisata direct in Tab2
-#   - Fisa are checkbox-uri sectiuni identic Tab1
-#   - Buton inapoi la rezultate
-#   - Butoane export CSV/Excel/PDF/Print doar la tabelul de rezultate
+# MODIFICĂRI VERSIUNEA 7.0:
+#   - Eliminat complet orice referire la Fisa completa
+#   - Export CSV/Excel/PDF/Print identic ca UI cu Tab1
+#   - Autorizare export cu email @upt.ro identic Tab1
 # =========================================================
 
 import io
@@ -19,9 +18,8 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from supabase import Client
-
-ACADEMIC_BLUE = "#0b2a52"
 
 # =========================================================
 # CONFIGURARE TABELE
@@ -124,8 +122,6 @@ VALUE_FIELDS = [
     "contributie_ue_proiect_upt", "costuri_totale_proiect", "grant_aprobat",
 ]
 
-_TABELE_FIN_PN = {"base_proiecte_pncdi", "base_proiecte_pnrr"}
-
 
 # =========================================================
 # FUNCȚII AJUTĂTOARE
@@ -205,8 +201,6 @@ def _rows_to_df(rows: list, table_name: str) -> pd.DataFrame:
     df = pd.DataFrame(rows).copy()
     cfg = TABLE_CONFIG.get(table_name, {})
     df["_sursa"]        = cfg.get("label", table_name)
-    df["_categorie"]    = cfg.get("categorie", "")
-    df["_subcategorie"] = cfg.get("subcategorie", "")
     df["_titlu"]        = df.apply(lambda r: _first_nonempty(r, TITLE_FIELDS), axis=1)
     df["_status"]       = df.apply(lambda r: _first_nonempty(r, STATUS_FIELDS), axis=1)
     df["_table_name"]   = table_name
@@ -303,7 +297,7 @@ def _apply_filters(df, categorii_selectate, sursa_text,
 
 
 # =========================================================
-# AFIȘARE REZULTATE — tabel
+# PREGĂTIRE TABEL PENTRU AFIȘARE
 # =========================================================
 
 def _fmt_cod(v: Any) -> str:
@@ -362,178 +356,187 @@ def _prepare_display_df(df: pd.DataFrame) -> pd.DataFrame:
     return disp
 
 
-def _export_excel_bytes(df: pd.DataFrame) -> bytes:
-    buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name="Explorare", index=False)
-    buf.seek(0)
-    return buf.getvalue()
-
-
 # =========================================================
-# BUTOANE EXPORT — pentru tabelul de rezultate
+# EXPORT — autorizare identică cu Tab1
 # =========================================================
 
-def _render_butoane_export_tabel(shown_df: pd.DataFrame):
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    e1, e2, e3, e4 = st.columns(4)
+def _render_export_auth_tab2(supabase: Client) -> bool:
+    import re as _re
+    auth_key = "export_auth_tab2"
+    pattern = _re.compile(r"^[a-z]+(?:\.[a-z]+)+@upt\.ro$", _re.IGNORECASE)
 
-    with e1:
-        csv_bytes = shown_df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "⬇️ CSV", data=csv_bytes,
-            file_name="explorare_avansata.csv", mime="text/csv",
-            use_container_width=True, key="tab2_export_csv",
+    if st.session_state.get("auth_ai", False) or st.session_state.get(auth_key, False):
+        nume = st.session_state.get("user_name") or st.session_state.get("user_email", "")
+        st.markdown(
+            f"<div style='background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);"
+            f"border-radius:10px;padding:8px 16px;color:#ffffff;font-weight:700;font-size:0.95rem;"
+            f"margin-bottom:0.5rem;'>✅ Export autorizat — {_html.escape(str(nume))}</div>",
+            unsafe_allow_html=True,
         )
-
-    with e2:
-        xlsx_bytes = _export_excel_bytes(shown_df)
-        st.download_button(
-            "⬇️ Excel", data=xlsx_bytes,
-            file_name="explorare_avansata.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True, key="tab2_export_xlsx",
-        )
-
-    with e3:
-        try:
-            from fpdf import FPDF
-            import matplotlib
-            font_path = os.path.join(
-                os.path.dirname(matplotlib.__file__),
-                "mpl-data", "fonts", "ttf", "DejaVuSans.ttf"
-            )
-            pdf = FPDF()
-            pdf.set_auto_page_break(auto=True, margin=10)
-            pdf.add_page()
-            use_dejavu = os.path.exists(font_path)
-            if use_dejavu:
-                pdf.add_font("DejaVu", fname=font_path)
-                pdf.set_font("DejaVu", size=9)
-            else:
-                pdf.set_font("Helvetica", size=9)
-
-            pdf.set_text_color(11, 42, 82)
-            pdf.cell(0, 8, "IDBDC UPT - Explorare avansata - Rezultate",
-                     new_x="LMARGIN", new_y="NEXT", align="C")
-            pdf.ln(3)
-
-            cols = list(shown_df.columns)
-            col_w = min(35, 190 // max(len(cols), 1))
-            if use_dejavu:
-                pdf.set_font("DejaVu", size=7)
-            else:
-                pdf.set_font("Helvetica", size=7)
-            pdf.set_fill_color(11, 42, 82)
-            pdf.set_text_color(255, 255, 255)
-            for col in cols:
-                pdf.cell(col_w, 6, str(col)[:18], border=1, fill=True)
-            pdf.ln()
-
-            pdf.set_text_color(0, 0, 0)
-            for i, (_, row) in enumerate(shown_df.iterrows()):
-                if i % 2 == 0:
-                    pdf.set_fill_color(247, 249, 252)
-                else:
-                    pdf.set_fill_color(255, 255, 255)
-                for col in cols:
-                    val = str(row.get(col, ""))[:20]
-                    pdf.cell(col_w, 5, val, border=1, fill=True)
-                pdf.ln()
-
-            pdf_bytes = bytes(pdf.output())
-            st.download_button(
-                "⬇️ PDF", data=pdf_bytes,
-                file_name="explorare_avansata.pdf", mime="application/pdf",
-                use_container_width=True, key="tab2_export_pdf",
-            )
-        except Exception:
-            st.button("⬇️ PDF", disabled=True, use_container_width=True, key="tab2_export_pdf_d")
-
-    with e4:
-        try:
-            cols = list(shown_df.columns)
-            rows_html = ""
-            for i, (_, row) in enumerate(shown_df.iterrows()):
-                bg = "#f7f9fc" if i % 2 == 0 else "#ffffff"
-                cells = "".join(
-                    f"<td style='border:1px solid #c0cce0;padding:4px 7px;"
-                    f"font-size:9px;background:{bg};'>"
-                    f"{_html.escape(str(row.get(c, '')))}</td>"
-                    for c in cols
-                )
-                rows_html += f"<tr>{cells}</tr>"
-            hdrs = "".join(
-                f"<th style='border:1px solid #c0cce0;padding:5px 7px;font-size:9px;"
-                f"background:#0b2a52;color:#fff;'>{_html.escape(str(c))}</th>"
-                for c in cols
-            )
-            print_html = (
-                "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
-                "<title>Explorare avansata</title>"
-                "<style>body{font-family:Arial,sans-serif;margin:18px;}"
-                "table{border-collapse:collapse;width:100%;}"
-                ".btn{display:inline-block;margin-bottom:16px;padding:7px 18px;"
-                "background:#0b2a52;color:#fff;border:none;border-radius:6px;"
-                "font-weight:700;cursor:pointer;}"
-                "@media print{.btn{display:none;}}"
-                "</style></head><body>"
-                "<button class='btn' onclick='window.print()'>Tiparire</button>"
-                "<div style='font-size:12px;font-weight:900;color:#0b2a52;margin-bottom:10px;'>"
-                "IDBDC UPT &mdash; Explorare avansata &mdash; Rezultate</div>"
-                f"<table><thead><tr>{hdrs}</tr></thead><tbody>{rows_html}</tbody></table>"
-                "</body></html>"
-            )
-            st.download_button(
-                "🖨️ Print", data=print_html.encode("utf-8"),
-                file_name="explorare_avansata.html", mime="text/html",
-                use_container_width=True, key="tab2_export_print",
-            )
-        except Exception:
-            st.button("🖨️ Print", disabled=True, use_container_width=True, key="tab2_export_print_d")
-
-
-# =========================================================
-# FIȘĂ COMPLETĂ — afișată direct în Tab2
-# =========================================================
-
-def _render_fisa_in_tab2(supabase: Client, cod: str, tabela: str):
-    from utils.display_config import TABLE_LABELS
-    from utils.fisa_completa_orchestrator import render_fisa_completa as render_fisa_generica
-    from utils.export_common import build_horizontal_export_data, build_vertical_export_data
-    from utils.export_csv_excel import build_csv_bytes, build_excel_bytes
-    from utils.export_pdf import generate_pdf_vertical
-    from utils.export_print import generate_print_html_vertical
-    from explorator.fise.contracte_cep import run as run_fisa_cep
-    from explorator.fise.contracte_terti import run as run_fisa_terti
-
-    titlu_fisa = TABLE_LABELS.get(tabela, "Fișă")
-    titlu_fisa_curat = titlu_fisa.split(" ", 1)[-1] if " " in titlu_fisa else titlu_fisa
-
-    # Buton înapoi
-    if st.button("← Înapoi la rezultate", key="tab2_inapoi"):
-        st.session_state.pop("tab2_fisa_cod", None)
-        st.session_state.pop("tab2_fisa_tabela", None)
-        st.rerun()
+        return True
 
     st.markdown(
-        f"<div style='color:#ffffff;font-size:1.35rem;font-weight:900;"
-        f"letter-spacing:0.03em;margin-bottom:0.5rem;'>"
-        f"INFORMAȚII {titlu_fisa_curat.upper()} — COD: {_html.escape(str(cod))}"
-        f"</div>",
+        "<div style='background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.22);"
+        "border-radius:12px;padding:12px 18px;margin-bottom:0.6rem;'>"
+        "<span style='color:#ffffff;font-weight:800;font-size:0.97rem;'>"
+        "🔐 Export disponibil exclusiv pentru cadrele UPT — autentificare cu email instituțional"
+        "</span></div>",
+        unsafe_allow_html=True,
+    )
+    ea1, ea2, _ = st.columns([2.0, 1.0, 3.0])
+    with ea1:
+        email_exp = st.text_input(
+            "Email", value="", key="export_email_tab2",
+            label_visibility="collapsed", placeholder="prenume.nume@upt.ro",
+        ).strip().lower()
+    with ea2:
+        auth_clicked = st.button("✅ Autorizare", key="export_auth_btn_tab2")
+    if auth_clicked:
+        if not pattern.match(email_exp):
+            st.error("Email invalid. Format: prenume.nume@upt.ro")
+        else:
+            try:
+                res = supabase.table("det_resurse_umane") \
+                    .select("nume_prenume,email").eq("email", email_exp).limit(1).execute()
+                if res.data:
+                    user = res.data[0]
+                    st.session_state[auth_key] = True
+                    st.session_state.user_email = email_exp
+                    st.session_state.user_name = (user.get("nume_prenume") or "").strip() or email_exp
+                    st.rerun()
+                else:
+                    st.error("Emailul nu există în baza de date IDBDC.")
+            except Exception as e:
+                st.error(f"Eroare verificare: {e}")
+    return False
+
+
+def _generate_pdf_tabel(df: pd.DataFrame) -> bytes:
+    try:
+        from fpdf import FPDF
+        import matplotlib
+        font_path = os.path.join(
+            os.path.dirname(matplotlib.__file__),
+            "mpl-data", "fonts", "ttf", "DejaVuSans.ttf"
+        )
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=10)
+        pdf.add_page()
+        use_dv = os.path.exists(font_path)
+        if use_dv:
+            pdf.add_font("DejaVu", fname=font_path)
+            pdf.set_font("DejaVu", size=9)
+        else:
+            pdf.set_font("Helvetica", size=9)
+
+        pdf.set_text_color(11, 42, 82)
+        pdf.cell(0, 8, "IDBDC UPT - Explorare avansata - Rezultate",
+                 new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.ln(3)
+
+        cols = list(df.columns)
+        col_w = min(35, 190 // max(len(cols), 1))
+        pdf.set_font("DejaVu" if use_dv else "Helvetica", size=7)
+        pdf.set_fill_color(11, 42, 82)
+        pdf.set_text_color(255, 255, 255)
+        for col in cols:
+            pdf.cell(col_w, 6, str(col)[:18], border=1, fill=True)
+        pdf.ln()
+
+        pdf.set_text_color(0, 0, 0)
+        for i, (_, row) in enumerate(df.iterrows()):
+            pdf.set_fill_color(247, 249, 252) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+            for col in cols:
+                pdf.cell(col_w, 5, str(row.get(col, ""))[:20], border=1, fill=True)
+            pdf.ln()
+
+        return bytes(pdf.output())
+    except Exception:
+        return None
+
+
+def _generate_print_html_tabel(df: pd.DataFrame) -> str:
+    cols = list(df.columns)
+    hdrs = "".join(
+        f"<th style='border:1px solid #c0cce0;padding:5px 7px;font-size:9px;"
+        f"background:#0b2a52;color:#fff;'>{_html.escape(str(c))}</th>"
+        for c in cols
+    )
+    rows_html = ""
+    for i, (_, row) in enumerate(df.iterrows()):
+        bg = "#f7f9fc" if i % 2 == 0 else "#ffffff"
+        cells = "".join(
+            f"<td style='border:1px solid #c0cce0;padding:4px 7px;"
+            f"font-size:9px;background:{bg};'>{_html.escape(str(row.get(c, '')))}</td>"
+            for c in cols
+        )
+        rows_html += f"<tr>{cells}</tr>"
+    return (
+        "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
+        "<title>Explorare avansata</title>"
+        "<style>body{font-family:Arial,sans-serif;margin:18px;}"
+        "table{border-collapse:collapse;width:100%;}"
+        ".btn{display:inline-block;margin-bottom:16px;padding:7px 18px;"
+        "background:#0b2a52;color:#fff;border:none;border-radius:6px;"
+        "font-weight:700;cursor:pointer;}"
+        "@media print{.btn{display:none;}}"
+        "</style></head><body>"
+        "<button class='btn' onclick='window.print()'>Tiparire</button>"
+        "<div style='font-size:12px;font-weight:900;color:#0b2a52;margin-bottom:10px;'>"
+        "IDBDC UPT &mdash; Explorare avansata &mdash; Rezultate</div>"
+        f"<table><thead><tr>{hdrs}</tr></thead><tbody>{rows_html}</tbody></table>"
+        "</body></html>"
+    )
+
+
+def _render_export_tabel(supabase: Client, shown_df: pd.DataFrame):
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.divider()
+    st.markdown(
+        "<div style='color:rgba(255,255,255,0.75);font-size:0.90rem;font-weight:700;"
+        "margin-bottom:6px;'>📤 Export tabel rezultate</div>",
         unsafe_allow_html=True,
     )
 
-    # Afișare fișă cu secțiuni — identic Tab1
-    if tabela == "base_contracte_cep":
-        run_fisa_cep(supabase, cod, tabela, "CEP")
-    elif tabela == "base_contracte_terti":
-        run_fisa_terti(supabase, cod, tabela, "TERȚI")
-    elif tabela == "base_proiecte_fdi":
-        from explorator.fise.proiecte_fdi import run as run_fisa_fdi
-        run_fisa_fdi(supabase, cod, tabela, "FDI")
-    else:
-        render_fisa_generica(supabase, cod, tabela, titlu_fisa_curat)
+    if not _render_export_auth_tab2(supabase):
+        return
+
+    csv_bytes = shown_df.to_csv(index=False).encode("utf-8-sig")
+
+    excel_buf = io.BytesIO()
+    with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
+        shown_df.to_excel(writer, index=False, sheet_name="Explorare avansata")
+    excel_buf.seek(0)
+
+    pdf_bytes = _generate_pdf_tabel(shown_df)
+    print_html = _generate_print_html_tabel(shown_df)
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.download_button(
+            "⬇️ CSV", data=csv_bytes,
+            file_name="explorare_avansata.csv", mime="text/csv",
+            key="tab2_csv",
+        )
+    with col2:
+        st.download_button(
+            "⬇️ Excel", data=excel_buf,
+            file_name="explorare_avansata.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="tab2_xlsx",
+        )
+    with col3:
+        if pdf_bytes:
+            st.download_button(
+                "⬇️ PDF", data=pdf_bytes,
+                file_name="explorare_avansata.pdf", mime="application/pdf",
+                key="tab2_pdf",
+            )
+        else:
+            st.button("⬇️ PDF", disabled=True, help="PDF indisponibil - verificați fontul sistem")
+    with col4:
+        if st.button("🖨️ Print", key="tab2_print"):
+            components.html(print_html, height=700, scrolling=True)
 
 
 # =========================================================
@@ -601,20 +604,8 @@ def _gate_tab2_full(render_fn, secret_key: str, key_session: str):
 # =========================================================
 
 def render_tab2_explorare_avansata(supabase: Client):
-
-    def _render_continut():
-        # Dacă e deschisă o fișă, o afișăm direct
-        if "tab2_fisa_cod" in st.session_state and "tab2_fisa_tabela" in st.session_state:
-            _render_fisa_in_tab2(
-                supabase,
-                st.session_state["tab2_fisa_cod"],
-                st.session_state["tab2_fisa_tabela"],
-            )
-        else:
-            _render_explorare(supabase)
-
     _gate_tab2_full(
-        render_fn   = _render_continut,
+        render_fn   = lambda: _render_explorare(supabase),
         secret_key  = "PASSWORD_TAB2",
         key_session = "tab2_deblocat",
     )
@@ -789,14 +780,12 @@ def _render_explorare(supabase: Client):
                 an_de_la, an_pana_la, data_de_la, data_pana_la,
                 entitate_text, status_text,
             )
-            st.session_state["tab2_results_raw"] = df_filtered.copy()
-            st.session_state["tab2_results_df"]  = df_filtered.copy()
+            st.session_state["tab2_results_df"] = df_filtered.copy()
 
     if "tab2_results_df" not in st.session_state:
         return
 
-    results_df  = st.session_state["tab2_results_df"].copy()
-    results_raw = st.session_state.get("tab2_results_raw", results_df).copy()
+    results_df = st.session_state["tab2_results_df"].copy()
 
     if results_df.empty:
         st.info("Nu au fost identificate inregistrari pentru combinatia selectata.")
@@ -836,13 +825,10 @@ def _render_explorare(supabase: Client):
     )
 
     if limita == "Toate":
-        shown_df  = display_df.copy()
-        shown_raw = results_raw.copy()
+        shown_df = display_df.copy()
     else:
-        shown_df  = display_df.head(int(limita)).copy()
-        shown_raw = results_raw.head(int(limita)).copy()
+        shown_df = display_df.head(int(limita)).copy()
 
-    # Tabel rezultate
     st.dataframe(
         shown_df,
         use_container_width=True,
@@ -850,37 +836,5 @@ def _render_explorare(supabase: Client):
         height=min(40 + len(shown_df) * 35, 520),
     )
 
-    # Butoane export pentru tabel
-    _render_butoane_export_tabel(shown_df)
-
-    # Selector cod → deschide fișa în Tab2
-    if "COD IDENTIFICARE" in shown_df.columns:
-        coduri = [c for c in shown_df["COD IDENTIFICARE"].dropna().unique().tolist() if str(c).strip()]
-    else:
-        coduri = []
-
-    if coduri:
-        st.markdown(
-            "<div style='color:rgba(255,255,255,0.70);font-size:0.88rem;font-weight:700;"
-            "margin-top:14px;margin-bottom:4px;'>"
-            "Fisa completa — selectati codul din lista:</div>",
-            unsafe_allow_html=True,
-        )
-        col_sel, col_btn, _ = st.columns([1, 1, 2])
-        with col_sel:
-            cod_ales = st.selectbox(
-                "Cod",
-                options=["— selectati —"] + coduri,
-                key="tab2_cod_ales",
-                label_visibility="collapsed",
-            )
-        with col_btn:
-            if st.button("📄 Deschide fisa", key="tab2_open_fisa", use_container_width=True):
-                if cod_ales and cod_ales != "— selectati —":
-                    match = results_raw[
-                        results_raw["cod_identificare"].astype(str).str.strip() == str(cod_ales).strip()
-                    ]
-                    tabela_aleasa = match.iloc[0]["_table_name"] if not match.empty else ""
-                    st.session_state["tab2_fisa_cod"]    = str(cod_ales)
-                    st.session_state["tab2_fisa_tabela"] = tabela_aleasa
-                    st.rerun()
+    # Export tabel — identic ca UI cu Tab1
+    _render_export_tabel(supabase, shown_df)
