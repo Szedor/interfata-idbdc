@@ -1,15 +1,13 @@
 # =========================================================
 # IDBDC/explorator/main.py
-# VERSIUNE: 3.9
-# STATUS: ACTUALIZAT - parole Tab2 (exp2026) si Tab3 (rap2026)
+# VERSIUNE: 4.0
+# STATUS: ACTUALIZAT
 # DATA: 2026.06.13
 # =========================================================
-# MODIFICĂRI VERSIUNEA 3.9:
-#   - Tab2 protejat cu parolă din Secrets (PASSWORD_TAB2)
-#   - Tab3 protejat cu parolă din Secrets (PASSWORD_TAB3)
-#   - Autentificare per sesiune: odată introdusă parola corectă,
-#     tab-ul rămâne deblocat până la închiderea sesiunii
-#   - Restul neatins față de versiunea 3.8
+# MODIFICĂRI VERSIUNEA 4.0:
+#   - Tab2: autorizarea mutată în explorare_avansata.py (UI identic Calea1)
+#   - Tab2 → Tab1: click pe cod din tabel deschide Tab1 cu codul completat
+#   - Restul neatins față de versiunea 3.9
 # =========================================================
 
 import streamlit as st
@@ -208,10 +206,15 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
+    # Dacă vine din Tab2 (click pe cod), preluăm codul din session_state
+    cod_initial = st.session_state.pop("tab2_goto_cod", "")
+
     c1, c2, _ = st.columns([1.2, 0.5, 3.3])
     with c1:
         cod = st.text_input(
-            "Cod identificare", value="", key="fisa_cod",
+            "Cod identificare",
+            value=cod_initial,
+            key="fisa_cod",
             placeholder="Ex: 998877 sau 26FDI26",
         ).strip()
 
@@ -282,9 +285,8 @@ def render_fisa_completa(supabase: Client):
 def _gate_tab(key_session: str, secret_key: str, titlu: str,
               descriere: str, render_fn):
     """
-    Afișează un câmp de parolă în fața unui tab.
-    Odată introdusă corect, tab-ul rămâne deblocat pe toată sesiunea.
-    Parola se citește din Streamlit Secrets (secret_key).
+    Folosit doar pentru Tab3 (Raportări).
+    Tab2 are propria autorizare în explorare_avansata.py.
     """
     if st.session_state.get(key_session, False):
         render_fn()
@@ -347,6 +349,13 @@ def run():
     render_header()
     st.divider()
 
+    # Dacă Tab2 a trimis un cod spre Tab1, determinăm tab-ul activ
+    tab_index = 0
+    if st.session_state.get("tab2_goto_tab1", False):
+        st.session_state["tab2_goto_cod"] = st.session_state.pop("tab2_goto_tab1_cod", "")
+        st.session_state.pop("tab2_goto_tab1", None)
+        tab_index = 0  # Tab1
+
     tab1, tab2, tab3 = st.tabs([
         "📄 Fișa completă (după cod)",
         "🔎 Explorare avansată",
@@ -357,13 +366,7 @@ def run():
         render_fisa_completa(supabase)
 
     with tab2:
-        _gate_tab(
-            key_session  = "tab2_deblocat",
-            secret_key   = "PASSWORD_TAB2",
-            titlu        = "🔎 Explorare avansată",
-            descriere    = "Această secțiune este disponibilă în prezent exclusiv operatorilor autorizați.",
-            render_fn    = lambda: render_tab2_explorare_avansata(supabase),
-        )
+        render_tab2_explorare_avansata(supabase)
 
     with tab3:
         _gate_tab(
