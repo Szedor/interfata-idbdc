@@ -840,7 +840,7 @@ def _render_explorare(supabase: Client):
             "Fisa completa — selectati codul din lista:</div>",
             unsafe_allow_html=True,
         )
-        col_sel, col_btn = st.columns([1, 1])
+        col_sel, col_btn, _ = st.columns([1, 1, 2])
         with col_sel:
             cod_ales = st.selectbox(
                 "Cod",
