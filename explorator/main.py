@@ -1,13 +1,14 @@
 # =========================================================
 # IDBDC/explorator/main.py
-# VERSIUNE: 4.0
-# STATUS: ACTUALIZAT
-# DATA: 2026.06.13
+# VERSIUNE: 5.0
+# STATUS: ACTUALIZAT — Tab3 conectat cu Rapoarte, Grafice, Alerte
+# DATA: 2026.06.14
 # =========================================================
-# MODIFICĂRI VERSIUNEA 4.0:
-#   - Tab2: autorizarea mutată în explorare_avansata.py (UI identic Calea1)
-#   - Tab2 → Tab1: click pe cod din tabel deschide Tab1 cu codul completat
-#   - Restul neatins față de versiunea 3.9
+# MODIFICĂRI VERSIUNEA 5.0:
+#   - Tab3 conectat cu sub-taburi: Rapoarte | Grafice (în Rapoarte) | Alerte
+#   - Număr alerte afișat dinamic pe Tab3
+#   - Autentificare export identică cu Tab1
+#   - Restul neatins față de versiunea 4.0
 # =========================================================
 
 import streamlit as st
@@ -24,6 +25,8 @@ from explorator.fise.contracte_cep import run as run_fisa_cep
 from explorator.fise.contracte_terti import run as run_fisa_terti
 from explorator.fise.contracte_speciale import run as run_fisa_speciale
 from explorator.explorare_avansata import render_tab2_explorare_avansata
+from explorator.tab3_rapoarte import render_tab3_rapoarte
+from explorator.tab3_alerte import render_tab3_alerte
 
 ACADEMIC_BLUE = "#0b2a52"
 TITLE_LINE_1 = "🔎 BAZE DE DATE  -  Interogare | Cautare | Consultare avansata"
@@ -206,7 +209,6 @@ def render_fisa_completa(supabase: Client):
         unsafe_allow_html=True,
     )
 
-    # Dacă vine din Tab2 (click pe cod), preluăm codul din session_state
     cod_initial = st.session_state.pop("tab2_goto_cod", "")
 
     c1, c2, _ = st.columns([1.2, 0.5, 3.3])
@@ -230,9 +232,11 @@ def render_fisa_completa(supabase: Client):
                 break
         with c2:
             if cod_found:
-                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>✅</div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>✅</div>",
+                            unsafe_allow_html=True)
             elif cod and len(cod) >= 3:
-                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>❌</div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top:28px;font-size:1.4rem;'>❌</div>",
+                            unsafe_allow_html=True)
 
     if not cod or len(cod) < 3:
         st.info("Introduceți codul identificare (minim 3 caractere).", icon="ℹ️")
@@ -282,12 +286,37 @@ def render_fisa_completa(supabase: Client):
         render_fisa_generica(supabase, cod, tabela_gasita, titlu_fisa_curat)
 
 
+def _render_tab3(supabase: Client):
+    """
+    Tab3 — Raportări cu sub-taburi: Rapoarte & Grafice | Alerte
+    Numărul de alerte este afișat dinamic după calcul.
+    """
+    # Badge alerte din sesiunea anterioară (dacă există)
+    nr_alerte_cache = st.session_state.get("tab3_nr_alerte", None)
+
+    label_alerte = (
+        f"🔔 Alerte  ({nr_alerte_cache})" if nr_alerte_cache is not None
+        else "🔔 Alerte"
+    )
+
+    subtab1, subtab2 = st.tabs([
+        "📊 Rapoarte & Grafice",
+        label_alerte,
+    ])
+
+    with subtab1:
+        render_tab3_rapoarte(supabase)
+
+    with subtab2:
+        nr = render_tab3_alerte(supabase)
+        if nr > 0:
+            # Salvăm numărul pentru a-l afișa pe tab la următorul rerun
+            st.session_state["tab3_nr_alerte"] = nr
+
+
 def _gate_tab(key_session: str, secret_key: str, titlu: str,
               descriere: str, render_fn):
-    """
-    Folosit doar pentru Tab3 (Raportări).
-    Tab2 are propria autorizare în explorare_avansata.py.
-    """
+    """Folosit doar pentru Tab3 — protecție cu parolă."""
     if st.session_state.get(key_session, False):
         render_fn()
         return
@@ -349,17 +378,21 @@ def run():
     render_header()
     st.divider()
 
-    # Dacă Tab2 a trimis un cod spre Tab1, determinăm tab-ul activ
-    tab_index = 0
+    # Dacă Tab2 a trimis un cod spre Tab1
     if st.session_state.get("tab2_goto_tab1", False):
         st.session_state["tab2_goto_cod"] = st.session_state.pop("tab2_goto_tab1_cod", "")
         st.session_state.pop("tab2_goto_tab1", None)
-        tab_index = 0  # Tab1
+
+    # Badge dinamic pe Tab3
+    nr_alerte = st.session_state.get("tab3_nr_alerte", None)
+    label_tab3 = (
+        f"📊 Raportări  🔔{nr_alerte}" if nr_alerte else "📊 Raportări"
+    )
 
     tab1, tab2, tab3 = st.tabs([
         "📄 Fișa completă (după cod)",
         "🔎 Explorare avansată",
-        "📊 Raportări",
+        label_tab3,
     ])
 
     with tab1:
@@ -370,11 +403,11 @@ def run():
 
     with tab3:
         _gate_tab(
-            key_session  = "tab3_deblocat",
-            secret_key   = "PASSWORD_TAB3",
-            titlu        = "📊 Raportări",
-            descriere    = "Această secțiune este disponibilă în prezent exclusiv operatorilor autorizați.",
-            render_fn    = lambda: st.info("Secțiunea Raportări — în pregătire.", icon="📊"),
+            key_session = "tab3_deblocat",
+            secret_key  = "PASSWORD_TAB3",
+            titlu       = "📊 Raportări",
+            descriere   = "Această secțiune este disponibilă operatorilor autorizați.",
+            render_fn   = lambda: _render_tab3(supabase),
         )
 
 
